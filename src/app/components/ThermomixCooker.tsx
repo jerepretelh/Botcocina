@@ -3,7 +3,6 @@ import { ChefHat, Lock, Volume2, VolumeX, UtensilsCrossed } from 'lucide-react';
 import {
   generateRecipeWithAI,
   requestRecipeClarificationWithAI,
-  setLocalAIConfig,
   type AIClarificationQuestion,
   type GeneratedRecipe,
 } from '../lib/recipeAI';
@@ -15,6 +14,7 @@ type QuantityMode = 'people' | 'have';
 type AmountUnit = 'units' | 'grams';
 type ClarificationNumberMode = 'people' | 'quantity';
 type ClarificationQuantityUnit = 'units' | 'grams';
+const APP_VERSION = `v${__APP_VERSION__}`;
 
 interface RecipeCategory {
   id: RecipeCategoryId;
@@ -1498,9 +1498,6 @@ export function ThermomixCooker() {
   const [, setVoiceStatus] = useState('Voz lista');
   const [awaitingNextUnitConfirmation, setAwaitingNextUnitConfirmation] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [localGoogleApiKeyInput, setLocalGoogleApiKeyInput] = useState('');
-  const [localGoogleModelInput, setLocalGoogleModelInput] = useState('gemini-2.5-flash');
-  const [isSavingAIConfig, setIsSavingAIConfig] = useState(false);
   const [aiClarificationQuestions, setAiClarificationQuestions] = useState<AIClarificationQuestion[]>([]);
   const [aiClarificationAnswers, setAiClarificationAnswers] = useState<Record<string, string | number>>({});
   const [aiClarificationNumberModes, setAiClarificationNumberModes] = useState<Record<string, ClarificationNumberMode>>({});
@@ -2183,33 +2180,6 @@ export function ThermomixCooker() {
     setAiError(null);
   };
 
-  const handleSaveLocalAIConfig = async () => {
-    setAiError(null);
-    setAiSuccess(null);
-    if (!localGoogleApiKeyInput.trim()) {
-      setAiError('Pega una GOOGLE_API_KEY para guardarla en esta sesión local.');
-      return;
-    }
-
-    setIsSavingAIConfig(true);
-    try {
-      const result = await setLocalAIConfig({
-        googleApiKey: localGoogleApiKeyInput.trim(),
-        googleModel: localGoogleModelInput.trim() || undefined,
-      });
-      setAiSuccess(
-        result.hasGoogleApiKey
-          ? `API key cargada en servidor local (${result.googleModel ?? 'modelo por defecto'}).`
-          : 'No se pudo activar la API key local.',
-      );
-      setLocalGoogleApiKeyInput('');
-    } catch (error) {
-      setAiError(error instanceof Error ? error.message : 'No se pudo guardar la API key local.');
-    } finally {
-      setIsSavingAIConfig(false);
-    }
-  };
-
   const setClarificationNumberMode = (questionId: string, mode: ClarificationNumberMode) => {
     setAiClarificationNumberModes((prev) => ({
       ...prev,
@@ -2621,7 +2591,10 @@ export function ThermomixCooker() {
               <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <ChefHat className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
-              <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
+              <div className="flex items-end gap-2">
+                <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
+                <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{APP_VERSION}</span>
+              </div>
             </div>
             <button
               onClick={handleVoiceToggle}
@@ -2696,7 +2669,10 @@ export function ThermomixCooker() {
               <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
                 <ChefHat className="w-6 h-6 md:w-8 md:h-8 text-white" />
               </div>
-              <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
+              <div className="flex items-end gap-2">
+                <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
+                <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{APP_VERSION}</span>
+              </div>
             </div>
             <button
               onClick={handleVoiceToggle}
@@ -2774,29 +2750,6 @@ export function ThermomixCooker() {
               <p className="text-sm md:text-base text-white font-semibold">
                 Crear nueva receta con IA
               </p>
-              <div className="bg-slate-800/60 border border-slate-600 rounded-xl p-3 space-y-2">
-                <p className="text-xs text-slate-300 font-semibold">Configurar IA local (temporal)</p>
-                <input
-                  type="password"
-                  value={localGoogleApiKeyInput}
-                  onChange={(event) => setLocalGoogleApiKeyInput(event.target.value)}
-                  placeholder="GOOGLE_API_KEY"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                />
-                <input
-                  value={localGoogleModelInput}
-                  onChange={(event) => setLocalGoogleModelInput(event.target.value)}
-                  placeholder="Modelo (ej: gemini-2.5-flash)"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
-                />
-                <button
-                  onClick={handleSaveLocalAIConfig}
-                  disabled={isSavingAIConfig}
-                  className="w-full bg-slate-700 text-white py-2 rounded-lg text-sm font-semibold border border-slate-500 disabled:opacity-60"
-                >
-                  {isSavingAIConfig ? 'Guardando...' : 'Guardar API key en esta sesión'}
-                </button>
-              </div>
               <textarea
                 value={aiPrompt}
                 onChange={(event) => handleAiPromptChange(event.target.value)}
@@ -3198,7 +3151,10 @@ export function ThermomixCooker() {
               <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center">
                 <ChefHat className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
-              <h1 className="text-lg md:text-xl font-bold text-white">Chef Bot Pro</h1>
+              <div className="flex items-end gap-2">
+                <h1 className="text-lg md:text-xl font-bold text-white">Chef Bot Pro</h1>
+                <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{APP_VERSION}</span>
+              </div>
             </div>
             <button
               onClick={handleVoiceToggle}
@@ -3361,7 +3317,10 @@ export function ThermomixCooker() {
             <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg md:rounded-xl flex items-center justify-center">
               <ChefHat className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h1 className="text-lg md:text-xl font-bold text-white">Chef Bot Pro</h1>
+            <div className="flex items-end gap-2">
+              <h1 className="text-lg md:text-xl font-bold text-white">Chef Bot Pro</h1>
+              <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{APP_VERSION}</span>
+            </div>
           </div>
           <div className="flex gap-2 md:gap-3">
             <button
