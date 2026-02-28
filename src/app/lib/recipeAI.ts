@@ -1,3 +1,5 @@
+import { CookingEquipment } from '../../types';
+
 export type FireLevel = 'low' | 'medium' | 'high';
 
 export interface GeneratedSubStep {
@@ -15,6 +17,8 @@ export interface GeneratedRecipeStep {
   stepNumber: number;
   stepName: string;
   fireLevel?: FireLevel;
+  temperature?: number;
+  equipment?: CookingEquipment;
   subSteps: GeneratedSubStep[];
 }
 
@@ -42,6 +46,7 @@ export interface GeneratedRecipe {
   };
   ingredients: GeneratedIngredient[];
   steps: GeneratedRecipeStep[];
+  equipment?: CookingEquipment;
 }
 
 export interface AIClarificationQuestion {
@@ -80,9 +85,9 @@ export async function generateRecipeWithAI(prompt: string): Promise<GeneratedRec
   if (!response.ok) {
     const message =
       typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof (payload as { error?: unknown }).error === 'string'
+        payload !== null &&
+        'error' in payload &&
+        typeof (payload as { error?: unknown }).error === 'string'
         ? (payload as { error: string }).error
         : 'No se pudo generar la receta con IA.';
     throw new Error(message);
@@ -112,9 +117,9 @@ export async function requestRecipeClarificationWithAI(
   if (!response.ok) {
     const message =
       typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof (payload as { error?: unknown }).error === 'string'
+        payload !== null &&
+        'error' in payload &&
+        typeof (payload as { error?: unknown }).error === 'string'
         ? (payload as { error: string }).error
         : 'No se pudo consultar preguntas previas con IA.';
     throw new Error(message);
