@@ -61,39 +61,6 @@ export interface AIClarificationResult {
   questions: AIClarificationQuestion[];
 }
 
-export async function setLocalAIConfig(config: {
-  googleApiKey?: string;
-  googleModel?: string;
-}): Promise<{ ok: boolean; hasGoogleApiKey: boolean; googleModel?: string }> {
-  const response = await fetch('/api/ai/config', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(config),
-  });
-
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    // keep null payload and throw below
-  }
-
-  if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof (payload as { error?: unknown }).error === 'string'
-        ? (payload as { error: string }).error
-        : 'No se pudo guardar la configuración local de IA.';
-    throw new Error(message);
-  }
-
-  return payload as { ok: boolean; hasGoogleApiKey: boolean; googleModel?: string };
-}
-
 export async function generateRecipeWithAI(prompt: string): Promise<GeneratedRecipe> {
   const response = await fetch('/api/ai/recipe', {
     method: 'POST',
