@@ -9,12 +9,14 @@ import {
 
 type Screen = 'category-select' | 'recipe-select' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking';
 type Portion = 1 | 2 | 4;
-type RecipeCategoryId = 'frituras' | 'arroces' | 'hervidos' | 'sopas' | 'personalizadas';
+type RecipeCategoryId = 'desayunos' | 'almuerzos' | 'cenas' | 'airfryer' | 'frituras' | 'arroces' | 'hervidos' | 'sopas' | 'personalizadas';
 type QuantityMode = 'people' | 'have';
 type AmountUnit = 'units' | 'grams';
 type ClarificationNumberMode = 'people' | 'quantity';
 type ClarificationQuantityUnit = 'units' | 'grams';
 const APP_VERSION = `v${__APP_VERSION__}`;
+const APPROX_GRAMS_PER_UNIT = 250;
+type IngredientsBackScreen = 'recipe-setup' | 'ai-clarify';
 
 interface RecipeCategory {
   id: RecipeCategoryId;
@@ -75,6 +77,70 @@ interface FaceTimerPair {
 
 const recipes: Recipe[] = [
   {
+    id: 'quinua-desayuno',
+    categoryId: 'desayunos',
+    name: 'Quinua del desayuno',
+    icon: '🥣',
+    ingredient: 'Porciones',
+    description: '5 pasos · 20-25 min',
+  },
+  {
+    id: 'pan-palta-huevo',
+    categoryId: 'desayunos',
+    name: 'Pan con palta y huevo',
+    icon: '🥑',
+    ingredient: 'Porciones',
+    description: '4 pasos · 10-15 min',
+  },
+  {
+    id: 'lomo-saltado-casero',
+    categoryId: 'almuerzos',
+    name: 'Lomo saltado casero',
+    icon: '🥩',
+    ingredient: 'Porciones',
+    description: '6 pasos · 30-40 min',
+  },
+  {
+    id: 'arroz-con-pollo-rapido',
+    categoryId: 'almuerzos',
+    name: 'Arroz con pollo rápido',
+    icon: '🍗',
+    ingredient: 'Porciones',
+    description: '6 pasos · 40-50 min',
+  },
+  {
+    id: 'sopa-criolla',
+    categoryId: 'cenas',
+    name: 'Sopa criolla',
+    icon: '🍲',
+    ingredient: 'Porciones',
+    description: '6 pasos · 25-35 min',
+  },
+  {
+    id: 'tortilla-verduras',
+    categoryId: 'cenas',
+    name: 'Tortilla de verduras',
+    icon: '🍳',
+    ingredient: 'Porciones',
+    description: '5 pasos · 20-25 min',
+  },
+  {
+    id: 'airfryer-pollo-crocante',
+    categoryId: 'airfryer',
+    name: 'Pollo crocante Airfryer',
+    icon: '🍗',
+    ingredient: 'Piezas',
+    description: '5 pasos · 25-35 min',
+  },
+  {
+    id: 'airfryer-camote-chips',
+    categoryId: 'airfryer',
+    name: 'Chips de camote Airfryer',
+    icon: '🍠',
+    ingredient: 'Camotes',
+    description: '5 pasos · 20-30 min',
+  },
+  {
     id: 'arroz',
     categoryId: 'arroces',
     name: 'Arroz Perfecto',
@@ -89,6 +155,14 @@ const recipes: Recipe[] = [
     icon: '🧄',
     ingredient: 'Tazas de arroz',
     description: '5 pasos · 30-40 min',
+  },
+  {
+    id: 'arroz-lentejas-compuesto',
+    categoryId: 'arroces',
+    name: 'Arroz con lentejas',
+    icon: '🍛',
+    ingredient: 'Porciones',
+    description: 'Fases guiadas · 45-55 min',
   },
   {
     id: 'huevo-frito',
@@ -125,6 +199,10 @@ const recipes: Recipe[] = [
 ];
 
 const recipeCategories: RecipeCategory[] = [
+  { id: 'desayunos', name: 'Desayunos', icon: '☀️', description: 'Opciones rápidas para iniciar el día' },
+  { id: 'almuerzos', name: 'Almuerzos', icon: '🍽️', description: 'Platos de fondo y comida criolla' },
+  { id: 'cenas', name: 'Cenas', icon: '🌙', description: 'Opciones ligeras y reconfortantes' },
+  { id: 'airfryer', name: 'Airfryer', icon: '🧺', description: 'Recetas pensadas para freidora de aire' },
   { id: 'frituras', name: 'Frituras', icon: '🍳', description: 'Huevo, papas y sartén fuerte' },
   { id: 'arroces', name: 'Arroces', icon: '🍚', description: 'Arroces sueltos y aromáticos' },
   { id: 'hervidos', name: 'Hervidos', icon: '🍲', description: 'Sancochados y cocción en agua' },
@@ -705,6 +783,374 @@ const sopaVerdurasRecipeData: RecipeStep[] = [
   },
 ];
 
+const arrozLentejasCompuestoIngredients: Ingredient[] = [
+  { name: 'Lentejas', emoji: '🫘', indispensable: true, portions: { 1: '1/2 taza', 2: '1 taza', 4: '2 tazas' } },
+  { name: 'Arroz', emoji: '🍚', indispensable: true, portions: { 1: '1/2 taza', 2: '1 taza', 4: '2 tazas' } },
+  { name: 'Agua', emoji: '💧', indispensable: true, portions: { 1: '3 tazas', 2: '6 tazas', 4: '10 tazas' } },
+  { name: 'Ajo picado', emoji: '🧄', indispensable: false, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+  { name: 'Cebolla', emoji: '🧅', indispensable: false, portions: { 1: '1/4 unidad', 2: '1/2 unidad', 4: '1 unidad' } },
+  { name: 'Aceite', emoji: '🫒', indispensable: true, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+  { name: 'Sal', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
+  {
+    stepNumber: 1,
+    stepName: 'Mise en place',
+    fireLevel: 'low',
+    subSteps: [
+      {
+        subStepName: 'Lavar lentejas y arroz por separado',
+        notes: 'Enjuaga hasta que el agua salga clara.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Picar cebolla y ajo',
+        notes: 'Déjalos listos para el sofrito.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+    ],
+  },
+  {
+    stepNumber: 2,
+    stepName: 'Lentejas - hervor inicial',
+    fireLevel: 'high',
+    subSteps: [
+      {
+        subStepName: 'Hervir agua para lentejas',
+        notes: 'Usa olla mediana con parte del agua total.',
+        portions: { 1: 240, 2: 300, 4: 420 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Agregar lentejas',
+        notes: 'Cocina hasta que estén casi tiernas.',
+        portions: { 1: 900, 2: 1080, 4: 1320 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Recordatorio: revisar agua',
+        notes: 'Si baja mucho, agrega un poco de agua caliente.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+    ],
+  },
+  {
+    stepNumber: 3,
+    stepName: 'Arroz - base',
+    fireLevel: 'medium',
+    subSteps: [
+      {
+        subStepName: 'Precalentar olla del arroz',
+        notes: 'Fuego medio, olla seca.',
+        portions: { 1: 45, 2: 60, 4: 75 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Calentar aceite y sofreír ajo/cebolla',
+        notes: 'Sofríe sin quemar el ajo.',
+        portions: { 1: 120, 2: 150, 4: 180 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Nacarar el arroz',
+        notes: 'Agrega arroz y revuelve para sellar.',
+        portions: { 1: 60, 2: 90, 4: 120 },
+        isTimer: true,
+      },
+    ],
+  },
+  {
+    stepNumber: 4,
+    stepName: 'Integración',
+    fireLevel: 'high',
+    subSteps: [
+      {
+        subStepName: 'Unir lentejas casi cocidas con arroz',
+        notes: 'Añade también parte de su caldo.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Ajustar sal y nivel de líquido',
+        notes: 'Debe quedar ligeramente por encima del grano.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Cocción abierta',
+        notes: 'Hasta que baje el líquido en superficie.',
+        portions: { 1: 420, 2: 540, 4: 720 },
+        isTimer: true,
+      },
+    ],
+  },
+  {
+    stepNumber: 5,
+    stepName: 'Graneado',
+    fireLevel: 'low',
+    subSteps: [
+      {
+        subStepName: 'Bajar fuego al mínimo',
+        notes: 'Tapa la olla para terminar al vapor.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Terminar cocción tapada',
+        notes: 'No destapar durante este tramo.',
+        portions: { 1: 720, 2: 900, 4: 1080 },
+        isTimer: true,
+      },
+    ],
+  },
+  {
+    stepNumber: 6,
+    stepName: 'Final',
+    fireLevel: 'low',
+    subSteps: [
+      {
+        subStepName: 'Reposar y esponjar',
+        notes: 'Apaga fuego, reposa y mezcla con tenedor.',
+        portions: { 1: 240, 2: 300, 4: 420 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Servir',
+        notes: 'Prueba sal final antes de llevar a mesa.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+    ],
+  },
+];
+
+const quinuaDesayunoIngredients: Ingredient[] = [
+  { name: 'Quinua lavada', emoji: '🌾', indispensable: true, portions: { 1: '1/3 taza', 2: '2/3 taza', 4: '1 1/3 taza' } },
+  { name: 'Agua', emoji: '💧', indispensable: true, portions: { 1: '1 taza', 2: '2 tazas', 4: '4 tazas' } },
+  { name: 'Leche', emoji: '🥛', indispensable: false, portions: { 1: '1/2 taza', 2: '1 taza', 4: '2 tazas' } },
+  { name: 'Canela', emoji: '🟤', indispensable: false, portions: { 1: 'Pizca', 2: 'Pizca', 4: '1/4 cdta' } },
+  { name: 'Miel o azúcar', emoji: '🍯', indispensable: false, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+];
+
+const quinuaDesayunoRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Lavado', fireLevel: 'low', subSteps: [
+    { subStepName: 'Enjuagar quinua', notes: 'Lava hasta retirar espuma/saponina.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Hervor', fireLevel: 'high', subSteps: [
+    { subStepName: 'Hervir agua', notes: 'Usa olla mediana.', portions: { 1: 180, 2: 240, 4: 360 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Cocción quinua', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Agregar quinua', notes: 'Remueve una vez y baja a fuego medio.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Cocinar', notes: 'Hasta que reviente el grano y esté suave.', portions: { 1: 720, 2: 840, 4: 1020 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Saborizar', fireLevel: 'low', subSteps: [
+    { subStepName: 'Agregar leche, canela y miel', notes: 'Opcional para versión cremosa.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Integrar sabores', notes: 'Remueve constantemente.', portions: { 1: 120, 2: 150, 4: 180 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Servir', fireLevel: 'low', subSteps: [
+    { subStepName: 'Reposar y servir', notes: 'Sirve caliente.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
+const panPaltaHuevoIngredients: Ingredient[] = [
+  { name: 'Pan francés', emoji: '🥖', indispensable: true, portions: { 1: '1 unidad', 2: '2 unidades', 4: '4 unidades' } },
+  { name: 'Palta', emoji: '🥑', indispensable: true, portions: { 1: '1/2 unidad', 2: '1 unidad', 4: '2 unidades' } },
+  { name: 'Huevo', emoji: '🥚', indispensable: true, portions: { 1: '1 unidad', 2: '2 unidades', 4: '4 unidades' } },
+  { name: 'Sal y limón', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+const panPaltaHuevoRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Preparar palta', fireLevel: 'low', subSteps: [
+    { subStepName: 'Majar palta', notes: 'Agrega sal y unas gotas de limón.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Precalentado', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Precalentar sartén', notes: 'Fuego medio.', portions: { 1: 30, 2: 40, 4: 50 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Huevo', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Cocinar huevo', notes: 'Frito o revuelto, al punto deseado.', portions: { 1: 120, 2: 160, 4: 220 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Montaje', fireLevel: 'low', subSteps: [
+    { subStepName: 'Armar pan con palta y huevo', notes: 'Servir de inmediato.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
+const lomoSaltadoIngredients: Ingredient[] = [
+  { name: 'Carne de res en tiras', emoji: '🥩', indispensable: true, portions: { 1: '180 g', 2: '350 g', 4: '700 g' } },
+  { name: 'Cebolla roja', emoji: '🧅', indispensable: true, portions: { 1: '1/2 unidad', 2: '1 unidad', 4: '2 unidades' } },
+  { name: 'Tomate', emoji: '🍅', indispensable: true, portions: { 1: '1 unidad', 2: '2 unidades', 4: '4 unidades' } },
+  { name: 'Sillao y vinagre', emoji: '🥢', indispensable: true, portions: { 1: '1 cda', 2: '2 cdas', 4: '4 cdas' } },
+  { name: 'Papas fritas', emoji: '🍟', indispensable: false, portions: { 1: '1 porción', 2: '2 porciones', 4: '4 porciones' } },
+];
+
+const lomoSaltadoRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Mise en place', fireLevel: 'low', subSteps: [
+    { subStepName: 'Cortar cebolla y tomate', notes: 'En pluma gruesa y gajos.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Sazonar carne', notes: 'Sal y pimienta al gusto.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Precalentado', fireLevel: 'high', subSteps: [
+    { subStepName: 'Precalentar sartén o wok', notes: 'Debe estar bien caliente.', portions: { 1: 60, 2: 75, 4: 90 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Sellar carne', fireLevel: 'high', subSteps: [
+    { subStepName: 'Dorar carne en tandas', notes: 'No llenar demasiado la sartén.', portions: { 1: 150, 2: 210, 4: 300 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Salteado', fireLevel: 'high', subSteps: [
+    { subStepName: 'Agregar cebolla y tomate', notes: 'Saltear rápido para mantener textura.', portions: { 1: 90, 2: 120, 4: 180 }, isTimer: true },
+    { subStepName: 'Agregar sillao y vinagre', notes: 'Flambear opcionalmente.', portions: { 1: 45, 2: 60, 4: 90 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Integración', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Volver a incorporar carne', notes: 'Mezcla por pocos segundos.', portions: { 1: 30, 2: 45, 4: 60 }, isTimer: true },
+  ]},
+  { stepNumber: 6, stepName: 'Servir', fireLevel: 'low', subSteps: [
+    { subStepName: 'Servir con arroz y/o papas', notes: 'Idealmente bien caliente.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
+const arrozConPolloRapidoIngredients: Ingredient[] = [
+  { name: 'Pollo en presas', emoji: '🍗', indispensable: true, portions: { 1: '1 presa', 2: '2 presas', 4: '4 presas' } },
+  { name: 'Arroz', emoji: '🍚', indispensable: true, portions: { 1: '1/2 taza', 2: '1 taza', 4: '2 tazas' } },
+  { name: 'Culantro licuado', emoji: '🌿', indispensable: true, portions: { 1: '2 cdas', 2: '4 cdas', 4: '8 cdas' } },
+  { name: 'Arveja y zanahoria', emoji: '🥕', indispensable: false, portions: { 1: '1/4 taza', 2: '1/2 taza', 4: '1 taza' } },
+  { name: 'Agua o caldo', emoji: '🍲', indispensable: true, portions: { 1: '1 1/2 taza', 2: '3 tazas', 4: '5 1/2 tazas' } },
+];
+
+const arrozConPolloRapidoRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Precalentado', fireLevel: 'high', subSteps: [
+    { subStepName: 'Precalentar olla', notes: 'Fuego medio alto.', portions: { 1: 45, 2: 60, 4: 75 }, isTimer: true },
+  ]},
+  { stepNumber: 2, stepName: 'Dorar pollo', fireLevel: 'high', subSteps: [
+    { subStepName: 'Sellar presas de pollo', notes: 'Dorar por ambos lados.', portions: { 1: 240, 2: 300, 4: 420 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Aderezo', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Agregar culantro y sofreír', notes: 'Integra con ajo/cebolla si tienes.', portions: { 1: 90, 2: 120, 4: 180 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Cocción arroz', fireLevel: 'high', subSteps: [
+    { subStepName: 'Agregar arroz y agua/caldo', notes: 'Ajusta sal.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Cocinar abierto', notes: 'Hasta que baje el líquido visible.', portions: { 1: 420, 2: 540, 4: 720 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Graneado', fireLevel: 'low', subSteps: [
+    { subStepName: 'Bajar fuego y tapar', notes: 'Añade arveja/zanahoria.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Terminar al vapor', notes: 'No destapar durante este tramo.', portions: { 1: 600, 2: 720, 4: 900 }, isTimer: true },
+  ]},
+  { stepNumber: 6, stepName: 'Final', fireLevel: 'low', subSteps: [
+    { subStepName: 'Reposar y servir', notes: 'Esponjar con tenedor.', portions: { 1: 180, 2: 240, 4: 300 }, isTimer: true },
+  ]},
+];
+
+const sopaCriollaIngredients: Ingredient[] = [
+  { name: 'Fideos cabello de ángel', emoji: '🍜', indispensable: true, portions: { 1: '40 g', 2: '80 g', 4: '160 g' } },
+  { name: 'Leche evaporada', emoji: '🥛', indispensable: true, portions: { 1: '1/4 taza', 2: '1/2 taza', 4: '1 taza' } },
+  { name: 'Carne molida', emoji: '🥩', indispensable: false, portions: { 1: '80 g', 2: '160 g', 4: '320 g' } },
+  { name: 'Pan tostado y orégano', emoji: '🍞', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+  { name: 'Caldo o agua', emoji: '🍲', indispensable: true, portions: { 1: '2 tazas', 2: '4 tazas', 4: '8 tazas' } },
+];
+
+const sopaCriollaRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Precalentado', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Precalentar olla', notes: 'Fuego medio.', portions: { 1: 40, 2: 50, 4: 60 }, isTimer: true },
+  ]},
+  { stepNumber: 2, stepName: 'Aderezo', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Sofreír base', notes: 'Cebolla, ajo y opcionalmente carne.', portions: { 1: 180, 2: 240, 4: 320 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Hervor', fireLevel: 'high', subSteps: [
+    { subStepName: 'Agregar caldo o agua', notes: 'Llevar a hervor.', portions: { 1: 240, 2: 300, 4: 420 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Cocción fideo', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Agregar fideos', notes: 'Mueve para que no se peguen.', portions: { 1: 180, 2: 240, 4: 300 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Terminar', fireLevel: 'low', subSteps: [
+    { subStepName: 'Agregar leche evaporada', notes: 'No hervir fuerte después.', portions: { 1: 60, 2: 90, 4: 120 }, isTimer: true },
+    { subStepName: 'Ajustar sal y orégano', notes: 'Rectifica sazón.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 6, stepName: 'Servir', fireLevel: 'low', subSteps: [
+    { subStepName: 'Servir con pan tostado', notes: 'Opcional huevo escalfado.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
+const tortillaVerdurasIngredients: Ingredient[] = [
+  { name: 'Huevos', emoji: '🥚', indispensable: true, portions: { 1: '2 unidades', 2: '4 unidades', 4: '8 unidades' } },
+  { name: 'Verduras picadas', emoji: '🥬', indispensable: true, portions: { 1: '1/2 taza', 2: '1 taza', 4: '2 tazas' } },
+  { name: 'Aceite', emoji: '🫒', indispensable: true, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+  { name: 'Sal y pimienta', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+const tortillaVerdurasRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Mise en place', fireLevel: 'low', subSteps: [
+    { subStepName: 'Batir huevos', notes: 'Agregar sal y pimienta.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Picar verduras', notes: 'Corte pequeño y uniforme.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Precalentado', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Precalentar sartén', notes: 'Fuego medio.', portions: { 1: 35, 2: 45, 4: 60 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Salteado', fireLevel: 'medium', subSteps: [
+    { subStepName: 'Saltear verduras', notes: 'Ablandar ligeramente.', portions: { 1: 120, 2: 150, 4: 210 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Cuajado', fireLevel: 'low', subSteps: [
+    { subStepName: 'Agregar huevo batido', notes: 'Mueve bordes suavemente.', portions: { 1: 180, 2: 240, 4: 320 }, isTimer: true },
+    { subStepName: 'Voltear tortilla', notes: 'Usa tapa/plato para girar con cuidado.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Terminar lado B', notes: 'Cocina hasta firme pero jugosa.', portions: { 1: 120, 2: 150, 4: 210 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Servir', fireLevel: 'low', subSteps: [
+    { subStepName: 'Reposar y servir', notes: 'Ideal con ensalada fresca.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
+const airfryerPolloIngredients: Ingredient[] = [
+  { name: 'Pollo en piezas', emoji: '🍗', indispensable: true, portions: { 1: '2 piezas', 2: '4 piezas', 4: '8 piezas' } },
+  { name: 'Aceite en spray', emoji: '🫒', indispensable: true, portions: { 1: 'Ligero', 2: 'Ligero', 4: 'Ligero' } },
+  { name: 'Ajo y paprika', emoji: '🧄', indispensable: false, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+  { name: 'Sal y pimienta', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+const airfryerPolloRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Preparación', fireLevel: 'low', subSteps: [
+    { subStepName: 'Sazonar pollo', notes: 'Seca bien antes de sazonar.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Precalentar Airfryer', fireLevel: 'high', subSteps: [
+    { subStepName: 'Precalentar a 200°C', notes: 'Canasta vacía.', portions: { 1: 240, 2: 240, 4: 300 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Primera cocción', fireLevel: 'high', subSteps: [
+    { subStepName: 'Cocinar lado A', notes: 'No sobrecargar canasta.', portions: { 1: 540, 2: 600, 4: 720 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Volteo y final', fireLevel: 'high', subSteps: [
+    { subStepName: 'Recordatorio: voltear pollo', notes: 'Rocía un poco más de spray si hace falta.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Cocinar lado B', notes: 'Hasta dorado y jugoso.', portions: { 1: 480, 2: 540, 4: 660 }, isTimer: true },
+  ]},
+  { stepNumber: 5, stepName: 'Reposo', fireLevel: 'low', subSteps: [
+    { subStepName: 'Reposar antes de servir', notes: '5 minutos fuera de la canasta.', portions: { 1: 300, 2: 300, 4: 300 }, isTimer: true },
+  ]},
+];
+
+const airfryerCamoteIngredients: Ingredient[] = [
+  { name: 'Camote', emoji: '🍠', indispensable: true, portions: { 1: '1 unidad', 2: '2 unidades', 4: '4 unidades' } },
+  { name: 'Aceite en spray', emoji: '🫒', indispensable: true, portions: { 1: 'Ligero', 2: 'Ligero', 4: 'Ligero' } },
+  { name: 'Sal', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+const airfryerCamoteRecipeData: RecipeStep[] = [
+  { stepNumber: 1, stepName: 'Preparación', fireLevel: 'low', subSteps: [
+    { subStepName: 'Cortar camote en láminas finas', notes: 'Mientras más parejo, mejor cocción.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Secar y rociar aceite', notes: 'No empapar, solo película ligera.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 2, stepName: 'Precalentar Airfryer', fireLevel: 'high', subSteps: [
+    { subStepName: 'Precalentar a 190°C', notes: 'Canasta vacía.', portions: { 1: 180, 2: 180, 4: 240 }, isTimer: true },
+  ]},
+  { stepNumber: 3, stepName: 'Primera tanda', fireLevel: 'high', subSteps: [
+    { subStepName: 'Cocinar chips tramo 1', notes: 'Distribuye en una sola capa.', portions: { 1: 300, 2: 360, 4: 420 }, isTimer: true },
+    { subStepName: 'Recordatorio: mover chips', notes: 'Sacude canasta para dorado parejo.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    { subStepName: 'Cocinar chips tramo 2', notes: 'Vigila para evitar quemar puntas.', portions: { 1: 240, 2: 300, 4: 360 }, isTimer: true },
+  ]},
+  { stepNumber: 4, stepName: 'Segunda tanda (si aplica)', fireLevel: 'high', subSteps: [
+    { subStepName: 'Repetir con el resto', notes: 'Misma lógica por tandas.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+  { stepNumber: 5, stepName: 'Final', fireLevel: 'low', subSteps: [
+    { subStepName: 'Agregar sal y servir', notes: 'Servir apenas salgan para máxima crocancia.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+  ]},
+];
+
 const initialRecipeContent: Record<string, RecipeContent> = {
   arroz: {
     ingredients: arrozIngredients,
@@ -741,6 +1187,60 @@ const initialRecipeContent: Record<string, RecipeContent> = {
     steps: sopaVerdurasRecipeData,
     tip: 'Corta las verduras de tamaño similar para una cocción pareja.',
     portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'arroz-lentejas-compuesto': {
+    ingredients: arrozLentejasCompuestoIngredients,
+    steps: arrozLentejasCompuestoRecipeData,
+    tip: 'Empieza por lentejas y avanza el arroz en paralelo; al unir, controla siempre el nivel de líquido.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'quinua-desayuno': {
+    ingredients: quinuaDesayunoIngredients,
+    steps: quinuaDesayunoRecipeData,
+    tip: 'Lava muy bien la quinua antes de cocinar para evitar sabor amargo.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'pan-palta-huevo': {
+    ingredients: panPaltaHuevoIngredients,
+    steps: panPaltaHuevoRecipeData,
+    tip: 'Para mejor textura, tuesta ligeramente el pan justo antes de montar.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'lomo-saltado-casero': {
+    ingredients: lomoSaltadoIngredients,
+    steps: lomoSaltadoRecipeData,
+    tip: 'El secreto está en fuego alto y salteado rápido para no aguachentar el tomate.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'arroz-con-pollo-rapido': {
+    ingredients: arrozConPolloRapidoIngredients,
+    steps: arrozConPolloRapidoRecipeData,
+    tip: 'Usa culantro fresco para color y aroma más intenso.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'sopa-criolla': {
+    ingredients: sopaCriollaIngredients,
+    steps: sopaCriollaRecipeData,
+    tip: 'No dejes hervir fuerte luego de agregar leche para mantener textura cremosa.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'tortilla-verduras': {
+    ingredients: tortillaVerdurasIngredients,
+    steps: tortillaVerdurasRecipeData,
+    tip: 'Cocina a fuego bajo para que cuaje parejo y no se queme la base.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'airfryer-pollo-crocante': {
+    ingredients: airfryerPolloIngredients,
+    steps: airfryerPolloRecipeData,
+    tip: 'Seca bien el pollo y evita encimar piezas para un dorado uniforme.',
+    portionLabels: { singular: 'pieza', plural: 'piezas' },
+  },
+  'airfryer-camote-chips': {
+    ingredients: airfryerCamoteIngredients,
+    steps: airfryerCamoteRecipeData,
+    tip: 'Corta muy parejo y cocina por tandas para mejor crocancia.',
+    portionLabels: { singular: 'camote', plural: 'camotes' },
   },
 };
 
@@ -893,7 +1393,7 @@ function inferSizingFromClarifications(
 
     return {
       quantityMode: isPeople ? 'people' : 'have',
-      count: clampNumber(count, isPeople ? 1 : (selectedQuantityUnit === 'grams' ? 50 : 1), isPeople ? 8 : (selectedQuantityUnit === 'grams' ? 5000 : 20)),
+      count: clampNumber(count, isPeople ? 1 : (selectedQuantityUnit === 'grams' ? 50 : 1), isPeople ? 12 : (selectedQuantityUnit === 'grams' ? 10000 : 99)),
       amountUnit: isPeople ? undefined : selectedQuantityUnit,
     };
   }
@@ -1484,6 +1984,7 @@ export function ThermomixCooker() {
   const [produceSize, setProduceSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [timerScaleFactor, setTimerScaleFactor] = useState(1);
   const [timingAdjustedLabel, setTimingAdjustedLabel] = useState('Tiempo estándar');
+  const [ingredientsBackScreen, setIngredientsBackScreen] = useState<IngredientsBackScreen>('recipe-setup');
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [currentSubStepIndex, setCurrentSubStepIndex] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -2060,7 +2561,7 @@ export function ThermomixCooker() {
   };
 
   const handleBackToAIPrompt = () => {
-    setScreen('recipe-select');
+    setScreen('category-select');
     setAiClarificationQuestions([]);
     setAiClarificationAnswers({});
     setAiClarificationNumberModes({});
@@ -2079,7 +2580,25 @@ export function ThermomixCooker() {
         ? 'Tiempo estándar'
         : `Tiempo ajustado x${setupScaleFactor.toFixed(2)}`,
     );
+    setIngredientsBackScreen('recipe-setup');
     setScreen('ingredients');
+  };
+
+  const handleSetupAmountUnitChange = (nextUnit: AmountUnit) => {
+    if (nextUnit === amountUnit) return;
+    const current = availableCount;
+
+    let converted = current;
+    if (amountUnit === 'units' && nextUnit === 'grams') {
+      converted = Math.round((current * APPROX_GRAMS_PER_UNIT) / 50) * 50;
+      converted = clampNumber(converted, 50, 5000);
+    } else if (amountUnit === 'grams' && nextUnit === 'units') {
+      converted = Math.max(1, Math.round(current / APPROX_GRAMS_PER_UNIT));
+      converted = clampNumber(converted, 1, 20);
+    }
+
+    setAmountUnit(nextUnit);
+    setAvailableCount(converted);
   };
 
   const handleStartCooking = () => {
@@ -2140,6 +2659,7 @@ export function ThermomixCooker() {
     setProduceSize('medium');
     setTimerScaleFactor(1);
     setTimingAdjustedLabel('Tiempo estándar');
+    setIngredientsBackScreen('recipe-setup');
     setCookingSteps(null);
     setActiveStepLoop(null);
     setCurrentStepIndex(0);
@@ -2181,6 +2701,21 @@ export function ThermomixCooker() {
   };
 
   const setClarificationNumberMode = (questionId: string, mode: ClarificationNumberMode) => {
+    const currentMode = aiClarificationNumberModes[questionId] ?? 'quantity';
+    const currentQuantityUnit = aiClarificationQuantityUnits[questionId] ?? 'units';
+    const currentRaw = aiClarificationAnswers[questionId];
+    const current = typeof currentRaw === 'number' && Number.isFinite(currentRaw) ? currentRaw : 1;
+
+    let nextValue = current;
+    if (currentMode === 'quantity' && mode === 'people') {
+      const unitsEquivalent = currentQuantityUnit === 'grams'
+        ? Math.max(1, Math.round(current / APPROX_GRAMS_PER_UNIT))
+        : Math.round(current);
+      nextValue = clampNumber(unitsEquivalent, 1, 12);
+    } else if (currentMode === 'people' && mode === 'quantity') {
+      nextValue = clampNumber(Math.round(current), 1, 99);
+    }
+
     setAiClarificationNumberModes((prev) => ({
       ...prev,
       [questionId]: mode,
@@ -2191,14 +2726,29 @@ export function ThermomixCooker() {
         [questionId]: 'units',
       }));
     }
+    setClarificationAnswer(questionId, nextValue);
     setAiError(null);
   };
 
   const setClarificationQuantityUnit = (questionId: string, unit: ClarificationQuantityUnit) => {
+    const currentUnit = aiClarificationQuantityUnits[questionId] ?? 'units';
+    const currentRaw = aiClarificationAnswers[questionId];
+    const current = typeof currentRaw === 'number' && Number.isFinite(currentRaw) ? currentRaw : 1;
+
+    let nextValue = current;
+    if (currentUnit !== unit) {
+      if (currentUnit === 'units' && unit === 'grams') {
+        nextValue = clampNumber(Math.round((current * APPROX_GRAMS_PER_UNIT) / 50) * 50, 50, 10000);
+      } else if (currentUnit === 'grams' && unit === 'units') {
+        nextValue = clampNumber(Math.max(1, Math.round(current / APPROX_GRAMS_PER_UNIT)), 1, 99);
+      }
+    }
+
     setAiClarificationQuantityUnits((prev) => ({
       ...prev,
       [questionId]: unit,
     }));
+    setClarificationAnswer(questionId, nextValue);
     setAiError(null);
   };
 
@@ -2249,12 +2799,87 @@ export function ThermomixCooker() {
       return value === undefined || value === null || value === '';
     });
 
+  const normalizeQuestionShape = (
+    question: AIClarificationQuestion,
+    normalizedPrompt: string,
+  ): AIClarificationQuestion => {
+    const text = normalizeText(`${question.id} ${question.question}`);
+
+    if (question.type === 'text') {
+      if (text.includes('tipo de papa') || text.includes('papa tienes') || text.includes('papa prefieres')) {
+        return {
+          ...question,
+          type: 'single_choice',
+          options: ['Canchán', 'Huayro', 'Yungay', 'Única', 'Blanca', 'Otra'],
+        };
+      }
+      if (text.includes('tipo de camote') || text.includes('camote prefieres')) {
+        return {
+          ...question,
+          type: 'single_choice',
+          options: ['Camote amarillo', 'Camote morado', 'Camote blanco', 'Otro'],
+        };
+      }
+      if (text.includes('tipo de pescado')) {
+        return {
+          ...question,
+          type: 'single_choice',
+          options: ['Perico', 'Lenguado', 'Tilapia', 'Merluza', 'Bonito', 'Otro'],
+        };
+      }
+      if (text.includes('corte') || text.includes('como cortar') || text.includes('trozos') || text.includes('filete')) {
+        return {
+          ...question,
+          type: 'single_choice',
+          options: ['Filete', 'Trozos medianos', 'Tiras', 'Bastones', 'Rodajas', 'Otro corte'],
+        };
+      }
+      if (
+        text.includes('cuantas personas') ||
+        text.includes('cuanta') ||
+        text.includes('cantidad') ||
+        text.includes('gramos') ||
+        text.includes('kilos') ||
+        text.includes('cuantos')
+      ) {
+        return {
+          ...question,
+          type: 'number',
+          min: 1,
+          max: text.includes('gramos') || text.includes('kilos') ? 5000 : 20,
+          step: text.includes('gramos') || text.includes('kilos') ? 50 : 1,
+          unit: text.includes('gramos') || text.includes('kilos') ? 'g' : 'unidades',
+        };
+      }
+    }
+
+    if (
+      question.type === 'single_choice' &&
+      (!Array.isArray(question.options) || question.options.length === 0)
+    ) {
+      if (normalizedPrompt.includes('papa') || normalizedPrompt.includes('camote')) {
+        return {
+          ...question,
+          options: ['Blanca', 'Canchán', 'Huayro', 'Yungay', 'Otra'],
+        };
+      }
+      if (normalizedPrompt.includes('pescado')) {
+        return {
+          ...question,
+          options: ['Perico', 'Tilapia', 'Merluza', 'Bonito', 'Otro'],
+        };
+      }
+    }
+
+    return question;
+  };
+
   const enrichClarificationQuestions = (
     userPrompt: string,
     questions: AIClarificationQuestion[],
   ): AIClarificationQuestion[] => {
     const normalizedPrompt = normalizeText(userPrompt);
-    const result = [...questions];
+    const result = questions.map((question) => normalizeQuestionShape(question, normalizedPrompt));
 
     const hasCutQuestion = result.some((question) => {
       const text = normalizeText(`${question.id} ${question.question}`);
@@ -2426,8 +3051,10 @@ export function ThermomixCooker() {
             ? 'Tiempo estándar'
             : `Tiempo ajustado x${autoScaleFactor.toFixed(2)}`,
         );
+        setIngredientsBackScreen('ai-clarify');
         setScreen('ingredients');
       } else {
+        setIngredientsBackScreen('recipe-setup');
         setScreen('recipe-setup');
       }
       setCurrentStepIndex(0);
@@ -2441,11 +3068,13 @@ export function ThermomixCooker() {
       setPendingStirAdvance(false);
       setStirPromptCountdown(0);
       setAwaitingNextUnitConfirmation(false);
-      setAiPrompt('');
-      setAiClarificationQuestions([]);
-      setAiClarificationAnswers({});
-      setAiClarificationNumberModes({});
-      setAiClarificationQuantityUnits({});
+      if (!clarifiedSizing) {
+        setAiPrompt('');
+        setAiClarificationQuestions([]);
+        setAiClarificationAnswers({});
+        setAiClarificationNumberModes({});
+        setAiClarificationQuantityUnits({});
+      }
       setAiSuccess(
         clarifiedSizing?.quantityMode === 'have'
           ? `Receta "${newRecipe.name}" agregada con base "lo que tienes" (${clarifiedSizing.count} ${clarifiedSizing.amountUnit === 'grams' ? 'g' : 'unid'}).`
@@ -2611,10 +3240,35 @@ export function ThermomixCooker() {
             </button>
           </div>
 
-          {/* Title */}
-          <div className="text-center mb-6 md:mb-8">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Elige una categoría</h2>
-            <p className="text-sm md:text-base text-slate-400">Selecciona el tipo de preparación</p>
+          {/* Primary Action */}
+          <div className="mb-5 md:mb-6 bg-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-700 space-y-3">
+            <p className="text-sm md:text-base text-white font-semibold">
+              Crear nueva receta con IA
+            </p>
+            <textarea
+              value={aiPrompt}
+              onChange={(event) => handleAiPromptChange(event.target.value)}
+              placeholder="Ej: salmón al ajillo en sartén, con tiempos para 1, 2 y 4 porciones"
+              className="w-full min-h-24 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm md:text-base text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500"
+            />
+            {aiError && <p className="text-sm text-red-400">{aiError}</p>}
+            {aiSuccess && <p className="text-sm text-green-400">{aiSuccess}</p>}
+            <button
+              onClick={handleGenerateRecipe}
+              disabled={isGeneratingRecipe || isCheckingClarifications}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isCheckingClarifications
+                ? 'Consultando preguntas...'
+                : isGeneratingRecipe
+                  ? 'Generando receta...'
+                  : 'Agregar receta con IA'}
+            </button>
+          </div>
+
+          {/* Secondary Title */}
+          <div className="mb-4 md:mb-5">
+            <p className="text-sm md:text-base text-slate-300 font-semibold">Recetas por categoría</p>
           </div>
 
           {/* Categories */}
@@ -2695,7 +3349,7 @@ export function ThermomixCooker() {
               {selectedCategoryMeta?.icon} {selectedCategoryMeta?.name ?? 'Recetas'}
             </h2>
             <p className="text-sm md:text-base text-slate-400">
-              Elige una receta o crea una personalizada con IA
+              Elige una receta
             </p>
           </div>
 
@@ -2746,30 +3400,6 @@ export function ThermomixCooker() {
               </div>
             )}
 
-            <div className="mt-4 bg-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-slate-700 space-y-3">
-              <p className="text-sm md:text-base text-white font-semibold">
-                Crear nueva receta con IA
-              </p>
-              <textarea
-                value={aiPrompt}
-                onChange={(event) => handleAiPromptChange(event.target.value)}
-                placeholder="Ej: salmón al ajillo en sartén, con tiempos para 1, 2 y 4 porciones"
-                className="w-full min-h-24 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm md:text-base text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500"
-              />
-              {aiError && <p className="text-sm text-red-400">{aiError}</p>}
-              {aiSuccess && <p className="text-sm text-green-400">{aiSuccess}</p>}
-              <button
-                onClick={handleGenerateRecipe}
-                disabled={isGeneratingRecipe || isCheckingClarifications}
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {isCheckingClarifications
-                  ? 'Consultando preguntas...'
-                  : isGeneratingRecipe
-                    ? 'Generando receta...'
-                    : 'Agregar receta con IA'}
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -2790,11 +3420,12 @@ export function ThermomixCooker() {
           </div>
 
           <div className="bg-slate-900/70 border border-slate-700 rounded-2xl p-4 md:p-5 space-y-4 text-left">
-            {aiClarificationQuestions.map((question) => {
+            {aiClarificationQuestions.map((question, index) => {
               const answer = aiClarificationAnswers[question.id];
               if (question.type === 'single_choice' && Array.isArray(question.options)) {
                 return (
-                  <div key={question.id}>
+                  <div key={question.id} className="rounded-xl bg-slate-950/50 border border-slate-700 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-orange-300 mb-1">Pregunta {index + 1}</p>
                     <p className="text-sm text-slate-200 mb-2">
                       {question.question}
                       {question.required ? ' *' : ''}
@@ -2820,16 +3451,17 @@ export function ThermomixCooker() {
               if (question.type === 'number') {
                 const unitMode = aiClarificationNumberModes[question.id] ?? 'quantity';
                 const quantityUnit = aiClarificationQuantityUnits[question.id] ?? 'units';
+                const isQuantityMode = unitMode === 'quantity';
                 const min = unitMode === 'people'
                   ? 1
                   : quantityUnit === 'grams'
                     ? 50
                     : 1;
                 const max = unitMode === 'people'
-                  ? 8
+                  ? 12
                   : quantityUnit === 'grams'
-                    ? 5000
-                    : 20;
+                    ? 10000
+                    : 99;
                 const step = unitMode === 'people'
                   ? 1
                   : quantityUnit === 'grams'
@@ -2838,80 +3470,61 @@ export function ThermomixCooker() {
                 const rawCurrentValue = typeof answer === 'number' ? answer : min;
                 const currentValue = clampNumber(rawCurrentValue, min, max);
                 return (
-                  <div key={question.id}>
+                  <div key={question.id} className="rounded-xl bg-slate-950/50 border border-slate-700 p-3">
+                    <p className="text-[11px] uppercase tracking-wide text-orange-300 mb-1">Pregunta {index + 1}</p>
                     <p className="text-sm text-slate-200 mb-2">
                       {question.question}
                       {question.required ? ' *' : ''}
                     </p>
-                    <div className="flex gap-2 mb-3">
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Base de cálculo</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3 rounded-xl p-1 bg-slate-900/70 border border-slate-700">
                       <button
-                        onClick={() => {
-                          setClarificationNumberMode(question.id, 'quantity');
-                          const current = typeof aiClarificationAnswers[question.id] === 'number'
-                            ? (aiClarificationAnswers[question.id] as number)
-                            : 1;
-                          setClarificationAnswer(question.id, clampNumber(current, 1, 20));
-                        }}
-                        className={`px-3 py-1.5 text-xs rounded-full border ${
+                        onClick={() => setClarificationNumberMode(question.id, 'quantity')}
+                        className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
                           unitMode === 'quantity'
                             ? 'bg-orange-500 text-white border-orange-500'
-                            : 'text-slate-100 border-slate-500'
+                            : 'text-slate-100 border-slate-700 bg-slate-900/30'
                         }`}
                       >
                         Cantidad
                       </button>
                       <button
-                        onClick={() => {
-                          setClarificationNumberMode(question.id, 'people');
-                          const current = typeof aiClarificationAnswers[question.id] === 'number'
-                            ? (aiClarificationAnswers[question.id] as number)
-                            : 1;
-                          setClarificationAnswer(question.id, clampNumber(current, 1, 8));
-                        }}
-                        className={`px-3 py-1.5 text-xs rounded-full border ${
+                        onClick={() => setClarificationNumberMode(question.id, 'people')}
+                        className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
                           unitMode === 'people'
                             ? 'bg-orange-500 text-white border-orange-500'
-                            : 'text-slate-100 border-slate-500'
+                            : 'text-slate-100 border-slate-700 bg-slate-900/30'
                         }`}
                       >
                         Personas
                       </button>
                     </div>
-                    {unitMode === 'quantity' && (
-                      <div className="flex gap-2 mb-3">
+                    {isQuantityMode && (
+                      <>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-400 mb-1">Unidad de cantidad</p>
+                        <div className="grid grid-cols-2 gap-2 mb-3 rounded-xl p-1 bg-slate-900/70 border border-slate-700">
                         <button
-                          onClick={() => {
-                            setClarificationQuantityUnit(question.id, 'units');
-                            const current = typeof aiClarificationAnswers[question.id] === 'number'
-                              ? (aiClarificationAnswers[question.id] as number)
-                              : 1;
-                            setClarificationAnswer(question.id, clampNumber(current, 1, 20));
-                          }}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
+                          onClick={() => setClarificationQuantityUnit(question.id, 'units')}
+                          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
                             quantityUnit === 'units'
                               ? 'bg-orange-500 text-white border-orange-500'
-                              : 'text-slate-100 border-slate-500'
+                              : 'text-slate-100 border-slate-700 bg-slate-900/30'
                           }`}
                         >
                           Unidades
                         </button>
                         <button
-                          onClick={() => {
-                            setClarificationQuantityUnit(question.id, 'grams');
-                            const current = typeof aiClarificationAnswers[question.id] === 'number'
-                              ? (aiClarificationAnswers[question.id] as number)
-                              : 50;
-                            setClarificationAnswer(question.id, clampNumber(current, 50, 5000));
-                          }}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
+                          onClick={() => setClarificationQuantityUnit(question.id, 'grams')}
+                          className={`px-3 py-2 text-xs rounded-lg border transition-colors ${
                             quantityUnit === 'grams'
                               ? 'bg-orange-500 text-white border-orange-500'
-                              : 'text-slate-100 border-slate-500'
+                              : 'text-slate-100 border-slate-700 bg-slate-900/30'
                           }`}
                         >
                           Gramos
                         </button>
-                      </div>
+                        </div>
+                      </>
                     )}
                     <div className="flex items-center justify-center gap-4">
                       <button
@@ -2934,7 +3547,8 @@ export function ThermomixCooker() {
                 );
               }
               return (
-                <div key={question.id}>
+                <div key={question.id} className="rounded-xl bg-slate-950/50 border border-slate-700 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-orange-300 mb-1">Pregunta {index + 1}</p>
                   <p className="text-sm text-slate-200 mb-2">
                     {question.question}
                     {question.required ? ' *' : ''}
@@ -2976,13 +3590,13 @@ export function ThermomixCooker() {
   // Recipe Setup Screen
   if (screen === 'recipe-setup') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-blue-900 to-indigo-800 flex items-center justify-center p-4">
-        <div className="w-full max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-orange-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center bg-slate-900/70 border border-slate-700 rounded-2xl md:rounded-3xl p-5 md:p-6">
           <div className="mb-8 md:mb-12 px-4">
             <h2 className="text-2xl md:text-4xl font-bold text-white mb-3 md:mb-4">
               Configura tu receta
             </h2>
-            <p className="text-sm md:text-base text-blue-200">Define la base de cálculo antes de cocinar</p>
+            <p className="text-sm md:text-base text-slate-300">Define la base de cálculo antes de cocinar</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mb-5">
@@ -2990,8 +3604,8 @@ export function ThermomixCooker() {
               onClick={() => setQuantityMode('people')}
               className={`py-3 rounded-xl border text-sm font-semibold ${
                 quantityMode === 'people'
-                  ? 'bg-white text-indigo-900 border-white'
-                  : 'bg-indigo-800/40 text-white border-indigo-300/40'
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-slate-900/30 text-white border-slate-600'
               }`}
             >
               Para personas
@@ -3000,8 +3614,8 @@ export function ThermomixCooker() {
               onClick={() => setQuantityMode('have')}
               className={`py-3 rounded-xl border text-sm font-semibold ${
                 quantityMode === 'have'
-                  ? 'bg-white text-indigo-900 border-white'
-                  : 'bg-indigo-800/40 text-white border-indigo-300/40'
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-slate-900/30 text-white border-slate-600'
               }`}
             >
               Con lo que tengo
@@ -3011,17 +3625,17 @@ export function ThermomixCooker() {
           {quantityMode === 'have' && (
             <div className="flex justify-center gap-2 mb-4">
               <button
-                onClick={() => setAmountUnit('units')}
+                onClick={() => handleSetupAmountUnitChange('units')}
                 className={`px-3 py-1.5 text-xs rounded-full border ${
-                  amountUnit === 'units' ? 'bg-white text-indigo-900 border-white' : 'text-white border-indigo-300/40'
+                  amountUnit === 'units' ? 'bg-orange-500 text-white border-orange-500' : 'text-white border-slate-600'
                 }`}
               >
                 Unidades
               </button>
               <button
-                onClick={() => setAmountUnit('grams')}
+                onClick={() => handleSetupAmountUnitChange('grams')}
                 className={`px-3 py-1.5 text-xs rounded-full border ${
-                  amountUnit === 'grams' ? 'bg-white text-indigo-900 border-white' : 'text-white border-indigo-300/40'
+                  amountUnit === 'grams' ? 'bg-orange-500 text-white border-orange-500' : 'text-white border-slate-600'
                 }`}
               >
                 Gramos
@@ -3036,9 +3650,9 @@ export function ThermomixCooker() {
                   ? setPeopleCount((prev) => Math.max(1, prev - 1))
                   : setAvailableCount((prev) => Math.max(1, prev - (amountUnit === 'grams' ? 50 : 1)))
               }
-              className="w-16 h-16 md:w-24 md:h-24 bg-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
+              className="w-16 h-16 md:w-24 md:h-24 bg-slate-100 rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
             >
-              <span className="text-4xl md:text-5xl font-bold text-indigo-900">−</span>
+              <span className="text-4xl md:text-5xl font-bold text-slate-900">−</span>
             </button>
 
             <div className="w-24 h-24 md:w-32 md:h-32 flex items-center justify-center">
@@ -3053,23 +3667,23 @@ export function ThermomixCooker() {
                   ? setPeopleCount((prev) => Math.min(8, prev + 1))
                   : setAvailableCount((prev) => Math.min(amountUnit === 'grams' ? 5000 : 20, prev + (amountUnit === 'grams' ? 50 : 1)))
               }
-              className="w-16 h-16 md:w-24 md:h-24 bg-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
+              className="w-16 h-16 md:w-24 md:h-24 bg-slate-100 rounded-full flex items-center justify-center shadow-2xl hover:scale-105 transition-transform"
             >
-              <span className="text-4xl md:text-5xl font-bold text-indigo-900">+</span>
+              <span className="text-4xl md:text-5xl font-bold text-slate-900">+</span>
             </button>
           </div>
 
-          <p className="text-sm text-blue-100 mb-6">
+          <p className="text-sm text-slate-200 mb-6">
             {quantityMode === 'people'
               ? `Para ${peopleCount} persona${peopleCount === 1 ? '' : 's'}`
               : `Tienes ${availableCount} ${amountUnit === 'grams' ? 'g' : selectedRecipe?.ingredient ?? 'unidades'}`}
           </p>
 
           {isTubersBoilRecipe && (
-            <div className="mb-6 space-y-3 bg-indigo-800/35 border border-indigo-300/25 rounded-2xl p-4 text-left">
-              <p className="text-xs uppercase tracking-wide text-blue-200">Ajuste de sancochado</p>
+            <div className="mb-6 space-y-3 bg-slate-950/60 border border-slate-700 rounded-2xl p-4 text-left">
+              <p className="text-xs uppercase tracking-wide text-slate-300">Ajuste de sancochado</p>
               <div>
-                <p className="text-xs text-blue-200 mb-1">Tipo</p>
+                <p className="text-xs text-slate-300 mb-1">Tipo</p>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { id: 'blanca', label: 'Papa blanca' },
@@ -3083,7 +3697,7 @@ export function ThermomixCooker() {
                       key={option.id}
                       onClick={() => setProduceType(option.id)}
                       className={`px-2.5 py-1.5 text-xs rounded-full border ${
-                        produceType === option.id ? 'bg-white text-indigo-900 border-white' : 'text-white border-indigo-300/40'
+                        produceType === option.id ? 'bg-orange-500 text-white border-orange-500' : 'text-white border-slate-600'
                       }`}
                     >
                       {option.label}
@@ -3092,7 +3706,7 @@ export function ThermomixCooker() {
                 </div>
               </div>
               <div>
-                <p className="text-xs text-blue-200 mb-1">Tamaño</p>
+                <p className="text-xs text-slate-300 mb-1">Tamaño</p>
                 <div className="flex gap-2">
                   {[
                     { id: 'small', label: 'Pequeña' },
@@ -3103,7 +3717,7 @@ export function ThermomixCooker() {
                       key={option.id}
                       onClick={() => setProduceSize(option.id as 'small' | 'medium' | 'large')}
                       className={`px-2.5 py-1.5 text-xs rounded-full border ${
-                        produceSize === option.id ? 'bg-white text-indigo-900 border-white' : 'text-white border-indigo-300/40'
+                        produceSize === option.id ? 'bg-orange-500 text-white border-orange-500' : 'text-white border-slate-600'
                       }`}
                     >
                       {option.label}
@@ -3114,7 +3728,7 @@ export function ThermomixCooker() {
             </div>
           )}
 
-          <div className="mb-6 text-sm text-blue-100 bg-indigo-800/30 border border-indigo-300/20 rounded-xl p-3">
+          <div className="mb-6 text-sm text-slate-200 bg-slate-950/60 border border-slate-700 rounded-xl p-3">
             Base: {quantityMode === 'people' ? `personas (${peopleCount})` : 'lo que tienes'} · Porción calculada: {setupPortionPreview}
             <br />
             {Math.abs(setupScaleFactor - 1) < 0.01 ? 'Tiempo estándar' : `Tiempo ajustado x${setupScaleFactor.toFixed(2)}`}
@@ -3124,13 +3738,13 @@ export function ThermomixCooker() {
           <div className="space-y-3">
             <button
               onClick={handleSetupContinue}
-              className="w-full bg-white text-indigo-900 py-5 md:py-6 rounded-3xl text-xl md:text-2xl font-bold shadow-2xl hover:scale-105 transition-transform"
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 md:py-6 rounded-3xl text-xl md:text-2xl font-bold shadow-2xl hover:scale-105 transition-transform"
             >
               Siguiente
             </button>
             <button
               onClick={() => setScreen('recipe-select')}
-              className="w-full text-white py-3 rounded-2xl border border-indigo-300/40"
+              className="w-full text-slate-100 py-3 rounded-2xl border border-slate-600"
             >
               Volver a recetas
             </button>
@@ -3289,7 +3903,7 @@ export function ThermomixCooker() {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
               <button
-                onClick={() => setScreen('recipe-setup')}
+                onClick={() => setScreen(ingredientsBackScreen)}
                 className="flex-1 bg-slate-800 text-white py-4 md:py-5 rounded-xl md:rounded-2xl font-bold text-base md:text-lg border border-slate-700 hover:border-orange-500 transition-colors"
               >
                 Volver
