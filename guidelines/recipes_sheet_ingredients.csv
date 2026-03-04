@@ -1,0 +1,8 @@
+recipeId,name,emoji,indispensable,p1,p2,p4
+huevo-frito,Huevos,🥚,true,1 huevo,2 huevos,4 huevos
+huevo-frito,Aceite,🫒,true,2 cdas,3 cdas,4 cdas
+huevo-frito,Sal,🧂,false,Al gusto,Al gusto,Al gusto
+arroz,Arroz,🍚,true,1 taza,2 tazas,4 tazas
+arroz,Agua,💧,true,1 1/2 tazas,3 tazas,5 1/2 tazas
+arroz,Aceite,🫒,true,1-2 cdtas,1 cda,2 cdas
+arroz,Ajo picado,🧄,false,1-2 cdtas,1 cda,2 cdas

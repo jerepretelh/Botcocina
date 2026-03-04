@@ -1,0 +1,12 @@
+recipeId,stepNumber,stepName,fireLevel,equipment
+huevo-frito,1,Precalentado,medium,stove
+huevo-frito,2,Calentar aceite,medium,stove
+huevo-frito,3,Cocinar cara 1,medium,stove
+huevo-frito,4,Voltear,low,stove
+huevo-frito,5,Final,low,stove
+arroz,1,Precalentado,high,stove
+arroz,2,Calentar aceite,high,stove
+arroz,3,Sofreír ajo,medium,stove
+arroz,4,Nacarar arroz,medium,stove
+arroz,5,Cocer,high,stove
+arroz,6,Tapar y terminar,low,stove

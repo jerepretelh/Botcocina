@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { ChefHat, Volume2, VolumeX, UtensilsCrossed } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router';
+import { Screen, RecipeCategoryId } from '../../types';
 import {
   recipeCategories,
 } from '../data/recipes';
@@ -30,6 +33,9 @@ const APP_VERSION = "v1.0.0"; // Fallback for __APP_VERSION__
 const APPROX_GRAMS_PER_UNIT = 250;
 
 export function ThermomixCooker() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const routeSyncRef = useRef(false);
   const recipeSelection = useRecipeSelection();
   const portions = usePortions({
     selectedRecipe: recipeSelection.selectedRecipe,
@@ -92,6 +98,92 @@ export function ThermomixCooker() {
     stirPromptVisible,
     currentStep,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
+
+  useEffect(() => {
+    const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
+
+    routeSyncRef.current = true;
+
+    if (normalizedPath === '/') {
+      recipeSelection.setSelectedCategory(null);
+      recipeSelection.setScreenDirect('category-select');
+      return;
+    }
+
+    if (normalizedPath === '/ia/aclarar') {
+      recipeSelection.setScreenDirect('ai-clarify');
+      return;
+    }
+
+    const categoryMatch = normalizedPath.match(/^\/categorias\/([^/]+)$/);
+    if (categoryMatch) {
+      const categoryId = decodeURIComponent(categoryMatch[1]);
+      const isValidCategory = recipeCategories.some((category) => category.id === categoryId);
+      if (!isValidCategory) {
+        routeSyncRef.current = false;
+        navigate('/', { replace: true });
+        return;
+      }
+      recipeSelection.setSelectedCategory(categoryId as RecipeCategoryId);
+      recipeSelection.setScreenDirect('recipe-select');
+      return;
+    }
+
+    const recipeStageMatch = normalizedPath.match(/^\/recetas\/([^/]+)\/(configurar|ingredientes|cocinar)$/);
+    if (recipeStageMatch) {
+      const recipeId = decodeURIComponent(recipeStageMatch[1]);
+      const stage = recipeStageMatch[2];
+      const recipe = recipeSelection.availableRecipes.find((item) => item.id === recipeId);
+
+      if (!recipe) {
+        if (recipeSelection.isSyncingCatalog) return;
+        routeSyncRef.current = false;
+        navigate('/', { replace: true });
+        return;
+      }
+
+      recipeSelection.setSelectedRecipe(recipe);
+      recipeSelection.setSelectedCategory(recipe.categoryId);
+      const targetScreen: Screen =
+        stage === 'configurar'
+          ? 'recipe-setup'
+          : stage === 'ingredientes'
+            ? 'ingredients'
+            : 'cooking';
+      recipeSelection.setScreenDirect(targetScreen);
+      return;
+    }
+
+    routeSyncRef.current = false;
+    navigate('/', { replace: true });
+  }, [location.pathname, recipeSelection.availableRecipes, recipeSelection.isSyncingCatalog]);
+
+  useEffect(() => {
+    if (routeSyncRef.current) {
+      routeSyncRef.current = false;
+      return;
+    }
+
+    const recipeId = recipeSelection.selectedRecipe?.id ? encodeURIComponent(recipeSelection.selectedRecipe.id) : null;
+    const categoryId = recipeSelection.selectedCategory ? encodeURIComponent(recipeSelection.selectedCategory) : null;
+
+    const targetPath =
+      screen === 'category-select'
+        ? '/'
+        : screen === 'recipe-select'
+          ? categoryId ? `/categorias/${categoryId}` : '/'
+          : screen === 'ai-clarify'
+            ? '/ia/aclarar'
+            : screen === 'recipe-setup'
+              ? recipeId ? `/recetas/${recipeId}/configurar` : '/'
+              : screen === 'ingredients'
+                ? recipeId ? `/recetas/${recipeId}/ingredientes` : '/'
+                : recipeId ? `/recetas/${recipeId}/cocinar` : '/';
+
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+  }, [screen, recipeSelection.selectedCategory, recipeSelection.selectedRecipe?.id, location.pathname, navigate]);
 
   // Computed state for UI
   const currentSubStepText = `${currentSubStep?.subStepName ?? ''} ${currentSubStep?.notes ?? ''}`.toLowerCase();
@@ -228,7 +320,7 @@ export function ThermomixCooker() {
         onVoiceToggle={voice.handleVoiceToggle}
         speechSupported={voice.speechSupported}
         selectedCategoryMeta={recipeSelection.selectedCategoryMeta}
-        onBack={handlers.handleBackToCategories}
+        onBack={() => recipeSelection.goBackScreen('category-select')}
         visibleRecipes={recipeSelection.visibleRecipes}
         onRecipeSelect={handlers.handleRecipeSelect}
       />
@@ -246,7 +338,7 @@ export function ThermomixCooker() {
         onAnswerChange={handlers.handleAnswerChange}
         onNumberModeChange={(id, mode) => aiRecipeGen.setAiClarificationNumberModes({ ...aiRecipeGen.aiClarificationNumberModes, [id]: mode })}
         onQuantityUnitChange={(id, unit) => aiRecipeGen.setAiClarificationQuantityUnits({ ...aiRecipeGen.aiClarificationQuantityUnits, [id]: unit })}
-        onBack={handlers.handleBackToAIPrompt}
+        onBack={() => recipeSelection.goBackScreen('category-select')}
         onGenerate={aiRecipeGen.handleGenerateRecipe}
         isGenerating={aiRecipeGen.isGeneratingRecipe}
         resolveUnit={aiRecipeGen.resolveClarificationUnit}
@@ -272,7 +364,7 @@ export function ThermomixCooker() {
         setProduceSize={recipeSelection.setProduceSize}
         setupPortionPreview={portions.setupPortionPreview}
         setupScaleFactor={portions.setupScaleFactor}
-        onBack={() => recipeSelection.setScreen('recipe-select')}
+        onBack={() => recipeSelection.goBackScreen('recipe-select')}
         onContinue={handlers.handleSetupContinue}
         selectedRecipe={recipeSelection.selectedRecipe}
       />
@@ -300,7 +392,7 @@ export function ThermomixCooker() {
         batchCountForRecipe={portions.batchCountForRecipe}
         batchUsageTips={portions.batchUsageTips}
         currentTip={recipeSelection.activeRecipeContent.tip}
-        onBack={() => recipeSelection.setScreen(recipeSelection.ingredientsBackScreen)}
+        onBack={() => recipeSelection.goBackScreen(recipeSelection.ingredientsBackScreen)}
         onStartCooking={handlers.handleStartCooking}
         currentRecipeData={recipeSelection.activeRecipeContent.steps}
       />
@@ -339,10 +431,11 @@ export function ThermomixCooker() {
       retirarTitle={retirarTitle}
       retirarMessage={retirarMessage}
       currentStep={cookingProgress.currentStep}
-      portionValue={portions.portionValue}
+      portionValue={portionValue}
       currentIngredients={recipeSelection.currentIngredients}
       activeIngredientSelection={recipeSelection.activeIngredientSelection}
       activeRecipeContent={recipeSelection.activeRecipeContent}
+      selectedRecipe={recipeSelection.selectedRecipe}
     />
   );
 }

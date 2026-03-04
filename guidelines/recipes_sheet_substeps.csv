@@ -1,0 +1,20 @@
+recipeId,stepNumber,subStepOrder,subStepName,notes,isTimer,p1,p2,p4
+huevo-frito,1,1,Precalentar sartén,"Sartén seca, fuego medio.",true,40,50,60
+huevo-frito,2,1,Agregar aceite,"Cantidad según porción.",false,2 cdas,3 cdas,4 cdas
+huevo-frito,2,2,Calentando aceite...,"Debe estar caliente sin humear.",true,25,30,35
+huevo-frito,3,1,Agregar huevo,"Con cuidado para evitar salpicaduras.",false,Continuar,Continuar,Continuar
+huevo-frito,3,2,Cocinando primera cara...,"No mover el huevo.",true,80,95,110
+huevo-frito,4,1,Recordatorio: voltear,"Dale la vuelta con espátula.",false,Continuar,Continuar,Continuar
+huevo-frito,4,2,Cocinando segunda cara...,"Tiempo corto para yema cremosa.",true,30,35,40
+huevo-frito,5,1,Retirar y servir,"Agregar sal al final.",false,Continuar,Continuar,Continuar
+arroz,1,1,Precalentar olla,"Debe estar seca.",true,60,90,120
+arroz,2,1,Agregar aceite,"Cantidad según porción.",false,1-2 cdtas,1 cda,2 cdas
+arroz,2,2,Calentando aceite...,"Sin humear.",true,40,50,60
+arroz,3,1,Agregar ajo,"Dorar sin quemar.",false,1-2 cdtas,1 cda,2 cdas
+arroz,3,2,Sofriendo...,"Mover constante.",true,45,60,75
+arroz,4,1,Agregar arroz,"Mezclar hasta que brille.",false,1 taza,2 tazas,4 tazas
+arroz,4,2,Nacarando...,"Mover para cubrir con aceite.",true,90,120,150
+arroz,5,1,Agregar agua y sal,"Sin remover en exceso.",false,1 1/2 tazas,3 tazas,5 1/2 tazas
+arroz,5,2,Hervor inicial...,"Hasta que evapore superficie.",true,300,420,540
+arroz,6,1,Tapar y bajar fuego,"No destapar durante cocción.",true,600,780,960
+arroz,6,2,Reposar,"Apagar, reposar 5 minutos.",true,300,300,300

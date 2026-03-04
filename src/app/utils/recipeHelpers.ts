@@ -286,7 +286,7 @@ export function ensureEquipmentTransitionSubSteps(steps: RecipeStep[], recipeEqu
       subStepName: `${action} a ${target}`,
       notes: currentEquipment === 'airfryer'
         ? `Ajusta la freidora de aire a ${target}.`
-        : `Ajusta de ${fireLevelLabel(previousLevel, previousEquipment)} a ${target} para este paso.`,
+        : `Ajusta de ${fireLevelLabel(previousLevel, previousEquipment)} a ${target} para este subpaso.`,
       portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
       isTimer: false,
     };
@@ -607,7 +607,7 @@ export function ensureRecipeShape(data: GeneratedRecipe): GeneratedRecipe {
     equipment: detectedEquipment,
     icon: data.icon?.trim() || (detectedEquipment === 'airfryer' ? '🧺' : detectedEquipment === 'oven' ? '🔥' : '🍽️'),
     ingredient: data.ingredient?.trim() || 'porciones',
-    description: data.description?.trim() || `${safeSteps.length || 1} pasos`,
+    description: data.description?.trim() || `${safeSteps.flatMap((step) => step.subSteps).length || 1} subpasos`,
     tip: data.tip?.trim() || (detectedEquipment === 'airfryer' ? 'Precalienta la freidora si es necesario.' : 'Ten todos los ingredientes listos antes de empezar.'),
     ingredients: safeIngredients
       .filter((ingredient) => ingredient?.name && ingredient?.portions)

@@ -1,0 +1,81 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e8]
+      - generic [ref=e10]:
+        - heading "Chef Bot Pro" [level=1] [ref=e11]
+        - generic [ref=e12]: v1.0.0
+    - button "Desactivar voz" [ref=e13]:
+      - img [ref=e14]
+  - generic [ref=e18]:
+    - paragraph [ref=e19]: Crear nueva receta con IA
+    - 'textbox "Ej: salmón al ajillo en sartén, con tiempos para 1, 2 y 4 porciones" [ref=e20]': Arroz con pollo peruano para 2 personas
+    - paragraph [ref=e138]: Falta GOOGLE_API_KEY (o OPENAI_API_KEY). Define una variable de entorno para usar recetas con IA.
+    - button "Agregar receta con IA" [ref=e21]
+  - paragraph [ref=e23]: Recetas por categoría
+  - generic [ref=e24]:
+    - heading "CATEGORÍAS" [level=3] [ref=e25]
+    - button "☀️ Desayunos Opciones rápidas para iniciar el día 2" [ref=e26]:
+      - generic [ref=e27]: ☀️
+      - generic [ref=e28]:
+        - heading "Desayunos" [level=3] [ref=e29]
+        - paragraph [ref=e30]: Opciones rápidas para iniciar el día
+      - generic [ref=e31]:
+        - generic [ref=e33]: "2"
+        - img [ref=e35]
+    - button "🍽️ Almuerzos Platos de fondo y comida criolla 2" [ref=e40]:
+      - generic [ref=e41]: 🍽️
+      - generic [ref=e42]:
+        - heading "Almuerzos" [level=3] [ref=e43]
+        - paragraph [ref=e44]: Platos de fondo y comida criolla
+      - generic [ref=e45]:
+        - generic [ref=e47]: "2"
+        - img [ref=e49]
+    - button "🌙 Cenas Opciones ligeras y reconfortantes 2" [ref=e54]:
+      - generic [ref=e55]: 🌙
+      - generic [ref=e56]:
+        - heading "Cenas" [level=3] [ref=e57]
+        - paragraph [ref=e58]: Opciones ligeras y reconfortantes
+      - generic [ref=e59]:
+        - generic [ref=e61]: "2"
+        - img [ref=e63]
+    - button "🧺 Airfryer Recetas pensadas para freidora de aire 2" [ref=e68]:
+      - generic [ref=e69]: 🧺
+      - generic [ref=e70]:
+        - heading "Airfryer" [level=3] [ref=e71]
+        - paragraph [ref=e72]: Recetas pensadas para freidora de aire
+      - generic [ref=e73]:
+        - generic [ref=e75]: "2"
+        - img [ref=e77]
+    - button "🍳 Frituras Huevo, papas y sartén fuerte 2" [ref=e82]:
+      - generic [ref=e83]: 🍳
+      - generic [ref=e84]:
+        - heading "Frituras" [level=3] [ref=e85]
+        - paragraph [ref=e86]: Huevo, papas y sartén fuerte
+      - generic [ref=e87]:
+        - generic [ref=e89]: "2"
+        - img [ref=e91]
+    - button "🍚 Arroces Arroces sueltos y aromáticos 3" [ref=e96]:
+      - generic [ref=e97]: 🍚
+      - generic [ref=e98]:
+        - heading "Arroces" [level=3] [ref=e99]
+        - paragraph [ref=e100]: Arroces sueltos y aromáticos
+      - generic [ref=e101]:
+        - generic [ref=e103]: "3"
+        - img [ref=e105]
+    - button "🍲 Hervidos Sancochados y cocción en agua 1" [ref=e110]:
+      - generic [ref=e111]: 🍲
+      - generic [ref=e112]:
+        - heading "Hervidos" [level=3] [ref=e113]
+        - paragraph [ref=e114]: Sancochados y cocción en agua
+      - generic [ref=e115]:
+        - generic [ref=e117]: "1"
+        - img [ref=e119]
+    - button "🥣 Sopas Caldos y sopas ligeras 1" [ref=e124]:
+      - generic [ref=e125]: 🥣
+      - generic [ref=e126]:
+        - heading "Sopas" [level=3] [ref=e127]
+        - paragraph [ref=e128]: Caldos y sopas ligeras
+      - generic [ref=e129]:
+        - generic [ref=e131]: "1"
+        - img [ref=e133]

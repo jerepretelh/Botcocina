@@ -175,7 +175,7 @@ export function IngredientsScreen({
                             })}
                         </div>
                         <p className="text-slate-400 text-xs md:text-sm mt-3">
-                            Puedes desactivar ingredientes opcionales. Los indispensables están bloqueados y al cocinar se ajustan los pasos automáticamente.
+                            Puedes desactivar ingredientes opcionales. Los indispensables están bloqueados y al cocinar se ajustan los subpasos automáticamente.
                         </p>
                         {batchUsageTips.length > 0 && (
                             <div className="mt-3 space-y-1 text-left">

@@ -1,0 +1,18 @@
+### Browser `asistente-cocina-ai-flow-test2` opened with pid 59409.
+- asistente-cocina-ai-flow-test2:
+  - browser-type: chrome
+  - user-data-dir: <in-memory>
+  - headed: false
+---
+### Ran Playwright code
+```js
+await page.goto('http://127.0.0.1:4173/');
+```
+### Page
+- Page URL: http://127.0.0.1:4173/
+- Page Title: Thermomix Recipe Prototype
+- Console: 1 errors, 0 warnings
+### Snapshot
+- [Snapshot](.playwright-cli/page-2026-03-03T18-43-33-871Z.yml)
+### Events
+- New console entries: .playwright-cli/console-2026-03-03T18-43-30-545Z.log#L1

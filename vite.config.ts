@@ -3,9 +3,11 @@ import { defineConfig, type Plugin } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { handleRecipesRequest } from './api/recipes/shared'
 
 const AI_RECIPE_ROUTE = '/api/ai/recipe'
 const AI_CONFIG_ROUTE = '/api/ai/config'
+const RECIPES_ROUTE = '/api/recipes'
 let localGoogleApiKey = ''
 let localGoogleModel = ''
 let localOpenAIApiKey = ''
@@ -339,6 +341,11 @@ function aiRecipeApiPlugin(): Plugin {
 
     if (req.url.startsWith(AI_CONFIG_ROUTE)) {
       void handleAIConfigRequest(req, res)
+      return
+    }
+
+    if (req.url.startsWith(RECIPES_ROUTE)) {
+      void handleRecipesRequest(req, res)
       return
     }
 

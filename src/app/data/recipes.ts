@@ -8,7 +8,7 @@ export const recipes: Recipe[] = [
     icon: '🥣',
     emoji: '🥣',
     ingredient: 'Porciones',
-    description: '5 pasos · 20-25 min',
+    description: '5 subpasos · 20-25 min',
   },
   {
     id: 'pan-palta-huevo',
@@ -17,7 +17,7 @@ export const recipes: Recipe[] = [
     icon: '🥑',
     emoji: '🥑',
     ingredient: 'Porciones',
-    description: '4 pasos · 10-15 min',
+    description: '4 subpasos · 10-15 min',
   },
   {
     id: 'lomo-saltado-casero',
@@ -26,7 +26,7 @@ export const recipes: Recipe[] = [
     icon: '🥩',
     emoji: '🥩',
     ingredient: 'Porciones',
-    description: '6 pasos · 30-40 min',
+    description: '6 subpasos · 30-40 min',
   },
   {
     id: 'arroz-con-pollo-rapido',
@@ -35,7 +35,7 @@ export const recipes: Recipe[] = [
     icon: '🍗',
     emoji: '🍗',
     ingredient: 'Porciones',
-    description: '6 pasos · 40-50 min',
+    description: '6 subpasos · 40-50 min',
   },
   {
     id: 'sopa-criolla',
@@ -43,7 +43,7 @@ export const recipes: Recipe[] = [
     name: 'Sopa criolla',
     icon: '🍲',
     ingredient: 'Porciones',
-    description: '6 pasos · 25-35 min',
+    description: '6 subpasos · 25-35 min',
   },
   {
     id: 'tortilla-verduras',
@@ -51,7 +51,7 @@ export const recipes: Recipe[] = [
     name: 'Tortilla de verduras',
     icon: '🍳',
     ingredient: 'Porciones',
-    description: '5 pasos · 20-25 min',
+    description: '5 subpasos · 20-25 min',
   },
   {
     id: 'airfryer-pollo-crocante',
@@ -59,7 +59,7 @@ export const recipes: Recipe[] = [
     name: 'Pollo crocante Airfryer',
     icon: '🍗',
     ingredient: 'Piezas',
-    description: '5 pasos · 25-35 min',
+    description: '5 subpasos · 25-35 min',
   },
   {
     id: 'airfryer-camote-chips',
@@ -67,7 +67,7 @@ export const recipes: Recipe[] = [
     name: 'Chips de camote Airfryer',
     icon: '🍠',
     ingredient: 'Camotes',
-    description: '5 pasos · 20-30 min',
+    description: '5 subpasos · 20-30 min',
   },
   {
     id: 'arroz',
@@ -75,7 +75,7 @@ export const recipes: Recipe[] = [
     name: 'Arroz Perfecto',
     icon: '🍚',
     ingredient: 'Tazas de arroz',
-    description: '6 pasos · 45-60 min',
+    description: '6 subpasos · 45-60 min',
   },
   {
     id: 'arroz-ajo',
@@ -83,7 +83,7 @@ export const recipes: Recipe[] = [
     name: 'Arroz al ajo',
     icon: '🧄',
     ingredient: 'Tazas de arroz',
-    description: '5 pasos · 30-40 min',
+    description: '5 subpasos · 30-40 min',
   },
   {
     id: 'arroz-lentejas-compuesto',
@@ -99,7 +99,7 @@ export const recipes: Recipe[] = [
     name: 'Huevo frito',
     icon: '🍳',
     ingredient: 'Huevos',
-    description: '5 pasos · automático',
+    description: '5 subpasos · automático',
   },
   {
     id: 'papas-fritas',
@@ -115,7 +115,7 @@ export const recipes: Recipe[] = [
     name: 'Huevo sancochado',
     icon: '🥚',
     ingredient: 'Huevos',
-    description: '4 pasos · 12-15 min',
+    description: '4 subpasos · 12-15 min',
   },
   {
     id: 'sopa-verduras',
@@ -123,7 +123,7 @@ export const recipes: Recipe[] = [
     name: 'Sopa de verduras',
     icon: '🥣',
     ingredient: 'Porciones',
-    description: '6 pasos · 30-40 min',
+    description: '6 subpasos · 30-40 min',
   },
 ];
 
