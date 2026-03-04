@@ -1,0 +1,13 @@
+diff --git a/src/app/components/screens/CookingScreen.tsx b/src/app/components/screens/CookingScreen.tsx
+index 6cbe673..c1bfb7e 100644
+--- a/src/app/components/screens/CookingScreen.tsx
++++ b/src/app/components/screens/CookingScreen.tsx
+@@ -128,7 +128,7 @@ export function CookingScreen({
+     : currentIsTimer
+       ? isRunning
+         ? 'Pausar'
+-        : 'Iniciar'
++        : 'Reanudar'
+       : 'Siguiente';
+   const isRunningTimerStep = currentIsTimer && isRunning;
+ 

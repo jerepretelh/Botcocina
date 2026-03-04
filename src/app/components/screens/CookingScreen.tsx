@@ -128,7 +128,7 @@ export function CookingScreen({
     : currentIsTimer
       ? isRunning
         ? 'Pausar'
-        : 'Iniciar'
+        : 'Reanudar'
       : 'Siguiente';
   const isRunningTimerStep = currentIsTimer && isRunning;
 
