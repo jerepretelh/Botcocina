@@ -1,10 +1,10 @@
 import { ThermomixCooker } from './components/ThermomixCooker';
-import { BrowserRouter } from 'react-router';
+import { HashRouter } from 'react-router';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <ThermomixCooker />
-    </BrowserRouter>
+    </HashRouter>
   );
 }

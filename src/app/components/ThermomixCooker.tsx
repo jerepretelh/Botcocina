@@ -17,6 +17,8 @@ import { useRecipeSelection } from '../hooks/useRecipeSelection';
 import { usePortions } from '../hooks/usePortions';
 import { useCookingProgress } from '../hooks/useCookingProgress';
 import { useAIRecipeGeneration } from '../hooks/useAIRecipeGeneration';
+import { useAnonymousSession } from '../hooks/useAnonymousSession';
+import { trackProductEvent } from '../lib/productEvents';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
 import { useThermomixTimer } from '../hooks/useThermomixTimer';
@@ -28,6 +30,7 @@ import { RecipeSetupScreen } from './screens/RecipeSetupScreen';
 import { IngredientsScreen } from './screens/IngredientsScreen';
 import { CookingScreen } from './screens/CookingScreen';
 import { AIClarifyScreen } from './screens/AIClarifyScreen';
+import { DesignSystemScreen } from './screens/DesignSystemScreen';
 
 const APP_VERSION = "v1.0.0"; // Fallback for __APP_VERSION__
 const APPROX_GRAMS_PER_UNIT = 250;
@@ -36,6 +39,7 @@ export function ThermomixCooker() {
   const navigate = useNavigate();
   const location = useLocation();
   const routeSyncRef = useRef(false);
+  const anonymousSession = useAnonymousSession();
   const recipeSelection = useRecipeSelection();
   const portions = usePortions({
     selectedRecipe: recipeSelection.selectedRecipe,
@@ -53,6 +57,7 @@ export function ThermomixCooker() {
     selectedRecipe: recipeSelection.selectedRecipe,
     activeRecipeContentSteps: recipeSelection.activeRecipeContent.steps,
     portion: recipeSelection.portion,
+    cloudUserId: anonymousSession.userId,
   });
 
   const aiRecipeGen = useAIRecipeGeneration({
@@ -83,6 +88,7 @@ export function ThermomixCooker() {
     setPendingStirAdvance: cookingProgress.setPendingStirAdvance,
     setStirPromptCountdown: cookingProgress.setStirPromptCountdown,
     setAwaitingNextUnitConfirmation: cookingProgress.setAwaitingNextUnitConfirmation,
+    aiUserId: anonymousSession.userId,
   });
 
   const {
@@ -94,10 +100,15 @@ export function ThermomixCooker() {
     currentStepIndex,
     currentSubStepIndex,
     currentSubStep,
+    portion,
     flipPromptVisible,
     stirPromptVisible,
     currentStep,
+    isRecipeFinished,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
+  const hasTrackedHomeRef = useRef(false);
+  const previousCookingPositionRef = useRef<{ step: number; subStep: number } | null>(null);
+  const previousScreenRef = useRef<Screen>(screen);
 
   useEffect(() => {
     const normalizedPath = location.pathname.replace(/\/+$/, '') || '/';
@@ -112,6 +123,10 @@ export function ThermomixCooker() {
 
     if (normalizedPath === '/ia/aclarar') {
       recipeSelection.setScreenDirect('ai-clarify');
+      return;
+    }
+    if (normalizedPath === '/design-system') {
+      recipeSelection.setScreenDirect('design-system');
       return;
     }
 
@@ -170,6 +185,8 @@ export function ThermomixCooker() {
     const targetPath =
       screen === 'category-select'
         ? '/'
+        : screen === 'design-system'
+          ? '/design-system'
         : screen === 'recipe-select'
           ? categoryId ? `/categorias/${categoryId}` : '/'
           : screen === 'ai-clarify'
@@ -184,6 +201,54 @@ export function ThermomixCooker() {
       navigate(targetPath);
     }
   }, [screen, recipeSelection.selectedCategory, recipeSelection.selectedRecipe?.id, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!anonymousSession.userId) return;
+    if (screen !== 'category-select') {
+      hasTrackedHomeRef.current = false;
+      return;
+    }
+    if (hasTrackedHomeRef.current) return;
+    hasTrackedHomeRef.current = true;
+    void trackProductEvent(anonymousSession.userId, 'home_open');
+  }, [anonymousSession.userId, screen]);
+
+  useEffect(() => {
+    if (!anonymousSession.userId) return;
+    const prev = previousScreenRef.current;
+    if (screen === 'cooking' && prev !== 'cooking' && recipeSelection.selectedRecipe) {
+      void trackProductEvent(anonymousSession.userId, 'recipe_start', {
+        recipeId: recipeSelection.selectedRecipe.id,
+      });
+      previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
+    }
+    previousScreenRef.current = screen;
+  }, [screen, anonymousSession.userId, recipeSelection.selectedRecipe, currentStepIndex, currentSubStepIndex]);
+
+  useEffect(() => {
+    if (!anonymousSession.userId || screen !== 'cooking' || !recipeSelection.selectedRecipe) return;
+    const previous = previousCookingPositionRef.current;
+    if (!previous) {
+      previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
+      return;
+    }
+
+    if (currentStepIndex !== previous.step || currentSubStepIndex !== previous.subStep) {
+      void trackProductEvent(anonymousSession.userId, 'step_next', {
+        recipeId: recipeSelection.selectedRecipe.id,
+        stepIndex: currentStepIndex,
+        subStepIndex: currentSubStepIndex,
+      });
+      previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
+    }
+  }, [screen, currentStepIndex, currentSubStepIndex, anonymousSession.userId, recipeSelection.selectedRecipe]);
+
+  useEffect(() => {
+    if (!anonymousSession.userId || !isRecipeFinished || !recipeSelection.selectedRecipe) return;
+    void trackProductEvent(anonymousSession.userId, 'recipe_complete', {
+      recipeId: recipeSelection.selectedRecipe.id,
+    });
+  }, [anonymousSession.userId, isRecipeFinished, recipeSelection.selectedRecipe]);
 
   // Computed state for UI
   const currentSubStepText = `${currentSubStep?.subStepName ?? ''} ${currentSubStep?.notes ?? ''}`.toLowerCase();
@@ -251,6 +316,7 @@ export function ThermomixCooker() {
     currentStepIndex,
     currentSubStepIndex,
     currentSubStep,
+    portion,
     flipPromptVisible,
     stirPromptVisible,
     isRetirarSubStep,
@@ -308,7 +374,14 @@ export function ThermomixCooker() {
         recipeCategories={recipeCategories}
         availableRecipes={recipeSelection.availableRecipes}
         onCategorySelect={handlers.handleCategorySelect}
+        onOpenDesignSystem={() => recipeSelection.setScreen('design-system')}
       />
+    );
+  }
+
+  if (screen === 'design-system') {
+    return (
+      <DesignSystemScreen onBack={() => recipeSelection.setScreen('category-select')} />
     );
   }
 

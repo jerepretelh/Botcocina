@@ -16,6 +16,7 @@ interface CategorySelectScreenProps {
     onAiPromptChange: (val: string) => void;
     onGenerateRecipe: () => void;
     onCategorySelect: (id: RecipeCategoryId) => void;
+    onOpenDesignSystem: () => void;
     recipeCategories: any[]; // Added to match usage
 }
 
@@ -33,6 +34,7 @@ export function CategorySelectScreen({
     onAiPromptChange,
     onGenerateRecipe,
     onCategorySelect,
+    onOpenDesignSystem,
 }: CategorySelectScreenProps) {
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 to-black flex items-center justify-center p-4">
@@ -63,6 +65,15 @@ export function CategorySelectScreen({
                 </div>
 
                 {/* Primary Action */}
+                <div className="mb-4">
+                    <button
+                        onClick={onOpenDesignSystem}
+                        className="w-full bg-slate-800/70 text-slate-200 py-2.5 rounded-xl border border-slate-600 hover:border-cyan-400 hover:text-cyan-300 transition-colors text-sm font-semibold"
+                    >
+                        Abrir Sistema de Diseño (temporal)
+                    </button>
+                </div>
+
                 <div className="mb-5 md:mb-6 bg-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-700 space-y-3">
                     <p className="text-sm md:text-base text-white font-semibold">
                         Crear nueva receta con IA

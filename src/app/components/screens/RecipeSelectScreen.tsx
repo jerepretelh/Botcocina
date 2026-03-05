@@ -90,9 +90,17 @@ export function RecipeSelectScreen({
                     </h3>
 
                     {visibleRecipes.map((recipe) => (
-                        <button
+                        <div
                             key={recipe.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => onRecipeSelect(recipe)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onRecipeSelect(recipe);
+                                }
+                            }}
                             className="w-full bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-slate-700 hover:border-orange-500 transition-all hover:scale-[1.02] flex items-center gap-3 md:gap-4"
                         >
                             <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg">
@@ -113,7 +121,7 @@ export function RecipeSelectScreen({
                                     <List className="w-5 h-5 md:w-6 md:h-6" />
                                 </button>
                             </div>
-                        </button>
+                        </div>
                     ))}
 
                     {visibleRecipes.length === 0 && (

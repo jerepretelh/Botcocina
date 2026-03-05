@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { SubStep, Screen } from '../../types';
+import { SubStep, Screen, Portion } from '../../types';
 
 interface UseThermomixVoiceProps {
     voiceEnabled: boolean;
@@ -10,6 +10,7 @@ interface UseThermomixVoiceProps {
     currentStepIndex: number;
     currentSubStepIndex: number;
     currentSubStep: SubStep | null;
+    portion: Portion;
     flipPromptVisible: boolean;
     stirPromptVisible: boolean;
     isRetirarSubStep: boolean;
@@ -27,6 +28,7 @@ export function useThermomixVoice({
     currentStepIndex,
     currentSubStepIndex,
     currentSubStep,
+    portion,
     flipPromptVisible,
     stirPromptVisible,
     isRetirarSubStep,
@@ -144,6 +146,20 @@ export function useThermomixVoice({
         }, 2200);
     };
 
+    const buildPortionVoiceText = (subStep: SubStep | null) => {
+        if (!subStep) return '';
+        const value = subStep.portions?.[portion];
+        if (typeof value === 'number' && value > 0) {
+            return `Tiempo estimado: ${value} segundos`;
+        }
+        if (typeof value !== 'string') return '';
+        const normalized = value.trim().toLowerCase();
+        if (!normalized || ['continuar', 'siguiente', 'ok', 'listo', '-', 'n/a', 'na'].includes(normalized)) {
+            return '';
+        }
+        return `Cantidad: ${value}`;
+    };
+
     const speakCurrentInstruction = (force = false) => {
         if (screen !== 'cooking') return;
         if (flipPromptVisible) {
@@ -159,7 +175,10 @@ export function useThermomixVoice({
         if (!title) return;
 
         const detail = isRetirarSubStep ? retirarMessage : currentSubStep?.notes;
-        const text = detail && !detail.startsWith('Cantidad') ? `${title}. ${detail}` : title;
+        const amount = isRetirarSubStep ? '' : buildPortionVoiceText(currentSubStep);
+        const text = [title, detail, amount]
+            .filter((value) => Boolean(value && String(value).trim()))
+            .join('. ');
         speakInstruction(text, force);
     };
 

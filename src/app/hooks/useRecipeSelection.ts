@@ -12,6 +12,7 @@ import {
 import { defaultRecipes, initialRecipeContent, recipeCategories } from '../data/recipes';
 import { buildInitialIngredientSelection } from '../utils/recipeHelpers';
 import { fetchRecipesCatalog } from '../lib/recipesCatalog';
+import type { CatalogSource } from '../../types';
 
 export function useRecipeSelection() {
     const [screen, setScreenState] = useState<Screen>('category-select');
@@ -22,7 +23,7 @@ export function useRecipeSelection() {
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [ingredientsBackScreen, setIngredientsBackScreen] = useState<IngredientsBackScreen>('recipe-setup');
     const [ingredientSelectionByRecipe, setIngredientSelectionByRecipe] = useState<Record<string, Record<string, boolean>>>({});
-    const [catalogSource, setCatalogSource] = useState<'local' | 'sheets'>('local');
+    const [catalogSource, setCatalogSource] = useState<CatalogSource>('local-dev');
     const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
     const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
 

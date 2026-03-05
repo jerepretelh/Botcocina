@@ -1,5 +1,5 @@
 import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient, Recipe } from '../../../types';
-import { RotateCcw, Play, Pause, ChevronsRight } from 'lucide-react';
+import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight } from 'lucide-react';
 
 interface CookingScreenProps {
   appVersion: string;
@@ -46,11 +46,6 @@ function formatClock(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function toDisplayValue(value: string | number) {
-  if (typeof value === 'number') return formatClock(value);
-  return value;
-}
-
 function isInformativePortionValue(value: string | number | null | undefined) {
   if (typeof value === 'number') return value > 0;
   if (typeof value !== 'string') return false;
@@ -74,6 +69,17 @@ function isInformativePortionValue(value: string | number | null | undefined) {
   return hasNumber || hasMeasureWord;
 }
 
+function getIngredientKey(name: string) {
+  return name.toLowerCase().replace(/\s+/g, '_');
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 export function CookingScreen({
   currentStepIndex,
   currentSubStepIndex,
@@ -81,8 +87,6 @@ export function CookingScreen({
   timeRemaining,
   flipPromptVisible,
   flipPromptCountdown,
-  stirPromptVisible,
-  stirPromptCountdown,
   awaitingNextUnitConfirmation,
   currentRecipeData,
   currentStep,
@@ -92,13 +96,13 @@ export function CookingScreen({
   isRetirarSubStep,
   retirarTitle,
   retirarMessage,
-  effectiveReminderTitle,
-  effectiveReminderMessage,
   onChangeMission,
   onNext,
   onTogglePause,
   onContinue,
   onConfirmNextUnit,
+  currentIngredients,
+  activeIngredientSelection,
   activeRecipeContent,
   selectedRecipe,
 }: CookingScreenProps) {
@@ -130,7 +134,6 @@ export function CookingScreen({
         ? 'Pausar'
         : 'Reanudar'
       : 'Siguiente';
-  const isRunningTimerStep = currentIsTimer && isRunning;
 
   const handleQuickAction = () => {
     if (awaitingNextUnitConfirmation) {
@@ -163,129 +166,208 @@ export function CookingScreen({
   };
 
   const recipeName = selectedRecipe?.name ?? 'Receta en curso';
-  const recipeIcon = selectedRecipe?.icon ?? '👨‍🍳';
-  const nextPosition = nextItem ? currentPosition + 1 : currentPosition;
-  const nextPortionValue = nextItem?.subStep.portions[portion];
-  const nextValueIsNumber = typeof nextPortionValue === 'number';
-  const hasInformativeNextValue = isInformativePortionValue(nextPortionValue);
+  const recipeIcon = selectedRecipe?.icon ?? '🍳';
+  const activeIngredients = currentIngredients.filter((ingredient) => {
+    const key = getIngredientKey(ingredient.name);
+    return activeIngredientSelection[key] ?? true;
+  });
+  const nextEstimated = nextItem ? nextItem.subStep.portions[portion] : null;
+  const nextEstimatedLabel =
+    typeof nextEstimated === 'number'
+      ? `Tiempo estimado: ${nextEstimated}s`
+      : typeof nextEstimated === 'string' && isInformativePortionValue(nextEstimated)
+        ? `Cantidad estimada: ${nextEstimated}`
+        : null;
+  const consumedIngredientKeys = new Set(
+    activeIngredients
+      .filter((ingredient) => {
+        const ingredientName = normalizeText(ingredient.name);
+        const isConsumed = flattenedSubSteps.some((subStepItem, index) => {
+          if (index > currentFlatIndex) return false;
+          const haystack = normalizeText(
+            `${subStepItem.step.stepName} ${subStepItem.subStep.subStepName} ${subStepItem.subStep.notes}`,
+          );
+          return haystack.includes(ingredientName);
+        });
+        return isConsumed;
+      })
+      .map((ingredient) => getIngredientKey(ingredient.name)),
+  );
 
   return (
-    <div className="min-h-screen bg-[#f5efd9] px-4 py-4 md:px-5 lg:px-6">
-      <div className="mx-auto max-w-[1280px]">
-        <header className="flex items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="text-3xl md:text-4xl text-orange-600">{recipeIcon}</div>
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight text-[#8f2f0d]">{recipeName}</h1>
-          </div>
-          <button
-            onClick={onChangeMission}
-            className="inline-flex items-center gap-3 rounded-3xl bg-[#f7f7f7] px-4 py-2.5 text-base md:text-xl lg:text-2xl font-semibold text-orange-600 shadow-md border border-slate-200"
-          >
-            <RotateCcw className="h-5 w-5 md:h-6 md:w-6" /> Reiniciar
-          </button>
-        </header>
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_center,_#1e1e1e_0%,_#0a0a0a_100%)] text-slate-100 antialiased">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
 
-        <section className="mt-4 rounded-3xl bg-[#ececef] px-5 py-4 shadow-sm border border-slate-200">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-xl md:text-2xl lg:text-3xl font-semibold text-slate-600">Progreso</p>
-            <p className="text-xl md:text-2xl lg:text-3xl font-bold text-orange-600">Subpaso {currentPosition} de {totalSubSteps}</p>
-          </div>
-          <div className="mt-3 h-3.5 md:h-4 rounded-full bg-[#cfd1d7] overflow-hidden">
-            <div className="h-full rounded-full bg-orange-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
-          </div>
-        </section>
+      <div className="relative z-10 h-1.5 w-full bg-white/5">
+        <div
+          className="h-full rounded-r-full bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.6)] transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
 
-        <section className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <article className="rounded-[30px] border-[3px] border-orange-500 bg-[#ececef] p-5 md:p-6 lg:p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-              <p className="text-[18px] md:text-[24px] lg:text-[30px] font-extrabold uppercase tracking-wide text-orange-600">Subpaso actual</p>
-              <p className="text-[24px] md:text-[34px] lg:text-[40px] font-bold text-[#7f2f14]">#{currentPosition}</p>
+      <div className="relative z-20 flex h-[calc(100vh-6px)] overflow-hidden">
+        <aside className="hidden w-72 shrink-0 flex-col border-r border-white/5 bg-black/30 backdrop-blur-2xl lg:flex">
+          <div className="border-b border-white/5 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-orange-400">Ingredientes</h3>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Lista activa</p>
+          </div>
+          <div className="flex-1 space-y-5 overflow-y-auto p-6">
+            {activeIngredients.slice(0, 10).map((ingredient) => (
+              <div key={ingredient.name} className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border text-lg ${
+                    consumedIngredientKeys.has(getIngredientKey(ingredient.name))
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                      : 'border-white/10 bg-white/5 text-orange-400'
+                  }`}
+                >
+                  {ingredient.emoji || '•'}
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`truncate text-sm font-bold ${
+                      consumedIngredientKeys.has(getIngredientKey(ingredient.name))
+                        ? 'text-emerald-300 line-through'
+                        : 'text-white'
+                    }`}
+                  >
+                    {ingredient.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {ingredient.portions[portion]}
+                    {consumedIngredientKeys.has(getIngredientKey(ingredient.name)) ? ' · usado' : ''}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <main className="relative flex flex-1 flex-col">
+          <header className="flex items-center justify-between px-8 py-6 lg:px-10 lg:py-8">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-white">
+                  <span className="text-4xl leading-none lg:text-5xl">{recipeIcon}</span>
+                  <span>{recipeName}</span>
+                </h1>
+              </div>
+            </div>
+            <button
+              onClick={onChangeMission}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reiniciar
+            </button>
+          </header>
+
+          <section className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+            <div className="mb-6 inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-5 py-2 backdrop-blur-md">
+              <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-orange-400">
+                Subpaso {currentPosition} de {totalSubSteps}
+              </span>
             </div>
 
-            <h2 className="mt-5 text-[30px] md:text-[38px] lg:text-[44px] leading-[1.08] font-bold text-[#101c36]">{currentTitle}</h2>
-            <p className="mt-4 text-[19px] md:text-[22px] lg:text-[26px] leading-[1.25] text-slate-600">{currentNotes}</p>
+            <h2 className="mb-4 text-5xl font-extrabold tracking-tight text-slate-50 lg:text-6xl">{currentTitle}</h2>
+            <p className="mb-8 max-w-lg text-lg font-medium leading-relaxed text-slate-400">{currentNotes}</p>
 
-            {currentIsTimer && (
-              <div className="mt-6 rounded-3xl bg-orange-500 px-6 py-5 text-white">
-                <p className="text-[46px] md:text-[60px] lg:text-[72px] leading-none font-bold tabular-nums">{formatClock(timeRemaining)}</p>
-                <p className="mt-2 text-[18px] md:text-[22px] lg:text-[26px]">minutos restantes</p>
+            {currentIsTimer ? (
+              <div className="relative mb-10 flex items-center justify-center">
+                <div className="absolute h-72 w-72 rounded-full bg-orange-600/15 blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
+                <div className="relative">
+                  <div className="text-[6rem] font-extrabold leading-none tracking-tight text-orange-500 drop-shadow-[0_0_40px_rgba(249,115,22,0.5)] lg:text-[9rem]">
+                    {formatClock(timeRemaining)}
+                  </div>
+                  <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.45em] text-orange-500/80">
+                    Minutos restantes
+                  </div>
+                </div>
               </div>
-            )}
-
-            {!currentIsTimer && hasPortionValue && (
-              <div className="mt-6 rounded-3xl bg-[#ebdfc6] px-6 py-5 text-[#ab380f]">
-                <p className="text-[30px] md:text-[36px] lg:text-[42px] font-bold">{String(portionValue)}</p>
-                <p className="mt-1 text-[16px] md:text-[20px] lg:text-[22px]">Cantidad según porción.</p>
+            ) : hasPortionValue ? (
+              <div className="mb-10 w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6">
+                <p className="text-3xl font-bold text-white">{String(portionValue)}</p>
+                <p className="mt-2 text-sm text-slate-400">Cantidad estimada</p>
               </div>
-            )}
+            ) : null}
 
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <div className="relative z-20 mx-auto flex w-full max-w-sm gap-4">
               <button
                 onClick={handleQuickAction}
-                className={`w-full rounded-3xl px-6 py-3.5 md:py-4 text-[24px] md:text-[30px] lg:text-[34px] font-bold text-white shadow-md inline-flex items-center justify-center gap-3 transition-colors duration-200 ${
-                  isRunningTimerStep
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-emerald-500 hover:bg-emerald-600'
+                className={`flex flex-1 items-center justify-center gap-3 rounded-[2rem] border py-5 text-lg font-extrabold transition-all active:scale-95 ${
+                  currentIsTimer && isRunning
+                    ? 'border-red-400/30 bg-red-500 text-white hover:bg-red-600'
+                    : 'border-orange-400/30 bg-orange-500 text-white shadow-[0_0_30px_rgba(249,115,22,0.25)] hover:bg-orange-400'
                 }`}
               >
-                {currentIsTimer ? (isRunning ? <Pause className="h-7 w-7 md:h-9 md:w-9" /> : <Play className="h-7 w-7 md:h-9 md:w-9" />) : <Play className="h-7 w-7 md:h-9 md:w-9" />}
+                {currentIsTimer && isRunning ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
                 {quickActionLabel}
               </button>
-
               <button
                 onClick={handleSkipStep}
                 disabled={isLastSubStep}
                 title="Saltar subpaso"
                 aria-label="Saltar subpaso"
-                className="h-full min-h-[56px] rounded-2xl border border-slate-400 bg-slate-100 px-4 md:px-5 text-slate-700 inline-flex items-center justify-center transition-colors duration-200 hover:bg-slate-200 hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:border-slate-400"
+                className="flex w-20 items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-slate-200 transition-all hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ChevronsRight className="h-6 w-6 md:h-7 md:w-7" />
+                <ChevronsRight className="h-7 w-7" />
               </button>
             </div>
-          </article>
+          </section>
+        </main>
 
-          <article className="rounded-[30px] border-[3px] border-slate-300 bg-[#ececef] p-5 md:p-6 lg:p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-              <p className="text-[18px] md:text-[24px] lg:text-[30px] font-extrabold uppercase tracking-wide text-slate-500">Siguiente subpaso</p>
-              <p className="text-[24px] md:text-[34px] lg:text-[40px] font-bold text-slate-500">#{nextPosition}</p>
-            </div>
-
+        <aside className="hidden w-80 shrink-0 flex-col border-l border-white/5 bg-black/30 backdrop-blur-2xl xl:flex">
+          <div className="border-b border-white/5 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Siguiente subpaso</h3>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Vista previa</p>
+          </div>
+          <div className="space-y-6 p-7">
             {nextItem ? (
               <>
-                <h3 className="mt-5 text-[30px] md:text-[38px] lg:text-[44px] leading-[1.08] font-bold text-[#1b2741]">{nextItem.subStep.subStepName}</h3>
-                <p className="mt-4 text-[19px] md:text-[22px] lg:text-[26px] leading-[1.25] text-slate-600">{nextItem.subStep.notes || 'Continúa con este subpaso.'}</p>
-
-                {hasInformativeNextValue && (
-                  <div className="mt-6 rounded-3xl bg-[#cfd3db] px-5 py-5 md:px-6 md:py-6">
-                    <p
-                      className={`font-bold leading-none text-[#33415d] ${nextValueIsNumber ? 'text-[40px] md:text-[52px] lg:text-[64px] tabular-nums' : 'text-[26px] md:text-[34px] lg:text-[40px]'}`}
-                    >
-                      {toDisplayValue(nextPortionValue)}
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/20 bg-orange-500/10">
+                  <ArrowRight className="h-7 w-7 text-orange-500" />
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.15em] text-orange-500/80">
+                    Subpaso {currentPosition + 1} de {totalSubSteps}
+                  </p>
+                  <h4 className="mb-3 text-2xl font-bold leading-tight text-white">{nextItem.subStep.subStepName}</h4>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm leading-relaxed text-slate-300">
+                      {nextItem.subStep.notes || 'Continúa con este subpaso.'}
                     </p>
-                    <p className="mt-1 text-[16px] md:text-[18px] lg:text-[20px] text-[#4a566e]">
-                      {typeof nextPortionValue === 'number' ? 'duración estimada' : 'cantidad estimada'}
-                    </p>
+                  </div>
+                </div>
+                {nextEstimatedLabel && (
+                  <div className="pt-4 text-sm font-semibold text-slate-500">
+                    {nextEstimatedLabel}
                   </div>
                 )}
               </>
             ) : (
-              <p className="mt-8 text-[20px] md:text-[26px] text-slate-500">No hay más subpasos.</p>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">No hay más subpasos</p>
+              </div>
             )}
-          </article>
-        </section>
+          </div>
+          <div className="mt-auto p-7">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 opacity-50">
+              <span className="text-xs font-bold uppercase tracking-widest">Preview bloqueado</span>
+              <span className="text-lg">🔒</span>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {flipPromptVisible && (
-        <div className="fixed inset-0 z-40 bg-orange-500 flex items-center justify-center pointer-events-none">
-          <div className="text-center text-white px-6">
-            <h3 className="text-5xl md:text-6xl font-bold mb-4">Voltea el huevo</h3>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-orange-500 pointer-events-none">
+          <div className="px-6 text-center text-white">
+            <h3 className="mb-4 text-5xl font-bold md:text-6xl">Voltea el huevo</h3>
             <p className="text-2xl md:text-3xl">Da la vuelta ahora y continúa con el lado B.</p>
-            <p className="mt-6 text-4xl md:text-5xl font-bold tabular-nums">{flipPromptCountdown}s</p>
+            <p className="mt-6 text-4xl font-bold tabular-nums md:text-5xl">{flipPromptCountdown}s</p>
           </div>
         </div>
       )}
-
-      {/* Modal azul de recordatorio deshabilitado por UX: interrumpe demasiado el flujo */}
     </div>
   );
 }

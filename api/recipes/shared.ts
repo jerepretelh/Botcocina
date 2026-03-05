@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Recipe, RecipeContent, RecipeStep, SubStep } from '../../src/types'
 import { defaultRecipes, initialRecipeContent } from '../../src/app/data/recipes'
+import { createClient } from '@supabase/supabase-js'
 
 type JsonRecipePayload = {
   recipes: Recipe[]
@@ -520,7 +521,150 @@ async function fetchCsv(url: string): Promise<string> {
   return response.text()
 }
 
-async function resolveRecipesPayload(): Promise<{ source: 'sheets' | 'local'; payload: JsonRecipePayload; warning?: string }> {
+function supabaseServerConfig(): { url: string; key: string } | null {
+  const enabled = (process.env.SUPABASE_ENABLED ?? process.env.VITE_SUPABASE_ENABLED ?? 'false').toLowerCase() === 'true'
+  if (!enabled) return null
+  const url = process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim()
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_ANON_KEY?.trim() ||
+    process.env.VITE_SUPABASE_ANON_KEY?.trim()
+  if (!url || !key) return null
+  return { url, key }
+}
+
+async function loadFromSupabaseServer(): Promise<JsonRecipePayload | null> {
+  const cfg = supabaseServerConfig()
+  if (!cfg) return null
+
+  const sb = createClient(cfg.url, cfg.key)
+  const [recipesRes, ingredientsRes, substepsRes] = await Promise.all([
+    sb
+      .from('recipes')
+      .select('id,category_id,name,icon,emoji,ingredient,description,equipment,tip,portion_label_singular,portion_label_plural')
+      .eq('is_published', true),
+    sb
+      .from('recipe_ingredients')
+      .select('recipe_id,sort_order,name,emoji,indispensable,p1,p2,p4'),
+    sb
+      .from('recipe_substeps')
+      .select('recipe_id,substep_order,step_number,step_name,substep_name,notes,is_timer,p1,p2,p4,fire_level,equipment')
+      .order('substep_order', { ascending: true }),
+  ])
+
+  if (recipesRes.error || ingredientsRes.error || substepsRes.error) return null
+
+  const recipesRows = recipesRes.data ?? []
+  if (recipesRows.length === 0) return null
+  const ingredientsRows = ingredientsRes.data ?? []
+  const substepsRows = substepsRes.data ?? []
+
+  const ingredientsByRecipe = new Map<string, typeof ingredientsRows>()
+  for (const item of ingredientsRows) {
+    const list = ingredientsByRecipe.get(item.recipe_id) ?? []
+    list.push(item)
+    ingredientsByRecipe.set(item.recipe_id, list)
+  }
+
+  const substepsByRecipe = new Map<string, typeof substepsRows>()
+  for (const item of substepsRows) {
+    const list = substepsByRecipe.get(item.recipe_id) ?? []
+    list.push(item)
+    substepsByRecipe.set(item.recipe_id, list)
+  }
+
+  const recipes: Recipe[] = []
+  const recipeContentById: Record<string, RecipeContent> = {}
+
+  for (const row of recipesRows) {
+    const sortedSubsteps = (substepsByRecipe.get(row.id) ?? []).sort((a, b) => a.substep_order - b.substep_order)
+    if (sortedSubsteps.length === 0) continue
+
+    const stepsByNumber = new Map<number, { stepName: string; fireLevel: RecipeStep['fireLevel']; equipment?: RecipeStep['equipment']; subSteps: Array<{ order: number; subStep: SubStep }> }>()
+    for (const ss of sortedSubsteps) {
+      const stepNumber = ss.step_number ?? ss.substep_order
+      const existing = stepsByNumber.get(stepNumber) ?? {
+        stepName: ss.step_name || ss.substep_name,
+        fireLevel: (ss.fire_level as RecipeStep['fireLevel']) || 'medium',
+        equipment: (ss.equipment as RecipeStep['equipment']) || undefined,
+        subSteps: [],
+      }
+      const toTimerPortion = (value: string) => {
+        const n = Number(value)
+        return Number.isFinite(n) && n > 0 ? Math.round(n) : 30
+      }
+      existing.subSteps.push({
+        order: ss.substep_order,
+        subStep: {
+          subStepName: ss.substep_name,
+          notes: ss.notes || '',
+          portions: ss.is_timer
+            ? { 1: toTimerPortion(ss.p1), 2: toTimerPortion(ss.p2), 4: toTimerPortion(ss.p4) }
+            : { 1: ss.p1 || 'Continuar', 2: ss.p2 || ss.p1 || 'Continuar', 4: ss.p4 || ss.p2 || ss.p1 || 'Continuar' },
+          isTimer: ss.is_timer,
+        },
+      })
+      stepsByNumber.set(stepNumber, existing)
+    }
+
+    const steps: RecipeStep[] = [...stepsByNumber.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([stepNumber, value]) => ({
+        stepNumber,
+        stepName: value.stepName,
+        fireLevel: value.fireLevel,
+        equipment: value.equipment,
+        subSteps: value.subSteps.sort((a, b) => a.order - b.order).map((x) => x.subStep),
+      }))
+    if (steps.length === 0) continue
+
+    recipes.push({
+      id: row.id,
+      categoryId: row.category_id as Recipe['categoryId'],
+      name: row.name,
+      icon: row.icon || '🍽️',
+      emoji: row.emoji || row.icon || '🍽️',
+      ingredient: row.ingredient,
+      description: row.description,
+      equipment: (row.equipment as Recipe['equipment']) || undefined,
+    })
+
+    recipeContentById[row.id] = {
+      ingredients: (ingredientsByRecipe.get(row.id) ?? [])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((it) => ({
+          name: it.name,
+          emoji: it.emoji || '🍽️',
+          indispensable: it.indispensable,
+          portions: {
+            1: it.p1 || 'Al gusto',
+            2: it.p2 || it.p1 || 'Al gusto',
+            4: it.p4 || it.p2 || it.p1 || 'Al gusto',
+          },
+        })),
+      steps,
+      tip: row.tip || 'Ten todo listo antes de empezar.',
+      portionLabels: {
+        singular: row.portion_label_singular || 'porción',
+        plural: row.portion_label_plural || 'porciones',
+      },
+    }
+  }
+
+  if (recipes.length === 0) return null
+
+  return { recipes, recipeContentById }
+}
+
+async function resolveRecipesPayload(): Promise<{ source: 'supabase' | 'sheets' | 'local'; payload: JsonRecipePayload; warning?: string }> {
+  const supabasePayload = await loadFromSupabaseServer()
+  if (supabasePayload) {
+    return {
+      source: 'supabase',
+      payload: supabasePayload,
+    }
+  }
+
   const multi = getMultiSheetCsvUrlsFromEnv()
   if (multi) {
     try {

@@ -1,16 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import { RecipeStep, StepLoopState, Recipe } from '../../types';
+import { isSupabaseEnabled, supabaseClient } from '../lib/supabaseClient';
 
 interface UseCookingProgressProps {
     selectedRecipe: Recipe | null;
     activeRecipeContentSteps: RecipeStep[];
     portion: number;
+    cloudUserId?: string | null;
 }
 
 export function useCookingProgress({
     selectedRecipe,
     activeRecipeContentSteps,
-    portion
+    portion,
+    cloudUserId
 }: UseCookingProgressProps) {
     const [cookingSteps, setCookingSteps] = useState<RecipeStep[] | null>(null);
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -64,9 +67,60 @@ export function useCookingProgress({
         }
     }, [selectedRecipe, currentStepIndex, currentSubStepIndex, activeStepLoop]);
 
+    useEffect(() => {
+        if (!isSupabaseEnabled || !supabaseClient || !cloudUserId || !selectedRecipe) return;
+        const shouldSave = currentStepIndex > 0 || currentSubStepIndex > 0 || Boolean(activeStepLoop);
+        if (!shouldSave) return;
+
+        const timeout = setTimeout(() => {
+            void supabaseClient
+                .from('user_recipe_progress')
+                .upsert(
+                    {
+                        user_id: cloudUserId,
+                        recipe_id: selectedRecipe.id,
+                        current_step_index: currentStepIndex,
+                        current_substep_index: currentSubStepIndex,
+                        active_step_loop: activeStepLoop,
+                        timer_state: {
+                            isRunning,
+                            timeRemaining,
+                        },
+                        last_saved_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'user_id,recipe_id' },
+                );
+        }, 250);
+
+        return () => clearTimeout(timeout);
+    }, [
+        cloudUserId,
+        selectedRecipe,
+        currentStepIndex,
+        currentSubStepIndex,
+        activeStepLoop,
+        isRunning,
+        timeRemaining,
+    ]);
+
     // Load progress
     const loadProgress = useCallback(() => {
         if (selectedRecipe) {
+            if (isSupabaseEnabled && supabaseClient && cloudUserId) {
+                void supabaseClient
+                    .from('user_recipe_progress')
+                    .select('current_step_index,current_substep_index,active_step_loop')
+                    .eq('user_id', cloudUserId)
+                    .eq('recipe_id', selectedRecipe.id)
+                    .maybeSingle()
+                    .then(({ data }) => {
+                        if (!data) return;
+                        setCurrentStepIndex(data.current_step_index || 0);
+                        setCurrentSubStepIndex(data.current_substep_index || 0);
+                        if (data.active_step_loop) setActiveStepLoop(data.active_step_loop);
+                    });
+            }
             const saved = localStorage.getItem(`cooking_progress_${selectedRecipe.id}`);
             if (saved) {
                 try {
@@ -81,7 +135,7 @@ export function useCookingProgress({
             }
         }
         return false;
-    }, [selectedRecipe]);
+    }, [selectedRecipe, cloudUserId]);
 
     const resetProgress = useCallback(() => {
         setCurrentStepIndex(0);
@@ -93,8 +147,15 @@ export function useCookingProgress({
         setStirPromptVisible(false);
         if (selectedRecipe) {
             localStorage.removeItem(`cooking_progress_${selectedRecipe.id}`);
+            if (isSupabaseEnabled && supabaseClient && cloudUserId) {
+                void supabaseClient
+                    .from('user_recipe_progress')
+                    .delete()
+                    .eq('user_id', cloudUserId)
+                    .eq('recipe_id', selectedRecipe.id);
+            }
         }
-    }, [selectedRecipe]);
+    }, [selectedRecipe, cloudUserId]);
 
     return {
         cookingSteps,

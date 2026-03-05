@@ -176,7 +176,15 @@ export function useThermomixTimer({
                         }
 
                         if (nextSubStepObj) {
-                            speakInstruction(`En 15 segundos: ${nextSubStepObj.subStepName}`, true);
+                            const nextValue = nextSubStepObj.portions?.[portion];
+                            const nextAmountText =
+                                typeof nextValue === 'number'
+                                    ? ` Tiempo estimado: ${nextValue} segundos.`
+                                    : typeof nextValue === 'string' &&
+                                        !['continuar', 'siguiente', 'ok', 'listo', '-', 'n/a', 'na'].includes(nextValue.trim().toLowerCase())
+                                        ? ` Cantidad: ${nextValue}.`
+                                        : '';
+                            speakInstruction(`En 15 segundos: ${nextSubStepObj.subStepName}.${nextAmountText}`, true);
                         }
                     }
 

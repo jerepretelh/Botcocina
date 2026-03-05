@@ -1,7 +1,7 @@
 import { useReducer, useCallback } from 'react';
 import type { Recipe, RecipeCategoryId, RecipeContent, Portion } from '../types';
 
-type Screen = 'category-select' | 'recipe-select' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking';
+type Screen = 'category-select' | 'recipe-select' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system';
 
 interface RecipeState {
   screen: Screen;
