@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { initialRecipeContent, recipeCategories, recipes } from '../src/app/data/recipes';
+import { printCatalogValidation, validateCatalogData } from './catalogValidation';
 
 const q = (value: unknown): string => {
   if (value === null || value === undefined) return 'null';
@@ -9,6 +10,13 @@ const q = (value: unknown): string => {
 };
 
 const qb = (value: boolean): string => (value ? 'true' : 'false');
+
+const validation = validateCatalogData();
+printCatalogValidation(validation);
+if (!validation.ok) {
+  console.error('[catalog] seed abortado: corrige errores de catálogo antes de generar SQL.');
+  process.exit(1);
+}
 
 const recipeIds = recipes.map((recipe) => recipe.id);
 

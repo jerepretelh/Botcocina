@@ -6,7 +6,10 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "catalog:validate": "tsx scripts/validate_catalog.ts",
     "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",
+    "catalog:release:prepare": "npm run catalog:validate && npm run seed:catalog:generate",
+    "catalog:push": "tsx scripts/push_catalog_to_supabase.ts",
     "import:recipes:sheets": "tsx scripts/import_recipes_from_sheets.ts"
   },
   "dependencies": {

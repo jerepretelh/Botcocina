@@ -665,6 +665,20 @@ async function resolveRecipesPayload(): Promise<{ source: 'supabase' | 'sheets' 
     }
   }
 
+  const allowSheetsFallback =
+    (process.env.ALLOW_SHEETS_FALLBACK ?? 'false').toLowerCase() === 'true' &&
+    (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production'
+  if (!allowSheetsFallback) {
+    return {
+      source: 'local',
+      payload: {
+        recipes: defaultRecipes,
+        recipeContentById: initialRecipeContent,
+      },
+      warning: 'Supabase no disponible y fallback a Google Sheets deshabilitado para producción.',
+    }
+  }
+
   const multi = getMultiSheetCsvUrlsFromEnv()
   if (multi) {
     try {

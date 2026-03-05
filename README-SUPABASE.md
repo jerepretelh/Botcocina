@@ -64,7 +64,41 @@ Archivo generado:
 
 Luego aplica ese SQL desde Supabase SQL Editor o vía MCP.
 
-## 5) Checklist de corte directo
+## 5) Flujo operativo semanal (Git + SQL seed)
+
+1. Editar recetas en `src/app/data/recipes.ts`.
+2. Validar catálogo:
+
+```bash
+npm run catalog:validate
+```
+
+3. Preparar release SQL:
+
+```bash
+npm run catalog:release:prepare
+```
+
+Opcional (publicación directa con service role):
+
+```bash
+npm run catalog:push
+```
+
+4. Aplicar seed primero en staging, luego producción.
+5. Registrar release en `docs/ops/catalog-release-log.md`.
+
+## 6) Reglas de fallback en producción
+
+- Catálogo principal: Supabase.
+- Fallback a Google Sheets por API queda deshabilitado por defecto en producción.
+- Solo se habilita en desarrollo con:
+
+```bash
+ALLOW_SHEETS_FALLBACK=true
+```
+
+## 7) Checklist de corte directo
 
 1. Migración aplicada.
 2. Importación exitosa (`import_runs.status = success`).
