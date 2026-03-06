@@ -18,6 +18,7 @@ import { usePortions } from '../hooks/usePortions';
 import { useCookingProgress } from '../hooks/useCookingProgress';
 import { useAIRecipeGeneration } from '../hooks/useAIRecipeGeneration';
 import { useAnonymousSession } from '../hooks/useAnonymousSession';
+import { useUserLists } from '../hooks/useUserLists';
 import { trackProductEvent } from '../lib/productEvents';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
@@ -59,6 +60,7 @@ export function ThermomixCooker() {
     portion: recipeSelection.portion,
     cloudUserId: anonymousSession.userId,
   });
+  const userLists = useUserLists({ userId: anonymousSession.userId });
 
   const aiRecipeGen = useAIRecipeGeneration({
     availableRecipes: recipeSelection.availableRecipes,
@@ -89,6 +91,7 @@ export function ThermomixCooker() {
     setStirPromptCountdown: cookingProgress.setStirPromptCountdown,
     setAwaitingNextUnitConfirmation: cookingProgress.setAwaitingNextUnitConfirmation,
     aiUserId: anonymousSession.userId,
+    addRecipeToDefaultList: userLists.addRecipeToDefaultList,
   });
 
   const {
@@ -106,6 +109,44 @@ export function ThermomixCooker() {
     currentStep,
     isRecipeFinished,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
+
+  const recipesForCurrentView = recipeSelection.availableRecipes.filter((recipe) => {
+    if (userLists.catalogViewMode === 'platform') {
+      return (recipe.visibility ?? 'public') === 'public';
+    }
+    if (userLists.catalogViewMode === 'my-lists') {
+      return userLists.activeListRecipeIds.has(recipe.id);
+    }
+    return true;
+  });
+
+  const visibleRecipesForCurrentView = recipeSelection.selectedCategory
+    ? recipesForCurrentView.filter((recipe) => recipe.categoryId === recipeSelection.selectedCategory)
+    : [];
+
+  const handleCreateList = async () => {
+    const name = window.prompt('Nombre de la nueva lista');
+    if (!name?.trim()) return;
+    await userLists.createUserList(name.trim());
+  };
+
+  const handleRenameList = async () => {
+    if (!userLists.activeListId || !userLists.activeList) return;
+    const name = window.prompt('Nuevo nombre de la lista', userLists.activeList.name);
+    if (!name?.trim()) return;
+    await userLists.renameUserList(userLists.activeListId, name.trim());
+  };
+
+  const handleDeleteList = async () => {
+    if (!userLists.activeListId || !userLists.activeList) return;
+    if (userLists.activeList.isDefault) {
+      window.alert('No puedes eliminar la lista por defecto.');
+      return;
+    }
+    const ok = window.confirm(`¿Eliminar la lista "${userLists.activeList.name}"?`);
+    if (!ok) return;
+    await userLists.deleteUserList(userLists.activeListId);
+  };
   const hasTrackedHomeRef = useRef(false);
   const previousCookingPositionRef = useRef<{ step: number; subStep: number } | null>(null);
   const previousScreenRef = useRef<Screen>(screen);
@@ -372,9 +413,17 @@ export function ThermomixCooker() {
         isGeneratingRecipe={aiRecipeGen.isGeneratingRecipe}
         isCheckingClarifications={aiRecipeGen.isCheckingClarifications}
         recipeCategories={recipeCategories}
-        availableRecipes={recipeSelection.availableRecipes}
+        availableRecipes={recipesForCurrentView}
         onCategorySelect={handlers.handleCategorySelect}
         onOpenDesignSystem={() => recipeSelection.setScreen('design-system')}
+        catalogViewMode={userLists.catalogViewMode}
+        onCatalogViewModeChange={userLists.setCatalogViewMode}
+        userLists={userLists.lists}
+        activeListId={userLists.activeListId}
+        onActiveListChange={userLists.setActiveListId}
+        onCreateList={() => void handleCreateList()}
+        onRenameList={() => void handleRenameList()}
+        onDeleteList={() => void handleDeleteList()}
       />
     );
   }
@@ -394,8 +443,12 @@ export function ThermomixCooker() {
         speechSupported={voice.speechSupported}
         selectedCategoryMeta={recipeSelection.selectedCategoryMeta}
         onBack={() => recipeSelection.goBackScreen('category-select')}
-        visibleRecipes={recipeSelection.visibleRecipes}
+        visibleRecipes={visibleRecipesForCurrentView}
         onRecipeSelect={handlers.handleRecipeSelect}
+        catalogViewMode={userLists.catalogViewMode}
+        activeListName={userLists.activeList?.name ?? null}
+        isRecipeInActiveList={(recipeId) => userLists.activeListRecipeIds.has(recipeId)}
+        onToggleRecipeInActiveList={(recipeId) => void userLists.toggleRecipeInActiveList(recipeId)}
       />
     );
   }

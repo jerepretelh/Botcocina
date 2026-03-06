@@ -15,6 +15,8 @@ type DbRecipe = {
   tip: string | null;
   portion_label_singular: string | null;
   portion_label_plural: string | null;
+  owner_user_id: string | null;
+  visibility: 'public' | 'private' | null;
 };
 
 type DbIngredient = {
@@ -100,24 +102,28 @@ export const supabaseCatalogRepository: CatalogRepository = {
     }
 
     try {
-      const [recipesRes, ingredientsRes, substepsRes] = await Promise.all([
+      const userRes = await supabaseClient.auth.getUser();
+      const userId = userRes.data.user?.id ?? null;
+
+      const [publicRecipesRes, privateRecipesRes] = await Promise.all([
         supabaseClient
           .from('recipes')
-          .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural')
+          .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility')
           .eq('is_published', true)
+          .eq('visibility', 'public')
           .order('name', { ascending: true }),
-        supabaseClient
-          .from('recipe_ingredients')
-          .select('recipe_id, sort_order, name, emoji, indispensable, p1, p2, p4')
-          .order('sort_order', { ascending: true }),
-        supabaseClient
-          .from('recipe_substeps')
-          .select('recipe_id, substep_order, step_number, step_name, substep_name, notes, is_timer, p1, p2, p4, fire_level, equipment')
-          .order('substep_order', { ascending: true }),
+        userId
+          ? supabaseClient
+              .from('recipes')
+              .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility')
+              .eq('owner_user_id', userId)
+              .eq('visibility', 'private')
+              .order('name', { ascending: true })
+          : Promise.resolve({ data: [], error: null } as any),
       ]);
 
-      if (recipesRes.error || ingredientsRes.error || substepsRes.error) {
-        const detail = recipesRes.error?.message || ingredientsRes.error?.message || substepsRes.error?.message || 'Error de lectura';
+      if (publicRecipesRes.error || privateRecipesRes.error) {
+        const detail = publicRecipesRes.error?.message || privateRecipesRes.error?.message || 'Error de lectura';
         return {
           source: 'local-dev',
           warning: `No se pudo leer catálogo Supabase (${detail}). Usando catálogo local.`,
@@ -126,11 +132,10 @@ export const supabaseCatalogRepository: CatalogRepository = {
         };
       }
 
-      const recipesRows = (recipesRes.data ?? []) as DbRecipe[];
-      const ingredientsRows = (ingredientsRes.data ?? []) as DbIngredient[];
-      const substepsRows = (substepsRes.data ?? []) as DbSubstep[];
+      const recipesRows = [...(publicRecipesRes.data ?? []), ...((privateRecipesRes.data ?? []) as any[])] as DbRecipe[];
+      const recipeIds = recipesRows.map((row) => row.id);
 
-      if (recipesRows.length === 0) {
+      if (recipeIds.length === 0) {
         return {
           source: 'local-dev',
           warning: 'Supabase no tiene recetas publicadas. Usando catálogo local.',
@@ -138,6 +143,32 @@ export const supabaseCatalogRepository: CatalogRepository = {
           recipeContentById: initialRecipeContent,
         };
       }
+
+      const [ingredientsRes, substepsRes] = await Promise.all([
+        supabaseClient
+          .from('recipe_ingredients')
+          .select('recipe_id, sort_order, name, emoji, indispensable, p1, p2, p4')
+          .in('recipe_id', recipeIds)
+          .order('sort_order', { ascending: true }),
+        supabaseClient
+          .from('recipe_substeps')
+          .select('recipe_id, substep_order, step_number, step_name, substep_name, notes, is_timer, p1, p2, p4, fire_level, equipment')
+          .in('recipe_id', recipeIds)
+          .order('substep_order', { ascending: true }),
+      ]);
+
+      if (ingredientsRes.error || substepsRes.error) {
+        const detail = ingredientsRes.error?.message || substepsRes.error?.message || 'Error de lectura';
+        return {
+          source: 'local-dev',
+          warning: `No se pudo leer detalle de recetas Supabase (${detail}). Usando catálogo local.`,
+          recipes: defaultRecipes,
+          recipeContentById: initialRecipeContent,
+        };
+      }
+
+      const ingredientsRows = (ingredientsRes.data ?? []) as DbIngredient[];
+      const substepsRows = (substepsRes.data ?? []) as DbSubstep[];
 
       const ingredientsByRecipe = new Map<string, DbIngredient[]>();
       for (const row of ingredientsRows) {
@@ -169,6 +200,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
           ingredient: recipeRow.ingredient,
           description: recipeRow.description,
           equipment: (recipeRow.equipment as Recipe['equipment']) || undefined,
+          ownerUserId: recipeRow.owner_user_id,
+          visibility: (recipeRow.visibility as Recipe['visibility']) || 'public',
         });
 
         recipeContentById[recipeRow.id] = {
@@ -216,5 +249,7 @@ export const supabaseCatalogRepository: CatalogRepository = {
       };
     }
   },
+  async fetchCatalogForUser(): Promise<RecipesCatalogPayload> {
+    return this.fetchCatalog();
+  },
 };
-

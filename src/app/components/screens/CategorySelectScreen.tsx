@@ -1,6 +1,5 @@
 import { ChefHat, Volume2, VolumeX, UtensilsCrossed } from 'lucide-react';
-import { RecipeCategoryId, Recipe } from '../../../types';
-import { recipeCategories } from '../../data/recipes';
+import { CatalogViewMode, RecipeCategory, RecipeCategoryId, Recipe, UserRecipeList } from '../../../types';
 
 interface CategorySelectScreenProps {
     appVersion: string;
@@ -17,7 +16,15 @@ interface CategorySelectScreenProps {
     onGenerateRecipe: () => void;
     onCategorySelect: (id: RecipeCategoryId) => void;
     onOpenDesignSystem: () => void;
-    recipeCategories: any[]; // Added to match usage
+    recipeCategories: RecipeCategory[];
+    catalogViewMode: CatalogViewMode;
+    onCatalogViewModeChange: (mode: CatalogViewMode) => void;
+    userLists: UserRecipeList[];
+    activeListId: string | null;
+    onActiveListChange: (listId: string) => void;
+    onCreateList: () => void;
+    onRenameList: () => void;
+    onDeleteList: () => void;
 }
 
 export function CategorySelectScreen({
@@ -35,6 +42,15 @@ export function CategorySelectScreen({
     onGenerateRecipe,
     onCategorySelect,
     onOpenDesignSystem,
+    recipeCategories,
+    catalogViewMode,
+    onCatalogViewModeChange,
+    userLists,
+    activeListId,
+    onActiveListChange,
+    onCreateList,
+    onRenameList,
+    onDeleteList,
 }: CategorySelectScreenProps) {
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-900 to-black flex items-center justify-center p-4">
@@ -72,6 +88,55 @@ export function CategorySelectScreen({
                     >
                         Abrir Sistema de Diseño (temporal)
                     </button>
+                </div>
+
+                <div className="mb-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => onCatalogViewModeChange('platform')}
+                            className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${catalogViewMode === 'platform'
+                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                : 'bg-slate-800 border-slate-700 text-slate-300'
+                                }`}
+                        >
+                            Plataforma
+                        </button>
+                        <button
+                            onClick={() => onCatalogViewModeChange('my-lists')}
+                            className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${catalogViewMode === 'my-lists'
+                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                                : 'bg-slate-800 border-slate-700 text-slate-300'
+                                }`}
+                        >
+                            Mis listas
+                        </button>
+                    </div>
+                    {catalogViewMode === 'my-lists' && (
+                        <div className="mt-3 space-y-2">
+                            <select
+                                value={activeListId ?? ''}
+                                onChange={(event) => onActiveListChange(event.target.value)}
+                                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100"
+                            >
+                                {userLists.map((list) => (
+                                    <option key={list.id} value={list.id}>
+                                        {list.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <div className="flex gap-2">
+                                <button onClick={onCreateList} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200">
+                                    Nueva lista
+                                </button>
+                                <button onClick={onRenameList} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200">
+                                    Renombrar
+                                </button>
+                                <button onClick={onDeleteList} className="px-3 py-1.5 rounded-lg bg-red-900/40 border border-red-600/60 text-xs text-red-200">
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="mb-5 md:mb-6 bg-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-700 space-y-3">

@@ -9,5 +9,5 @@ export interface RecipesCatalogPayload {
 
 export interface CatalogRepository {
   fetchCatalog: () => Promise<RecipesCatalogPayload>;
+  fetchCatalogForUser?: (userId: string, activeListId?: string | null) => Promise<RecipesCatalogPayload>;
 }
-

@@ -7,6 +7,7 @@ export type ClarificationNumberMode = 'people' | 'quantity';
 export type ClarificationQuantityUnit = 'units' | 'grams';
 export type CookingEquipment = 'stove' | 'airfryer' | 'oven';
 export type CatalogSource = 'supabase' | 'local-dev';
+export type CatalogViewMode = 'platform' | 'my-lists' | 'all';
 
 export type IngredientsBackScreen = 'recipe-setup' | 'ai-clarify';
 
@@ -27,6 +28,25 @@ export interface Recipe {
     description: string;
     basePortions?: number;
     equipment?: CookingEquipment;
+    ownerUserId?: string | null;
+    visibility?: 'public' | 'private';
+}
+
+export interface UserRecipeList {
+    id: string;
+    userId: string;
+    name: string;
+    slug: string;
+    isDefault: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UserListRecipe {
+    listId: string;
+    recipeId: string;
+    sortOrder: number;
+    createdAt: string;
 }
 
 export interface SubStep {

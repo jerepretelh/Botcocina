@@ -49,6 +49,8 @@ async function main() {
       portion_label_singular: content?.portionLabels?.singular ?? 'porción',
       portion_label_plural: content?.portionLabels?.plural ?? 'porciones',
       source: 'imported',
+      owner_user_id: null,
+      visibility: 'public',
       is_published: true,
     };
   });
@@ -156,4 +158,3 @@ main().catch((error) => {
   console.error(`[catalog] push failed: ${message}`);
   process.exit(1);
 });
-

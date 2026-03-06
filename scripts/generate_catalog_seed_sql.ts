@@ -53,10 +53,11 @@ for (const recipe of recipes) {
   lines.push(
     `insert into public.recipes (` +
       `id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, source, is_published` +
+      `, owner_user_id, visibility` +
       `) values (` +
-      `${q(recipe.id)}, ${q(recipe.categoryId)}, ${q(recipe.name)}, ${q(recipe.icon)}, ${q((recipe as { emoji?: string }).emoji ?? recipe.icon)}, ${q(recipe.ingredient)}, ${q(recipe.description)}, ${q((recipe as { equipment?: string }).equipment ?? null)}, ${q(tip)}, ${q(singular)}, ${q(plural)}, 'imported', true` +
+      `${q(recipe.id)}, ${q(recipe.categoryId)}, ${q(recipe.name)}, ${q(recipe.icon)}, ${q((recipe as { emoji?: string }).emoji ?? recipe.icon)}, ${q(recipe.ingredient)}, ${q(recipe.description)}, ${q((recipe as { equipment?: string }).equipment ?? null)}, ${q(tip)}, ${q(singular)}, ${q(plural)}, 'imported', true, null, 'public'` +
       `) on conflict (id) do update set ` +
-      `category_id = excluded.category_id, name = excluded.name, icon = excluded.icon, emoji = excluded.emoji, ingredient = excluded.ingredient, description = excluded.description, equipment = excluded.equipment, tip = excluded.tip, portion_label_singular = excluded.portion_label_singular, portion_label_plural = excluded.portion_label_plural, source = excluded.source, is_published = excluded.is_published, updated_at = now();`,
+      `category_id = excluded.category_id, name = excluded.name, icon = excluded.icon, emoji = excluded.emoji, ingredient = excluded.ingredient, description = excluded.description, equipment = excluded.equipment, tip = excluded.tip, portion_label_singular = excluded.portion_label_singular, portion_label_plural = excluded.portion_label_plural, source = excluded.source, is_published = excluded.is_published, owner_user_id = excluded.owner_user_id, visibility = excluded.visibility, updated_at = now();`,
   );
 
   if (!content) continue;

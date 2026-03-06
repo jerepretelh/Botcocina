@@ -30,6 +30,7 @@ import {
 } from '../utils/recipeHelpers';
 import { useAIClarifications } from './useAIClarifications';
 import { isSupabaseEnabled, supabaseClient } from '../lib/supabaseClient';
+import { trackProductEvent } from '../lib/productEvents';
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface UseAIRecipeGenerationDeps {
@@ -61,6 +62,7 @@ interface UseAIRecipeGenerationDeps {
     setStirPromptCountdown: (action: any) => void;
     setAwaitingNextUnitConfirmation: (action: any) => void;
     aiUserId?: string | null;
+    addRecipeToDefaultList?: (recipeId: string) => Promise<void>;
 }
 
 // ─── Clarification Helpers (pure functions) ──────────────────────────
@@ -208,6 +210,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setStirPromptCountdown,
         setAwaitingNextUnitConfirmation,
         aiUserId,
+        addRecipeToDefaultList,
     } = deps;
 
     const persistAiRecipeToSupabase = useCallback(
@@ -254,7 +257,9 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                         portion_label_singular: content.portionLabels.singular,
                         portion_label_plural: content.portionLabels.plural,
                         source: 'ai',
-                        is_published: true,
+                        owner_user_id: aiUserId,
+                        visibility: 'private',
+                        is_published: false,
                         updated_at: new Date().toISOString(),
                     },
                     { onConflict: 'id' },
@@ -307,13 +312,17 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     recipe_id: recipe.id,
                     raw_response: content,
                 });
+                if (addRecipeToDefaultList) {
+                    await addRecipeToDefaultList(recipe.id);
+                }
+                await trackProductEvent(aiUserId, 'ai_recipe_created_private', { recipeId: recipe.id });
             } catch (error) {
                 await updateGeneration('failed', {
                     error_message: error instanceof Error ? error.message : 'failed-to-persist-ai-recipe',
                 });
             }
         },
-        [aiUserId],
+        [aiUserId, addRecipeToDefaultList],
     );
 
     const ai = useAIClarifications();
@@ -457,9 +466,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
             const inferredPortion = inferPortionFromPrompt(finalPrompt);
             const generated = ensureRecipeShape(await generateRecipeWithAI(finalPrompt));
             const baseId = buildRecipeId(generated.id || generated.name);
-            const uniqueId = availableRecipes.some((recipe) => recipe.id === baseId)
-                ? `${baseId}-${Date.now()}`
-                : baseId;
+            const uniqueId = `${baseId}-${aiUserId?.slice(0, 8) ?? 'anon'}-${Date.now()}`;
 
             if (generated.ingredients.length === 0 || generated.steps.length === 0) {
                 throw new Error('La IA devolvió una receta incompleta. Intenta nuevamente.');
@@ -472,6 +479,8 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 icon: generated.icon,
                 ingredient: generated.ingredient,
                 description: generated.description,
+                ownerUserId: aiUserId ?? null,
+                visibility: 'private',
             };
 
             const newContent: RecipeContent = {
@@ -542,12 +551,12 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
             }
             ai.setAiSuccess(
                 clarifiedSizing?.quantityMode === 'have'
-                    ? `Receta "${newRecipe.name}" agregada con base "lo que tienes" (${clarifiedSizing.count} ${clarifiedSizing.amountUnit === 'grams' ? 'g' : 'unid'}).`
+                    ? `Receta "${newRecipe.name}" guardada en Mis recetas con base "lo que tienes" (${clarifiedSizing.count} ${clarifiedSizing.amountUnit === 'grams' ? 'g' : 'unid'}).`
                     : clarifiedPeopleCount
-                        ? `Receta "${newRecipe.name}" agregada. Configurada para ${clarifiedPeopleCount} personas.`
+                        ? `Receta "${newRecipe.name}" guardada en Mis recetas. Configurada para ${clarifiedPeopleCount} personas.`
                         : inferredPortion
-                            ? `Receta "${newRecipe.name}" agregada. Detecté ${inferredPortion} porciones desde el prompt.`
-                            : `Receta "${newRecipe.name}" agregada.`,
+                            ? `Receta "${newRecipe.name}" guardada en Mis recetas. Detecté ${inferredPortion} porciones desde el prompt.`
+                            : `Receta "${newRecipe.name}" guardada en Mis recetas.`,
             );
         } catch (error) {
             ai.setAiError(error instanceof Error ? error.message : 'No se pudo generar la receta.');

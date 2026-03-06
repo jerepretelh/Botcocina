@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ChefHat, Volume2, VolumeX, List } from 'lucide-react';
-import { Recipe, RecipeCategoryId, RecipeCategory, RecipeStep } from '../../../types';
+import { ChefHat, Volume2, VolumeX, List, Bookmark, BookmarkCheck } from 'lucide-react';
+import { CatalogViewMode, Recipe, RecipeCategory, RecipeStep } from '../../../types';
 import { RoadmapModal } from '../ui/RoadmapModal';
 import { initialRecipeContent } from '../../data/recipes';
 
@@ -13,6 +13,10 @@ interface RecipeSelectScreenProps {
     onVoiceToggle: () => void;
     onBack: () => void;
     onRecipeSelect: (recipe: Recipe) => void;
+    catalogViewMode: CatalogViewMode;
+    activeListName: string | null;
+    isRecipeInActiveList: (recipeId: string) => boolean;
+    onToggleRecipeInActiveList: (recipeId: string) => void;
 }
 
 export function RecipeSelectScreen({
@@ -24,6 +28,10 @@ export function RecipeSelectScreen({
     onVoiceToggle,
     onBack: onBackToCategories,
     onRecipeSelect,
+    catalogViewMode,
+    activeListName,
+    isRecipeInActiveList,
+    onToggleRecipeInActiveList,
 }: RecipeSelectScreenProps) {
     const [roadmapRecipe, setRoadmapRecipe] = useState<Recipe | null>(null);
 
@@ -70,7 +78,7 @@ export function RecipeSelectScreen({
                         {selectedCategoryMeta?.icon} {selectedCategoryMeta?.name ?? 'Recetas'}
                     </h2>
                     <p className="text-sm md:text-base text-slate-400">
-                        Elige una receta
+                        {catalogViewMode === 'my-lists' ? `Lista activa: ${activeListName ?? 'Mis listas'}` : 'Elige una receta'}
                     </p>
                 </div>
 
@@ -112,7 +120,21 @@ export function RecipeSelectScreen({
                                 </h3>
                                 <p className="text-xs md:text-sm text-slate-400">{recipe.description}</p>
                             </div>
-                            <div className="shrink-0">
+                            <div className="shrink-0 flex gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onToggleRecipeInActiveList(recipe.id);
+                                    }}
+                                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center hover:bg-slate-700 hover:border-orange-500 transition-all text-cyan-300 shadow-md"
+                                    title={isRecipeInActiveList(recipe.id) ? 'Quitar de lista' : 'Guardar en lista'}
+                                >
+                                    {isRecipeInActiveList(recipe.id) ? (
+                                        <BookmarkCheck className="w-5 h-5 md:w-6 md:h-6" />
+                                    ) : (
+                                        <Bookmark className="w-5 h-5 md:w-6 md:h-6" />
+                                    )}
+                                </button>
                                 <button
                                     onClick={(e) => handleViewRoadmap(e, recipe)}
                                     className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center hover:bg-slate-700 hover:border-orange-500 transition-all text-orange-400 shadow-md"
