@@ -1,417 +1,373 @@
-import { useState } from 'react';
-import { ChefHat, Volume2, VolumeX, List } from 'lucide-react';
-import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient } from '../../../types';
-import { RoadmapModal } from '../ui/RoadmapModal';
+import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient, Recipe } from '../../../types';
+import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight } from 'lucide-react';
 
 interface CookingScreenProps {
-    appVersion: string;
-    voiceEnabled: boolean;
-    speechSupported: boolean;
-    currentStepIndex: number;
-    currentSubStepIndex: number;
-    activeStepLoop: StepLoopState | null;
-    isRunning: boolean;
-    timeRemaining: number;
-    flipPromptVisible: boolean;
-    flipPromptCountdown: number;
-    stirPromptVisible: boolean;
-    stirPromptCountdown: number;
-    awaitingNextUnitConfirmation: boolean;
-    currentRecipeData: RecipeStep[];
-    currentStep: RecipeStep | null;
-    currentSubStep: SubStep | null;
-    portion: Portion;
-    portionValue: number | null;
-    isRetirarSubStep: boolean;
-    retirarTitle: string;
-    retirarMessage: string;
-    effectiveReminderTitle: string;
-    effectiveReminderMessage: string;
-    onVoiceToggle: () => void;
-    onChangeMission: () => void;
-    onPrevious: () => void;
-    onNext: () => void;
-    onTogglePause: () => void;
-    onJumpToSubStep: (stepIndex: number, subStepIndex: number) => void;
-    onContinue: () => void;
-    onConfirmNextUnit: () => void;
-    currentIngredients: Ingredient[];
-    activeIngredientSelection: Record<string, boolean>;
-    activeRecipeContent: RecipeContent;
+  appVersion: string;
+  voiceEnabled: boolean;
+  speechSupported: boolean;
+  currentStepIndex: number;
+  currentSubStepIndex: number;
+  activeStepLoop: StepLoopState | null;
+  isRunning: boolean;
+  timeRemaining: number;
+  flipPromptVisible: boolean;
+  flipPromptCountdown: number;
+  stirPromptVisible: boolean;
+  stirPromptCountdown: number;
+  awaitingNextUnitConfirmation: boolean;
+  currentRecipeData: RecipeStep[];
+  currentStep: RecipeStep | null;
+  currentSubStep: SubStep | null;
+  portion: Portion;
+  portionValue: number | string | null;
+  isRetirarSubStep: boolean;
+  retirarTitle: string;
+  retirarMessage: string;
+  effectiveReminderTitle: string;
+  effectiveReminderMessage: string;
+  onVoiceToggle: () => void;
+  onChangeMission: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
+  onTogglePause: () => void;
+  onJumpToSubStep: (stepIndex: number, subStepIndex: number) => void;
+  onContinue: () => void;
+  onConfirmNextUnit: () => void;
+  currentIngredients: Ingredient[];
+  activeIngredientSelection: Record<string, boolean>;
+  activeRecipeContent: RecipeContent;
+  selectedRecipe?: Recipe | null;
+}
+
+function formatClock(seconds: number) {
+  const safe = Math.max(0, Math.round(seconds));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function isInformativePortionValue(value: string | number | null | undefined) {
+  if (typeof value === 'number') return value > 0;
+  if (typeof value !== 'string') return false;
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return false;
+
+  const nonInformative = new Set([
+    'continuar',
+    'siguiente',
+    'listo',
+    'ok',
+    'n/a',
+    'na',
+    '-',
+  ]);
+  if (nonInformative.has(normalized)) return false;
+
+  const hasNumber = /\d/.test(normalized);
+  const hasMeasureWord = /(cda|cdas|cdita|cditas|gr|g|kg|ml|l|taza|tazas|unidad|unidades|huevo|huevos|pizca|al gusto)/.test(normalized);
+  return hasNumber || hasMeasureWord;
+}
+
+function getIngredientKey(name: string) {
+  return name.toLowerCase().replace(/\s+/g, '_');
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 export function CookingScreen({
-    appVersion,
-    voiceEnabled,
-    speechSupported,
-    currentStepIndex,
-    currentSubStepIndex,
-    activeStepLoop,
-    isRunning,
-    timeRemaining,
-    flipPromptVisible,
-    flipPromptCountdown,
-    stirPromptVisible,
-    stirPromptCountdown,
-    awaitingNextUnitConfirmation,
-    currentRecipeData,
-    currentStep,
-    currentSubStep,
-    portion,
-    portionValue,
-    isRetirarSubStep,
-    retirarTitle,
-    retirarMessage,
-    effectiveReminderTitle,
-    effectiveReminderMessage,
-    onVoiceToggle,
-    onChangeMission,
-    onPrevious,
-    onNext,
-    onTogglePause,
-    onJumpToSubStep,
-    onContinue,
-    onConfirmNextUnit,
-    currentIngredients,
-    activeIngredientSelection,
-    activeRecipeContent,
+  currentStepIndex,
+  currentSubStepIndex,
+  isRunning,
+  timeRemaining,
+  flipPromptVisible,
+  flipPromptCountdown,
+  awaitingNextUnitConfirmation,
+  currentRecipeData,
+  currentStep,
+  currentSubStep,
+  portion,
+  portionValue,
+  isRetirarSubStep,
+  retirarTitle,
+  retirarMessage,
+  onChangeMission,
+  onNext,
+  onTogglePause,
+  onContinue,
+  onConfirmNextUnit,
+  currentIngredients,
+  activeIngredientSelection,
+  activeRecipeContent,
+  selectedRecipe,
 }: CookingScreenProps) {
-    const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
+  const flattenedSubSteps = currentRecipeData.flatMap((step, sIdx) =>
+    step.subSteps.map((subStep, ssIdx) => ({ stepIndex: sIdx, subStepIndex: ssIdx, step, subStep })),
+  );
 
-    // Restauramos las variables calculadas que antes eran props o se perdieron
-    const isRecipeFinished = currentStepIndex === currentRecipeData.length - 1 &&
-        currentSubStepIndex === (currentStep?.subSteps.length ?? 0) - 1;
+  const currentFlatIndex = flattenedSubSteps.findIndex(
+    (item) => item.stepIndex === currentStepIndex && item.subStepIndex === currentSubStepIndex,
+  );
 
-    const isLoopingCurrentStep = Boolean(activeStepLoop && activeStepLoop.stepIndex === currentStepIndex);
+  const currentPosition = currentFlatIndex >= 0 ? currentFlatIndex + 1 : 1;
+  const totalSubSteps = Math.max(flattenedSubSteps.length, 1);
+  const progressPercent = Math.round((currentPosition / totalSubSteps) * 100);
+  const isLastSubStep = currentPosition >= totalSubSteps;
 
-    const getFireEmojis = (level?: 'low' | 'medium' | 'high') => {
-        switch (level) {
-            case 'high': return '🔥🔥🔥';
-            case 'medium': return '🔥🔥';
-            case 'low': return '🔥';
-            default: return '';
-        }
-    };
+  const nextItem = currentFlatIndex >= 0 && currentFlatIndex < flattenedSubSteps.length - 1 ? flattenedSubSteps[currentFlatIndex + 1] : null;
 
-    const isAutoReminderSubStep = Boolean((currentSubStep as any)?.isAutoReminder);
+  const currentTitle = isRetirarSubStep ? retirarTitle : currentSubStep?.subStepName || currentStep?.stepName || 'Siguiente acción';
+  const currentNotes = isRetirarSubStep ? retirarMessage : currentSubStep?.notes || 'Sigue la indicación para continuar.';
 
-    const handleJump = (sIdx: number, ssIdx: number) => {
-        onJumpToSubStep(sIdx, ssIdx);
-        setIsRoadmapOpen(false);
-    };
+  const currentIsTimer = Boolean(currentSubStep?.isTimer);
+  const hasPortionValue = isInformativePortionValue(portionValue);
 
-    return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-4">
-            <div className="w-full max-w-5xl">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4 md:mb-8">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg md:rounded-xl flex items-center justify-center">
-                            <ChefHat className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <h1 className="text-lg md:text-xl font-bold text-white">Chef Bot Pro</h1>
-                            <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{appVersion}</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-2 md:gap-3">
-                        <button
-                            onClick={() => setIsRoadmapOpen(true)}
-                            className="w-9 h-9 md:w-10 md:h-10 bg-slate-800 text-white rounded-lg md:rounded-xl flex items-center justify-center border border-slate-700 hover:border-orange-500 transition-colors"
-                            title="Ver ruta de receta"
-                        >
-                            <List className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
-                        <button
-                            onClick={onChangeMission}
-                            className="px-3 py-2 md:px-4 md:py-2 bg-slate-800 text-white rounded-lg md:rounded-xl text-xs md:text-sm border border-slate-700 hover:border-orange-500 transition-colors"
-                        >
-                            Cambiar receta
-                        </button>
-                        <button
-                            onClick={onVoiceToggle}
-                            className={`w-9 h-9 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center border transition-colors ${voiceEnabled ? 'bg-orange-900/40 border-orange-600' : 'bg-slate-800 border-slate-700'
-                                }`}
-                            title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
-                        >
-                            {voiceEnabled ? (
-                                <Volume2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                            ) : (
-                                <VolumeX className="w-4 h-4 md:w-5 md:h-5 text-slate-300" />
-                            )}
-                        </button>
-                    </div>
+  const quickActionLabel = awaitingNextUnitConfirmation
+    ? `Continuar ${activeRecipeContent.portionLabels.singular}`
+    : currentIsTimer
+      ? isRunning
+        ? 'Pausar'
+        : 'Reanudar'
+      : 'Siguiente';
+
+  const handleQuickAction = () => {
+    if (awaitingNextUnitConfirmation) {
+      onConfirmNextUnit();
+      return;
+    }
+    if (currentIsTimer) {
+      onTogglePause();
+      return;
+    }
+    if (isRetirarSubStep) {
+      onContinue();
+      return;
+    }
+    onNext();
+  };
+
+  const handleSkipStep = () => {
+    if (awaitingNextUnitConfirmation) {
+      onConfirmNextUnit();
+      return;
+    }
+    if (isRetirarSubStep) {
+      onContinue();
+      return;
+    }
+    if (!isLastSubStep) {
+      onNext();
+    }
+  };
+
+  const recipeName = selectedRecipe?.name ?? 'Receta en curso';
+  const recipeIcon = selectedRecipe?.icon ?? '🍳';
+  const activeIngredients = currentIngredients.filter((ingredient) => {
+    const key = getIngredientKey(ingredient.name);
+    return activeIngredientSelection[key] ?? true;
+  });
+  const nextEstimated = nextItem ? nextItem.subStep.portions[portion] : null;
+  const nextEstimatedLabel =
+    typeof nextEstimated === 'number'
+      ? `Tiempo estimado: ${nextEstimated}s`
+      : typeof nextEstimated === 'string' && isInformativePortionValue(nextEstimated)
+        ? `Cantidad estimada: ${nextEstimated}`
+        : null;
+  const consumedIngredientKeys = new Set(
+    activeIngredients
+      .filter((ingredient) => {
+        const ingredientName = normalizeText(ingredient.name);
+        const isConsumed = flattenedSubSteps.some((subStepItem, index) => {
+          if (index > currentFlatIndex) return false;
+          const haystack = normalizeText(
+            `${subStepItem.step.stepName} ${subStepItem.subStep.subStepName} ${subStepItem.subStep.notes}`,
+          );
+          return haystack.includes(ingredientName);
+        });
+        return isConsumed;
+      })
+      .map((ingredient) => getIngredientKey(ingredient.name)),
+  );
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_center,_#1e1e1e_0%,_#0a0a0a_100%)] text-slate-100 antialiased">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
+
+      <div className="relative z-10 h-1.5 w-full bg-white/5">
+        <div
+          className="h-full rounded-r-full bg-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.6)] transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      <div className="relative z-20 flex h-[calc(100vh-6px)] overflow-hidden">
+        <aside className="hidden w-72 shrink-0 flex-col border-r border-white/5 bg-black/30 backdrop-blur-2xl lg:flex">
+          <div className="border-b border-white/5 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-orange-400">Ingredientes</h3>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Lista activa</p>
+          </div>
+          <div className="flex-1 space-y-5 overflow-y-auto p-6">
+            {activeIngredients.slice(0, 10).map((ingredient) => (
+              <div key={ingredient.name} className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border text-lg ${
+                    consumedIngredientKeys.has(getIngredientKey(ingredient.name))
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                      : 'border-white/10 bg-white/5 text-orange-400'
+                  }`}
+                >
+                  {ingredient.emoji || '•'}
                 </div>
-
-                <div className="bg-gradient-to-b from-slate-900 to-black rounded-2xl md:rounded-3xl p-4 md:p-8 border border-slate-800">
-                    {/* Status Badge */}
-                    <div className="flex justify-center items-center mb-4 md:mb-6 relative">
-                        <button
-                            onClick={onPrevious}
-                            disabled={currentSubStepIndex === 0 || stirPromptVisible}
-                            className="absolute left-0 w-10 h-10 md:w-12 md:h-12 bg-slate-800 rounded-lg md:rounded-xl flex items-center justify-center border border-slate-700 hover:border-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                        </button>
-                        <div className="bg-gradient-to-r from-orange-900 to-orange-800 px-4 py-2 md:px-6 md:py-3 rounded-full border border-orange-700 flex items-center gap-1 md:gap-2">
-                            <span className="text-base md:text-lg">🔥</span>
-                            <span className="text-white font-semibold uppercase tracking-wide text-xs md:text-sm">
-                                {currentStep?.stepName}
-                            </span>
-                        </div>
-                        <button
-                            onClick={onNext}
-                            disabled={isRecipeFinished || stirPromptVisible}
-                            className="absolute right-0 w-10 h-10 md:w-12 md:h-12 bg-slate-800 rounded-lg md:rounded-xl flex items-center justify-center border border-slate-700 hover:border-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* Step Counters */}
-                    <div className="text-center mb-4 md:mb-8">
-                        <p className="text-slate-500 uppercase tracking-wider text-xs md:text-sm">
-                            Paso {currentStep?.stepNumber} de {currentRecipeData.length}
-                        </p>
-                        <p className="text-orange-300 text-xs md:text-sm mt-1">
-                            Fuego: {currentStep?.fireLevel === 'low' ? 'bajo' : currentStep?.fireLevel === 'high' ? 'alto' : 'medio'} {getFireEmojis(currentStep?.fireLevel)}
-                        </p>
-                        {isLoopingCurrentStep && activeStepLoop && (
-                            <p className="text-orange-400 text-xs md:text-sm font-semibold mt-1">
-                                Pieza {activeStepLoop.currentItem} de {activeStepLoop.totalItems}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Main Content - Split Layout */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-6 md:mb-8">
-                        {/* Left Side - Instructions */}
-                        <div className="flex flex-col justify-center order-2 lg:order-1">
-                            <p className="text-slate-500 uppercase tracking-wider text-xs md:text-sm mb-2">
-                                Sub-paso {currentSubStepIndex + 1} de {currentStep?.subSteps.length}
-                            </p>
-                            <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 md:mb-4">
-                                {isRetirarSubStep ? retirarTitle : currentSubStep?.subStepName}
-                            </h3>
-                            {(isRetirarSubStep || (currentSubStep?.notes && !currentSubStep.notes.startsWith('Cantidad'))) && (
-                                <p className="text-lg md:text-xl text-slate-400 leading-relaxed">
-                                    {isRetirarSubStep ? retirarMessage : currentSubStep?.notes}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Right Side - Timer or Quantity Display */}
-                        <div className="flex items-center justify-center order-1 lg:order-2">
-                            {(currentSubStep?.isTimer || currentStep?.stepNumber === 5) ? (
-                                <div className="relative">
-                                    <svg className="w-64 h-64 md:w-80 md:h-80 transform -rotate-90">
-                                        <circle
-                                            cx="128"
-                                            cy="128"
-                                            r="115"
-                                            stroke="currentColor"
-                                            strokeWidth="12"
-                                            fill="none"
-                                            className="text-slate-800 md:hidden"
-                                        />
-                                        <circle
-                                            cx="128"
-                                            cy="128"
-                                            r="115"
-                                            stroke="currentColor"
-                                            strokeWidth="12"
-                                            fill="none"
-                                            strokeDasharray={`${2 * Math.PI * 115}`}
-                                            strokeDashoffset={`${2 * Math.PI * 115 * (1 - ((portionValue as number) - timeRemaining) / (portionValue as number))
-                                                }`}
-                                            className={`${(currentStep as any)?.equipment === 'airfryer' ? 'text-amber-500' : (currentStep as any)?.equipment === 'oven' ? 'text-rose-500' : 'text-orange-500'} transition-all duration-1000 md:hidden`}
-                                            strokeLinecap="round"
-                                        />
-                                        <circle
-                                            cx="160"
-                                            cy="160"
-                                            r="145"
-                                            stroke="currentColor"
-                                            strokeWidth="14"
-                                            fill="none"
-                                            className="text-slate-800 hidden md:block"
-                                        />
-                                        <circle
-                                            cx="160"
-                                            cy="160"
-                                            r="145"
-                                            stroke="currentColor"
-                                            strokeWidth="14"
-                                            fill="none"
-                                            strokeDasharray={`${2 * Math.PI * 145}`}
-                                            strokeDashoffset={`${2 * Math.PI * 145 * (1 - ((portionValue as number) - timeRemaining) / (portionValue as number))
-                                                }`}
-                                            className={`${(currentStep as any)?.equipment === 'airfryer' ? 'text-amber-500' : (currentStep as any)?.equipment === 'oven' ? 'text-rose-500' : 'text-orange-500'} transition-all duration-1000 hidden md:block`}
-                                            strokeLinecap="round"
-                                        />
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 md:gap-4">
-                                        <span className="text-6xl md:text-8xl font-bold text-white tabular-nums">
-                                            {timeRemaining}
-                                        </span>
-                                        <button
-                                            onClick={onTogglePause}
-                                            className="bg-slate-800 text-white px-4 py-2 md:px-6 md:py-2 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold border border-slate-700 hover:border-orange-500 transition-colors flex items-center gap-2"
-                                        >
-                                            <span className="text-base md:text-lg">{isRunning ? '⏸' : '▶'}</span>
-                                            {isRunning ? 'Pausar' : 'Iniciar'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (portionValue as any) !== 'Continuar' ? (
-                                <div className="bg-slate-800 rounded-2xl md:rounded-3xl p-12 md:p-16 border border-slate-700">
-                                    <p className="text-5xl md:text-7xl font-bold text-orange-400 text-center">
-                                        {portionValue}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center">
-                                    <div className="text-6xl md:text-8xl">👌</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Controls */}
-                    {isRetirarSubStep && !isRecipeFinished && (
-                        <div className="space-y-3 mb-4">
-                            <button
-                                onClick={onNext}
-                                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-xl md:rounded-2xl font-bold text-lg md:text-xl shadow-lg hover:from-orange-600 hover:to-orange-700 transition-colors"
-                            >
-                                Listo
-                            </button>
-                        </div>
-                    )}
-
-                    {isRecipeFinished && (
-                        <div className="space-y-3 mb-4">
-                            <button
-                                onClick={onChangeMission}
-                                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-4 rounded-xl md:rounded-2xl font-bold text-lg md:text-xl shadow-lg hover:from-emerald-600 hover:to-emerald-700 transition-colors"
-                            >
-                                Finalizar
-                            </button>
-                        </div>
-                    )}
-
-                    {awaitingNextUnitConfirmation && (
-                        <div className="space-y-3 mb-4">
-                            <button
-                                onClick={onConfirmNextUnit}
-                                className="w-full bg-blue-600 text-white py-4 rounded-xl md:rounded-2xl font-bold text-lg md:text-xl shadow-lg hover:bg-blue-700 transition-colors"
-                            >
-                                Continuar con siguiente {activeRecipeContent.portionLabels.singular}
-                            </button>
-                        </div>
-                    )}
-
-                    {!currentSubStep?.isTimer && !isRetirarSubStep && !isAutoReminderSubStep && (
-                        <div className="space-y-4">
-                            <button
-                                onClick={onNext}
-                                disabled={isRecipeFinished || awaitingNextUnitConfirmation || isRetirarSubStep}
-                                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-5 md:py-6 rounded-xl md:rounded-2xl font-bold text-xl md:text-2xl shadow-lg hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                ¡Listo!
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Next Step Preview */}
-                    {!isRecipeFinished && (
-                        <div className="mt-8 pt-6 border-t border-slate-800/50">
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="flex h-2 w-2 rounded-full bg-orange-500 animate-pulse"></span>
-                                <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">Próximo paso</p>
-                            </div>
-                            <div className="bg-slate-900/40 rounded-2xl p-4 border border-slate-800/50 group hover:border-orange-500/30 transition-colors">
-                                {(() => {
-                                    let nextStepObj = null;
-                                    let nextSubStepObj = null;
-
-                                    if (currentSubStepIndex < (currentStep?.subSteps.length ?? 0) - 1) {
-                                        nextStepObj = currentStep;
-                                        nextSubStepObj = currentStep?.subSteps[currentSubStepIndex + 1];
-                                    } else if (currentStepIndex < currentRecipeData.length - 1) {
-                                        nextStepObj = currentRecipeData[currentStepIndex + 1];
-                                        nextSubStepObj = nextStepObj.subSteps[0];
-                                    }
-
-                                    if (!nextSubStepObj) return <p className="text-slate-600 italic text-sm">Fin de la receta</p>;
-
-                                    return (
-                                        <div className="flex items-start gap-4">
-                                            <div className="flex-1">
-                                                <p className="text-white font-bold text-sm md:text-base group-hover:text-orange-300 transition-colors">
-                                                    {nextSubStepObj.subStepName}
-                                                </p>
-                                                <p className="text-slate-500 text-xs md:text-sm mt-1 line-clamp-1">
-                                                    {nextSubStepObj.notes}
-                                                </p>
-                                            </div>
-                                            {nextSubStepObj.isTimer && (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-950/30 border border-orange-500/20 rounded-lg">
-                                                    <span className="text-orange-400 text-xs font-bold">⏱️</span>
-                                                    <span className="text-orange-400 text-xs font-black">
-                                                        {nextSubStepObj.portions[portion] as string}s
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    )}
+                <div className="min-w-0">
+                  <p
+                    className={`truncate text-sm font-bold ${
+                      consumedIngredientKeys.has(getIngredientKey(ingredient.name))
+                        ? 'text-emerald-300 line-through'
+                        : 'text-white'
+                    }`}
+                  >
+                    {ingredient.name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {ingredient.portions[portion]}
+                    {consumedIngredientKeys.has(getIngredientKey(ingredient.name)) ? ' · usado' : ''}
+                  </p>
                 </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <main className="relative flex flex-1 flex-col">
+          <header className="flex items-center justify-between px-8 py-6 lg:px-10 lg:py-8">
+            <div className="flex items-center gap-4">
+              <div>
+                <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-white">
+                  <span className="text-4xl leading-none lg:text-5xl">{recipeIcon}</span>
+                  <span>{recipeName}</span>
+                </h1>
+              </div>
+            </div>
+            <button
+              onClick={onChangeMission}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reiniciar
+            </button>
+          </header>
+
+          <section className="flex flex-1 flex-col items-center justify-center px-4 text-center">
+            <div className="mb-6 inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-5 py-2 backdrop-blur-md">
+              <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-orange-400">
+                Subpaso {currentPosition} de {totalSubSteps}
+              </span>
             </div>
 
-            {flipPromptVisible && (
-                <div className="fixed inset-0 z-40 bg-orange-500 flex items-center justify-center pointer-events-none">
-                    <div className="text-center text-white px-6">
-                        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-orange-400/40 flex items-center justify-center text-4xl">
-                            ⏱️
-                        </div>
-                        <h3 className="text-5xl md:text-6xl font-bold mb-4">Voltea el huevo</h3>
-                        <p className="text-2xl md:text-3xl">Da la vuelta ahora y continúa con el lado B.</p>
-                        <p className="mt-6 text-4xl md:text-5xl font-bold tabular-nums">{flipPromptCountdown}s</p>
-                    </div>
-                </div>
-            )}
+            <h2 className="mb-4 text-5xl font-extrabold tracking-tight text-slate-50 lg:text-6xl">{currentTitle}</h2>
+            <p className="mb-8 max-w-lg text-lg font-medium leading-relaxed text-slate-400">{currentNotes}</p>
 
-            {stirPromptVisible && (
-                <div className="fixed inset-0 z-30 bg-blue-600/95 flex items-center justify-center pointer-events-none">
-                    <div className="text-center text-white px-6 max-w-2xl">
-                        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-blue-400/30 flex items-center justify-center text-4xl">
-                            🍟
-                        </div>
-                        <h3 className="text-4xl md:text-5xl font-bold mb-4">{effectiveReminderTitle}</h3>
-                        <p className="text-xl md:text-2xl text-blue-100">{effectiveReminderMessage}</p>
-                        <p className="mt-6 text-4xl md:text-5xl font-bold tabular-nums">{stirPromptCountdown}s</p>
-                    </div>
+            {currentIsTimer ? (
+              <div className="relative mb-10 flex items-center justify-center">
+                <div className="absolute h-72 w-72 rounded-full bg-orange-600/15 blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
+                <div className="relative">
+                  <div className="text-[6rem] font-extrabold leading-none tracking-tight text-orange-500 drop-shadow-[0_0_40px_rgba(249,115,22,0.5)] lg:text-[9rem]">
+                    {formatClock(timeRemaining)}
+                  </div>
+                  <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.45em] text-orange-500/80">
+                    Minutos restantes
+                  </div>
                 </div>
-            )}
+              </div>
+            ) : hasPortionValue ? (
+              <div className="mb-10 w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6">
+                <p className="text-3xl font-bold text-white">{String(portionValue)}</p>
+                <p className="mt-2 text-sm text-slate-400">Cantidad estimada</p>
+              </div>
+            ) : null}
 
-            <RoadmapModal
-                isOpen={isRoadmapOpen}
-                onClose={() => setIsRoadmapOpen(false)}
-                title="Hoja de Ruta"
-                steps={currentRecipeData}
-                currentStepIndex={currentStepIndex}
-                currentSubStepIndex={currentSubStepIndex}
-                onJumpToSubStep={handleJump}
-                portion={portion}
-            />
+            <div className="relative z-20 mx-auto flex w-full max-w-sm gap-4">
+              <button
+                onClick={handleQuickAction}
+                className={`flex flex-1 items-center justify-center gap-3 rounded-[2rem] border py-5 text-lg font-extrabold transition-all active:scale-95 ${
+                  currentIsTimer && isRunning
+                    ? 'border-red-400/30 bg-red-500 text-white hover:bg-red-600'
+                    : 'border-orange-400/30 bg-orange-500 text-white shadow-[0_0_30px_rgba(249,115,22,0.25)] hover:bg-orange-400'
+                }`}
+              >
+                {currentIsTimer && isRunning ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+                {quickActionLabel}
+              </button>
+              <button
+                onClick={handleSkipStep}
+                disabled={isLastSubStep}
+                title="Saltar subpaso"
+                aria-label="Saltar subpaso"
+                className="flex w-20 items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-slate-200 transition-all hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronsRight className="h-7 w-7" />
+              </button>
+            </div>
+          </section>
+        </main>
+
+        <aside className="hidden w-80 shrink-0 flex-col border-l border-white/5 bg-black/30 backdrop-blur-2xl xl:flex">
+          <div className="border-b border-white/5 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Siguiente subpaso</h3>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Vista previa</p>
+          </div>
+          <div className="space-y-6 p-7">
+            {nextItem ? (
+              <>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/20 bg-orange-500/10">
+                  <ArrowRight className="h-7 w-7 text-orange-500" />
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.15em] text-orange-500/80">
+                    Subpaso {currentPosition + 1} de {totalSubSteps}
+                  </p>
+                  <h4 className="mb-3 text-2xl font-bold leading-tight text-white">{nextItem.subStep.subStepName}</h4>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-sm leading-relaxed text-slate-300">
+                      {nextItem.subStep.notes || 'Continúa con este subpaso.'}
+                    </p>
+                  </div>
+                </div>
+                {nextEstimatedLabel && (
+                  <div className="pt-4 text-sm font-semibold text-slate-500">
+                    {nextEstimatedLabel}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">No hay más subpasos</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-auto p-7">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 opacity-50">
+              <span className="text-xs font-bold uppercase tracking-widest">Preview bloqueado</span>
+              <span className="text-lg">🔒</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {flipPromptVisible && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-orange-500 pointer-events-none">
+          <div className="px-6 text-center text-white">
+            <h3 className="mb-4 text-5xl font-bold md:text-6xl">Voltea el huevo</h3>
+            <p className="text-2xl md:text-3xl">Da la vuelta ahora y continúa con el lado B.</p>
+            <p className="mt-6 text-4xl font-bold tabular-nums md:text-5xl">{flipPromptCountdown}s</p>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 }

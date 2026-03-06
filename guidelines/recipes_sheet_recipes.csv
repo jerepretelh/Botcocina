@@ -1,0 +1,3 @@
+id,categoryId,name,icon,emoji,ingredient,description,equipment,tip,portionLabelSingular,portionLabelPlural
+huevo-frito,frituras,Huevo frito,🍳,🍳,Huevos,"5 pasos · automático",stove,"Ten todo listo antes de empezar. El secreto está en el aceite bien caliente.",huevo,huevos
+arroz,arroces,Arroz Perfecto,🍚,🍚,"Tazas de arroz","6 pasos · 45-60 min",stove,"La clave del arroz perfecto está en respetar tiempos y fuego bajo al final.",taza,tazas

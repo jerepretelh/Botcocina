@@ -77,6 +77,7 @@ export function useThermomixTimer({
     currentRecipeData,
 }: UseThermomixTimerProps) {
     const beepAudioContextRef = useRef<AudioContext | null>(null);
+    const initializedTimerKeyRef = useRef<string>('');
 
     const playCountdownBeep = async () => {
         if (typeof window === 'undefined') return;
@@ -116,6 +117,8 @@ export function useThermomixTimer({
     };
 
     useEffect(() => {
+        const currentKey = `${screen}:${currentStepIndex}:${currentSubStepIndex}:${portion}:${String(portionValue)}:${timerScaleFactor}`;
+
         if (screen !== 'cooking') {
             setIsRunning(false);
             setTimeRemaining(0);
@@ -123,21 +126,27 @@ export function useThermomixTimer({
             setStirPromptVisible(false);
             setPendingStirAdvance(false);
             setStirPromptCountdown(0);
+            initializedTimerKeyRef.current = '';
             return;
         }
 
         if (currentSubStep?.isTimer && typeof portionValue === 'number') {
-            setTimeRemaining(portionValue);
-            setIsRunning(true);
+            // Initialize only when entering a new timer context; avoid resetting on each render.
+            if (initializedTimerKeyRef.current !== currentKey) {
+                setTimeRemaining(portionValue);
+                setIsRunning(true);
+                initializedTimerKeyRef.current = currentKey;
+            }
         } else if (currentStep?.stepNumber === 5) {
             const timerSubStep = currentStep.subSteps.find(sub => sub.isTimer);
             if (timerSubStep && currentSubStepIndex === 0) {
                 const timerValue = timerSubStep.portions[portion];
                 if (typeof timerValue === 'number') {
                     // For step 5, we only set it if it's currently 0 to avoid resets
-                    if (timeRemaining === 0) {
+                    if (timeRemaining === 0 && initializedTimerKeyRef.current !== currentKey) {
                         setTimeRemaining(Math.round(timerValue * (timerScaleFactor || 1)));
                         setIsRunning(true);
+                        initializedTimerKeyRef.current = currentKey;
                     }
                 }
             } else {
@@ -147,8 +156,9 @@ export function useThermomixTimer({
         } else {
             setTimeRemaining(0);
             setIsRunning(false);
+            initializedTimerKeyRef.current = '';
         }
-    }, [screen, currentStepIndex, currentSubStepIndex, portion, currentSubStep, portionValue, timerScaleFactor]);
+    }, [screen, currentStepIndex, currentSubStepIndex, portion, currentSubStep?.isTimer, portionValue, timerScaleFactor]);
 
     useEffect(() => {
         let interval: ReturnType<typeof setTimeout>;
@@ -166,7 +176,15 @@ export function useThermomixTimer({
                         }
 
                         if (nextSubStepObj) {
-                            speakInstruction(`En 15 segundos: ${nextSubStepObj.subStepName}`, true);
+                            const nextValue = nextSubStepObj.portions?.[portion];
+                            const nextAmountText =
+                                typeof nextValue === 'number'
+                                    ? ` Tiempo estimado: ${nextValue} segundos.`
+                                    : typeof nextValue === 'string' &&
+                                        !['continuar', 'siguiente', 'ok', 'listo', '-', 'n/a', 'na'].includes(nextValue.trim().toLowerCase())
+                                        ? ` Cantidad: ${nextValue}.`
+                                        : '';
+                            speakInstruction(`En 15 segundos: ${nextSubStepObj.subStepName}.${nextAmountText}`, true);
                         }
                     }
 

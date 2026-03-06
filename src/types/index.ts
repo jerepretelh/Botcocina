@@ -1,4 +1,4 @@
-export type Screen = 'category-select' | 'recipe-select' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking';
+export type Screen = 'category-select' | 'recipe-select' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system';
 export type Portion = 1 | 2 | 4;
 export type RecipeCategoryId = 'desayunos' | 'almuerzos' | 'cenas' | 'airfryer' | 'frituras' | 'arroces' | 'hervidos' | 'sopas' | 'personalizadas';
 export type QuantityMode = 'people' | 'have';
@@ -6,6 +6,8 @@ export type AmountUnit = 'units' | 'grams';
 export type ClarificationNumberMode = 'people' | 'quantity';
 export type ClarificationQuantityUnit = 'units' | 'grams';
 export type CookingEquipment = 'stove' | 'airfryer' | 'oven';
+export type CatalogSource = 'supabase' | 'local-dev';
+export type CatalogViewMode = 'platform' | 'my-lists' | 'all';
 
 export type IngredientsBackScreen = 'recipe-setup' | 'ai-clarify';
 
@@ -26,6 +28,25 @@ export interface Recipe {
     description: string;
     basePortions?: number;
     equipment?: CookingEquipment;
+    ownerUserId?: string | null;
+    visibility?: 'public' | 'private';
+}
+
+export interface UserRecipeList {
+    id: string;
+    userId: string;
+    name: string;
+    slug: string;
+    isDefault: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface UserListRecipe {
+    listId: string;
+    recipeId: string;
+    sortOrder: number;
+    createdAt: string;
 }
 
 export interface SubStep {
@@ -80,4 +101,10 @@ export interface FaceTimerPair {
     secondIndex: number;
     firstSeconds: number;
     secondSeconds: number;
+}
+
+export interface UserIdentity {
+    anon_user_id: string;
+    session_id: string;
+    created_at: string;
 }

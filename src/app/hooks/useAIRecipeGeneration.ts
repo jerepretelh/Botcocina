@@ -29,6 +29,8 @@ import {
     clampNumber,
 } from '../utils/recipeHelpers';
 import { useAIClarifications } from './useAIClarifications';
+import { isSupabaseEnabled, supabaseClient } from '../lib/supabaseClient';
+import { trackProductEvent } from '../lib/productEvents';
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface UseAIRecipeGenerationDeps {
@@ -59,6 +61,8 @@ interface UseAIRecipeGenerationDeps {
     setPendingStirAdvance: (action: any) => void;
     setStirPromptCountdown: (action: any) => void;
     setAwaitingNextUnitConfirmation: (action: any) => void;
+    aiUserId?: string | null;
+    addRecipeToDefaultList?: (recipeId: string) => Promise<void>;
 }
 
 // ─── Clarification Helpers (pure functions) ──────────────────────────
@@ -205,7 +209,121 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setPendingStirAdvance,
         setStirPromptCountdown,
         setAwaitingNextUnitConfirmation,
+        aiUserId,
+        addRecipeToDefaultList,
     } = deps;
+
+    const persistAiRecipeToSupabase = useCallback(
+        async (recipe: Recipe, content: RecipeContent, prompt: string) => {
+            if (!isSupabaseEnabled || !supabaseClient || !aiUserId) return;
+
+            const createdRun = await supabaseClient
+                .from('ai_recipe_generations')
+                .insert({
+                    user_id: aiUserId,
+                    prompt,
+                    mode: 'generate',
+                    status: 'created',
+                })
+                .select('id')
+                .single();
+
+            const generationId = createdRun.data?.id as string | undefined;
+
+            const updateGeneration = async (status: 'approved' | 'failed', fields?: Record<string, unknown>) => {
+                if (!generationId) return;
+                await supabaseClient
+                    .from('ai_recipe_generations')
+                    .update({
+                        status,
+                        updated_at: new Date().toISOString(),
+                        ...fields,
+                    })
+                    .eq('id', generationId);
+            };
+
+            try {
+                await supabaseClient.from('recipes').upsert(
+                    {
+                        id: recipe.id,
+                        category_id: recipe.categoryId,
+                        name: recipe.name,
+                        icon: recipe.icon,
+                        emoji: recipe.emoji ?? recipe.icon,
+                        ingredient: recipe.ingredient,
+                        description: recipe.description,
+                        equipment: recipe.equipment ?? null,
+                        tip: content.tip,
+                        portion_label_singular: content.portionLabels.singular,
+                        portion_label_plural: content.portionLabels.plural,
+                        source: 'ai',
+                        owner_user_id: aiUserId,
+                        visibility: 'private',
+                        is_published: false,
+                        updated_at: new Date().toISOString(),
+                    },
+                    { onConflict: 'id' },
+                );
+
+                await supabaseClient.from('recipe_ingredients').delete().eq('recipe_id', recipe.id);
+                await supabaseClient.from('recipe_substeps').delete().eq('recipe_id', recipe.id);
+
+                const ingredientsPayload = content.ingredients.map((ingredient, index) => ({
+                    recipe_id: recipe.id,
+                    sort_order: index + 1,
+                    name: ingredient.name,
+                    emoji: ingredient.emoji || '🍽️',
+                    indispensable: Boolean(ingredient.indispensable),
+                    p1: ingredient.portions[1] || 'Al gusto',
+                    p2: ingredient.portions[2] || ingredient.portions[1] || 'Al gusto',
+                    p4: ingredient.portions[4] || ingredient.portions[2] || ingredient.portions[1] || 'Al gusto',
+                }));
+                if (ingredientsPayload.length > 0) {
+                    await supabaseClient.from('recipe_ingredients').insert(ingredientsPayload);
+                }
+
+                const substepsPayload = content.steps.flatMap((step) =>
+                    step.subSteps.map((subStep, index) => {
+                        const p1 = subStep.portions[1];
+                        const p2 = subStep.portions[2];
+                        const p4 = subStep.portions[4];
+                        return {
+                            recipe_id: recipe.id,
+                            substep_order: step.stepNumber * 100 + index + 1,
+                            step_number: step.stepNumber,
+                            step_name: step.stepName,
+                            substep_name: subStep.subStepName,
+                            notes: subStep.notes || '',
+                            is_timer: subStep.isTimer,
+                            p1: String(p1 ?? (subStep.isTimer ? 30 : 'Continuar')),
+                            p2: String(p2 ?? p1 ?? (subStep.isTimer ? 45 : 'Continuar')),
+                            p4: String(p4 ?? p2 ?? p1 ?? (subStep.isTimer ? 60 : 'Continuar')),
+                            fire_level: step.fireLevel ?? null,
+                            equipment: step.equipment ?? null,
+                            updated_at: new Date().toISOString(),
+                        };
+                    }),
+                );
+                if (substepsPayload.length > 0) {
+                    await supabaseClient.from('recipe_substeps').insert(substepsPayload);
+                }
+
+                await updateGeneration('approved', {
+                    recipe_id: recipe.id,
+                    raw_response: content,
+                });
+                if (addRecipeToDefaultList) {
+                    await addRecipeToDefaultList(recipe.id);
+                }
+                await trackProductEvent(aiUserId, 'ai_recipe_created_private', { recipeId: recipe.id });
+            } catch (error) {
+                await updateGeneration('failed', {
+                    error_message: error instanceof Error ? error.message : 'failed-to-persist-ai-recipe',
+                });
+            }
+        },
+        [aiUserId, addRecipeToDefaultList],
+    );
 
     const ai = useAIClarifications();
 
@@ -348,9 +466,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
             const inferredPortion = inferPortionFromPrompt(finalPrompt);
             const generated = ensureRecipeShape(await generateRecipeWithAI(finalPrompt));
             const baseId = buildRecipeId(generated.id || generated.name);
-            const uniqueId = availableRecipes.some((recipe) => recipe.id === baseId)
-                ? `${baseId}-${Date.now()}`
-                : baseId;
+            const uniqueId = `${baseId}-${aiUserId?.slice(0, 8) ?? 'anon'}-${Date.now()}`;
 
             if (generated.ingredients.length === 0 || generated.steps.length === 0) {
                 throw new Error('La IA devolvió una receta incompleta. Intenta nuevamente.');
@@ -363,6 +479,8 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 icon: generated.icon,
                 ingredient: generated.ingredient,
                 description: generated.description,
+                ownerUserId: aiUserId ?? null,
+                visibility: 'private',
             };
 
             const newContent: RecipeContent = {
@@ -381,6 +499,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 ...prev,
                 [newRecipe.id]: buildInitialIngredientSelection(newContent.ingredients),
             }));
+            void persistAiRecipeToSupabase(newRecipe, newContent, finalPrompt);
             setCookingSteps(null);
             setSelectedCategory('personalizadas');
             setSelectedRecipe(newRecipe);
@@ -432,12 +551,12 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
             }
             ai.setAiSuccess(
                 clarifiedSizing?.quantityMode === 'have'
-                    ? `Receta "${newRecipe.name}" agregada con base "lo que tienes" (${clarifiedSizing.count} ${clarifiedSizing.amountUnit === 'grams' ? 'g' : 'unid'}).`
+                    ? `Receta "${newRecipe.name}" guardada en Mis recetas con base "lo que tienes" (${clarifiedSizing.count} ${clarifiedSizing.amountUnit === 'grams' ? 'g' : 'unid'}).`
                     : clarifiedPeopleCount
-                        ? `Receta "${newRecipe.name}" agregada. Configurada para ${clarifiedPeopleCount} personas.`
+                        ? `Receta "${newRecipe.name}" guardada en Mis recetas. Configurada para ${clarifiedPeopleCount} personas.`
                         : inferredPortion
-                            ? `Receta "${newRecipe.name}" agregada. Detecté ${inferredPortion} porciones desde el prompt.`
-                            : `Receta "${newRecipe.name}" agregada.`,
+                            ? `Receta "${newRecipe.name}" guardada en Mis recetas. Detecté ${inferredPortion} porciones desde el prompt.`
+                            : `Receta "${newRecipe.name}" guardada en Mis recetas.`,
             );
         } catch (error) {
             ai.setAiError(error instanceof Error ? error.message : 'No se pudo generar la receta.');
@@ -455,6 +574,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setFlipPromptVisible, setPendingFlipAdvance, setFlipPromptCountdown,
         setStirPromptVisible, setPendingStirAdvance, setStirPromptCountdown,
         setAwaitingNextUnitConfirmation,
+        persistAiRecipeToSupabase,
     ]);
 
     return {

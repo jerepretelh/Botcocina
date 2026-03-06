@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Screen,
     RecipeCategoryId,
@@ -11,15 +11,21 @@ import {
 } from '../../types';
 import { defaultRecipes, initialRecipeContent, recipeCategories } from '../data/recipes';
 import { buildInitialIngredientSelection } from '../utils/recipeHelpers';
+import { fetchRecipesCatalog } from '../lib/recipesCatalog';
+import type { CatalogSource } from '../../types';
 
 export function useRecipeSelection() {
-    const [screen, setScreen] = useState<Screen>('category-select');
+    const [screen, setScreenState] = useState<Screen>('category-select');
+    const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
     const [availableRecipes, setAvailableRecipes] = useState<Recipe[]>(defaultRecipes);
     const [recipeContentById, setRecipeContentById] = useState<Record<string, RecipeContent>>(initialRecipeContent);
     const [selectedCategory, setSelectedCategory] = useState<RecipeCategoryId | null>(null);
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [ingredientsBackScreen, setIngredientsBackScreen] = useState<IngredientsBackScreen>('recipe-setup');
     const [ingredientSelectionByRecipe, setIngredientSelectionByRecipe] = useState<Record<string, Record<string, boolean>>>({});
+    const [catalogSource, setCatalogSource] = useState<CatalogSource>('local-dev');
+    const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
+    const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
 
     // Basic configuration state
     const [quantityMode, setQuantityMode] = useState<QuantityMode>('people');
@@ -53,9 +59,55 @@ export function useRecipeSelection() {
             : null;
     }, [selectedCategory]);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        const syncCatalog = async () => {
+            setIsSyncingCatalog(true);
+            const result = await fetchRecipesCatalog();
+            if (cancelled) return;
+            setAvailableRecipes(result.recipes);
+            setRecipeContentById((prev) => ({
+                ...prev,
+                ...result.recipeContentById,
+            }));
+            setCatalogSource(result.source);
+            setCatalogWarning(result.warning ?? null);
+            setIsSyncingCatalog(false);
+        };
+
+        void syncCatalog();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const navigateToScreen = (nextScreen: Screen) => {
+        setScreenState((currentScreen) => {
+            if (currentScreen === nextScreen) return currentScreen;
+            setScreenHistory((prev) => [...prev, currentScreen]);
+            return nextScreen;
+        });
+    };
+
+    const goBackScreen = (fallback: Screen = 'category-select') => {
+        setScreenHistory((prev) => {
+            const last = prev[prev.length - 1];
+            if (last) {
+                setScreenState(last);
+                return prev.slice(0, -1);
+            }
+            setScreenState(fallback);
+            return prev;
+        });
+    };
+
     return {
         screen,
-        setScreen,
+        setScreen: navigateToScreen,
+        setScreenDirect: setScreenState,
+        goBackScreen,
         availableRecipes,
         setAvailableRecipes,
         recipeContentById,
@@ -89,5 +141,8 @@ export function useRecipeSelection() {
         activeIngredientSelection,
         visibleRecipes,
         selectedCategoryMeta,
+        catalogSource,
+        catalogWarning,
+        isSyncingCatalog,
     };
 }

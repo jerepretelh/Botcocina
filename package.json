@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "catalog:validate": "tsx scripts/validate_catalog.ts",
+    "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",
+    "catalog:release:prepare": "npm run catalog:validate && npm run seed:catalog:generate",
+    "catalog:push": "tsx scripts/push_catalog_to_supabase.ts",
+    "import:recipes:sheets": "tsx scripts/import_recipes_from_sheets.ts"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -39,10 +44,12 @@
     "@radix-ui/react-toggle": "1.1.2",
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
+    "@supabase/supabase-js": "^2.98.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "3.6.0",
+    "dotenv": "^17.3.1",
     "embla-carousel-react": "8.6.0",
     "input-otp": "1.4.2",
     "lucide-react": "0.487.0",
@@ -67,6 +74,7 @@
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "6.3.5"
   },

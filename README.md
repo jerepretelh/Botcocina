@@ -17,6 +17,13 @@
 
   Run `npm run dev` to start the development server.
 
+  ## Supabase
+
+  This project now supports Supabase as primary catalog/progress backend.
+  For setup and direct cutover from Google Sheets, see:
+
+  - `README-SUPABASE.md`
+
   ## AI Recipe Creator
 
   On the first screen ("Elige tu misión"), use **Crear nueva receta con IA**.

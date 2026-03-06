@@ -1,0 +1,4 @@
+### Ran Playwright code
+```js
+await page.getByRole('textbox', { name: 'Ej: salmón al ajillo en sarté' }).fill('Arroz con pollo peruano para 2 personas');
+```
