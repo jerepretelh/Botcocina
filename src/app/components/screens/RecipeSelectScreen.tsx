@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ChefHat, Volume2, VolumeX, List, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Heart, List, Volume2, VolumeX } from 'lucide-react';
 import { CatalogViewMode, Recipe, RecipeCategory, RecipeStep } from '../../../types';
 import { RoadmapModal } from '../ui/RoadmapModal';
 import { initialRecipeContent } from '../../data/recipes';
+import { MainShellLayout } from './MainShellLayout';
+import { ProductContainer, ProductEmptyState, ProductHeader, ProductPage, ProductSurface } from '../ui/product-system';
 
 interface RecipeSelectScreenProps {
     appVersion: string;
@@ -17,6 +19,18 @@ interface RecipeSelectScreenProps {
     activeListName: string | null;
     isRecipeInActiveList: (recipeId: string) => boolean;
     onToggleRecipeInActiveList: (recipeId: string) => void;
+    isFavorite: (recipeId: string) => boolean;
+    onToggleFavorite: (recipeId: string) => void;
+    onPlanRecipe: (recipe: Recipe) => void;
+    currentUserEmail: string | null;
+    onGoHome: () => void;
+    onGoMyRecipes: () => void;
+    onGoFavorites: () => void;
+    onGoWeeklyPlan: () => void;
+    onGoShoppingList: () => void;
+    onGoSettings: () => void;
+    onSignOut: () => void;
+    onOpenRecipeSearch: () => void;
 }
 
 export function RecipeSelectScreen({
@@ -32,6 +46,18 @@ export function RecipeSelectScreen({
     activeListName,
     isRecipeInActiveList,
     onToggleRecipeInActiveList,
+    isFavorite,
+    onToggleFavorite,
+    onPlanRecipe,
+    currentUserEmail,
+    onGoHome,
+    onGoMyRecipes,
+    onGoFavorites,
+    onGoWeeklyPlan,
+    onGoShoppingList,
+    onGoSettings,
+    onSignOut,
+    onOpenRecipeSearch,
 }: RecipeSelectScreenProps) {
     const [roadmapRecipe, setRoadmapRecipe] = useState<Recipe | null>(null);
 
@@ -45,123 +71,170 @@ export function RecipeSelectScreen({
         : [];
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-900 to-black flex items-center justify-center p-4">
-            <div className="w-full max-w-lg">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6 md:mb-8">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                            <ChefHat className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
-                            <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{appVersion}</span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onVoiceToggle}
-                        className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border transition-colors ${voiceEnabled ? 'bg-orange-900/40 border-orange-600' : 'bg-slate-800 border-slate-700'
-                            }`}
-                        title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
-                    >
-                        {voiceEnabled ? (
-                            <Volume2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                        ) : (
-                            <VolumeX className="w-4 h-4 md:w-5 md:h-5 text-slate-300" />
-                        )}
-                    </button>
-                </div>
+        <MainShellLayout
+            activeItem="home"
+            currentUserEmail={currentUserEmail}
+            onGoHome={onGoHome}
+            onGoMyRecipes={onGoMyRecipes}
+            onGoFavorites={onGoFavorites}
+            onGoWeeklyPlan={onGoWeeklyPlan}
+            onGoShoppingList={onGoShoppingList}
+            onGoSettings={onGoSettings}
+            onSignOut={onSignOut}
+        >
+            <ProductPage>
+                <ProductContainer>
+                    <ProductHeader
+                        eyebrow={selectedCategoryMeta ? `${selectedCategoryMeta.icon} Categoría` : 'Recetas'}
+                        title={selectedCategoryMeta?.name ?? 'Recetas'}
+                        description={
+                            catalogViewMode === 'my-lists'
+                                ? `Lista activa: ${activeListName ?? 'Mis listas'}`
+                                : 'Explora recetas con el mismo lenguaje visual y abre la que quieras cocinar.'
+                        }
+                        onBack={onBackToCategories}
+                        actions={
+                            <button
+                                onClick={onVoiceToggle}
+                                className={`flex size-12 items-center justify-center rounded-full border transition-colors ${voiceEnabled ? 'border-primary/30 bg-primary/10 text-primary' : 'border-primary/10 bg-card/70 text-slate-500 dark:text-slate-400'}`}
+                                title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
+                            >
+                                {voiceEnabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+                            </button>
+                        }
+                    />
 
-                {/* Title */}
-                <div className="text-center mb-6 md:mb-8">
-                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                        {selectedCategoryMeta?.icon} {selectedCategoryMeta?.name ?? 'Recetas'}
-                    </h2>
-                    <p className="text-sm md:text-base text-slate-400">
-                        {catalogViewMode === 'my-lists' ? `Lista activa: ${activeListName ?? 'Mis listas'}` : 'Elige una receta'}
-                    </p>
-                </div>
-
-                <div className="mb-4">
-                    <button
-                        onClick={onBackToCategories}
-                        className="bg-slate-800 text-white px-4 py-2 rounded-xl border border-slate-700 hover:border-orange-500 transition-colors text-sm font-semibold"
-                    >
-                        ← Volver a categorías
-                    </button>
-                </div>
-
-                {/* Recipes */}
-                <div className="space-y-4">
-                    <h3 className="text-orange-400 text-xs md:text-sm font-semibold tracking-wider uppercase">
-                        RECETAS
-                    </h3>
-
-                    {visibleRecipes.map((recipe) => (
-                        <div
-                            key={recipe.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => onRecipeSelect(recipe)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    onRecipeSelect(recipe);
-                                }
-                            }}
-                            className="w-full bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-slate-700 hover:border-orange-500 transition-all hover:scale-[1.02] flex items-center gap-3 md:gap-4"
-                        >
-                            <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg">
-                                {recipe.icon}
+                    <ProductSurface className="p-6 md:p-8">
+                        <div className="mb-6 flex flex-col gap-3 border-b border-primary/10 pb-6 md:flex-row md:items-end md:justify-between">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Catálogo</p>
+                                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                                    {visibleRecipes.length} receta{visibleRecipes.length === 1 ? '' : 's'} disponibles
+                                </h2>
                             </div>
-                            <div className="flex-1 text-left">
-                                <h3 className="text-lg md:text-xl font-bold text-white mb-1">
-                                    {recipe.name}
-                                </h3>
-                                <p className="text-xs md:text-sm text-slate-400">{recipe.description}</p>
-                            </div>
-                            <div className="shrink-0 flex gap-2">
+                            <div className="flex flex-col items-start gap-2 md:items-end">
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onToggleRecipeInActiveList(recipe.id);
+                                    type="button"
+                                    onClick={onOpenRecipeSearch}
+                                    className="rounded-full border border-primary/15 bg-card px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/8"
+                                >
+                                    Buscar idea por nombre
+                                </button>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Versión {appVersion}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                            {visibleRecipes.map((recipe) => (
+                                <div
+                                    key={recipe.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => onRecipeSelect(recipe)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            onRecipeSelect(recipe);
+                                        }
                                     }}
-                                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center hover:bg-slate-700 hover:border-orange-500 transition-all text-cyan-300 shadow-md"
-                                    title={isRecipeInActiveList(recipe.id) ? 'Quitar de lista' : 'Guardar en lista'}
+                                    className="group rounded-[1.75rem] border border-primary/10 bg-background/75 p-5 transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
                                 >
-                                    {isRecipeInActiveList(recipe.id) ? (
-                                        <BookmarkCheck className="w-5 h-5 md:w-6 md:h-6" />
-                                    ) : (
-                                        <Bookmark className="w-5 h-5 md:w-6 md:h-6" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={(e) => handleViewRoadmap(e, recipe)}
-                                    className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center hover:bg-slate-700 hover:border-orange-500 transition-all text-orange-400 shadow-md"
-                                    title="Ver ruta de cocción"
-                                >
-                                    <List className="w-5 h-5 md:w-6 md:h-6" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-3xl shadow-sm">
+                                            {recipe.icon}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <h3 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
+                                                        {recipe.name}
+                                                    </h3>
+                                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{recipe.description}</p>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onToggleFavorite(recipe.id);
+                                                    }}
+                                                    className={`flex size-11 items-center justify-center rounded-full border transition-colors ${isFavorite(recipe.id) ? 'border-primary/25 bg-primary/10 text-primary' : 'border-primary/10 bg-card text-slate-500 dark:text-slate-400'}`}
+                                                    title={isFavorite(recipe.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                                >
+                                                    <Heart className={`size-5 ${isFavorite(recipe.id) ? 'fill-current' : ''}`} />
+                                                </button>
+                                            </div>
 
-                    {visibleRecipes.length === 0 && (
-                        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-700 text-slate-300 text-sm">
-                            Esta categoría aún no tiene recetas.
-                        </div>
-                    )}
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                <span className="rounded-full bg-primary/8 px-3 py-1 text-xs font-semibold text-primary">
+                                                    {recipe.categoryId}
+                                                </span>
+                                                {recipe.visibility === 'private' ? (
+                                                    <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                                        Privada
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
 
-                </div>
-            </div>
+                                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onToggleRecipeInActiveList(recipe.id);
+                                                }}
+                                                className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-primary/8 hover:text-primary dark:text-slate-200"
+                                                title={isRecipeInActiveList(recipe.id) ? 'Quitar de lista' : 'Guardar en lista'}
+                                            >
+                                                {isRecipeInActiveList(recipe.id) ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
+                                                {isRecipeInActiveList(recipe.id) ? 'En lista' : 'Guardar'}
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onPlanRecipe(recipe);
+                                                }}
+                                                className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-primary/8 hover:text-primary dark:text-slate-200"
+                                                title="Agregar al plan semanal"
+                                            >
+                                                Planificar
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleViewRoadmap(e, recipe)}
+                                                className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-primary/8 hover:text-primary dark:text-slate-200"
+                                                title="Ver ruta de cocción"
+                                            >
+                                                <List className="size-4" />
+                                                Ruta
+                                            </button>
+                                        </div>
+                                        <button
+                                            onClick={() => onRecipeSelect(recipe)}
+                                            className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
+                                        >
+                                            Abrir receta
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+
+                            {visibleRecipes.length === 0 && (
+                                <div className="lg:col-span-2">
+                                    <ProductEmptyState message="Esta categoría aún no tiene recetas disponibles." />
+                                </div>
+                            )}
+                        </div>
+                    </ProductSurface>
+                </ProductContainer>
+            </ProductPage>
 
             <RoadmapModal
                 isOpen={!!roadmapRecipe}
                 onClose={() => setRoadmapRecipe(null)}
                 title={`Ruta: ${roadmapRecipe?.name}`}
                 steps={roadmapSteps}
-                portion={1} // Preview default portion
+                portion={1}
             />
-        </div>
+        </MainShellLayout>
     );
 }

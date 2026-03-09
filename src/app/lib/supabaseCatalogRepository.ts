@@ -17,6 +17,8 @@ type DbRecipe = {
   portion_label_plural: string | null;
   owner_user_id: string | null;
   visibility: 'public' | 'private' | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
 type DbIngredient = {
@@ -108,17 +110,17 @@ export const supabaseCatalogRepository: CatalogRepository = {
       const [publicRecipesRes, privateRecipesRes] = await Promise.all([
         supabaseClient
           .from('recipes')
-          .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility')
+          .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, created_at, updated_at')
           .eq('is_published', true)
           .eq('visibility', 'public')
           .order('name', { ascending: true }),
         userId
           ? supabaseClient
               .from('recipes')
-              .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility')
+              .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, created_at, updated_at')
               .eq('owner_user_id', userId)
               .eq('visibility', 'private')
-              .order('name', { ascending: true })
+              .order('created_at', { ascending: false })
           : Promise.resolve({ data: [], error: null } as any),
       ]);
 
@@ -202,6 +204,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
           equipment: (recipeRow.equipment as Recipe['equipment']) || undefined,
           ownerUserId: recipeRow.owner_user_id,
           visibility: (recipeRow.visibility as Recipe['visibility']) || 'public',
+          createdAt: recipeRow.created_at ?? undefined,
+          updatedAt: recipeRow.updated_at ?? undefined,
         });
 
         recipeContentById[recipeRow.id] = {

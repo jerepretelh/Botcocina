@@ -1,211 +1,258 @@
-import { ChefHat, Volume2, VolumeX, UtensilsCrossed } from 'lucide-react';
-import { CatalogViewMode, RecipeCategory, RecipeCategoryId, Recipe, UserRecipeList } from '../../../types';
+import { Heart, HeartOff, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import type { Recipe, RecipeCategory, RecipeCategoryId } from '../../../types';
+import { MainShellLayout } from './MainShellLayout';
 
 interface CategorySelectScreenProps {
-    appVersion: string;
-    voiceEnabled: boolean;
-    speechSupported: boolean;
-    aiPrompt: string;
-    aiError: string | null;
-    aiSuccess: string | null;
-    isCheckingClarifications: boolean;
-    isGeneratingRecipe: boolean;
-    availableRecipes: Recipe[];
-    onVoiceToggle: () => void;
-    onAiPromptChange: (val: string) => void;
-    onGenerateRecipe: () => void;
-    onCategorySelect: (id: RecipeCategoryId) => void;
-    onOpenDesignSystem: () => void;
-    recipeCategories: RecipeCategory[];
-    catalogViewMode: CatalogViewMode;
-    onCatalogViewModeChange: (mode: CatalogViewMode) => void;
-    userLists: UserRecipeList[];
-    activeListId: string | null;
-    onActiveListChange: (listId: string) => void;
-    onCreateList: () => void;
-    onRenameList: () => void;
-    onDeleteList: () => void;
+  appVersion: string;
+  voiceEnabled: boolean;
+  speechSupported: boolean;
+  currentUserEmail: string | null;
+  aiError: string | null;
+  aiSuccess: string | null;
+  recipeCategories: RecipeCategory[];
+  recentRecipes: Recipe[];
+  favoriteRecipeIds: Set<string>;
+  onVoiceToggle: () => void;
+  onOpenAIWizard: () => void;
+  onOpenRecipeSearch: () => void;
+  onCategorySelect: (id: RecipeCategoryId) => void;
+  onRecipeOpen: (recipe: Recipe) => void;
+  onToggleFavorite: (recipeId: string) => void;
+  onOpenMyRecipes: () => void;
+  onOpenFavorites: () => void;
+  onOpenWeeklyPlan: () => void;
+  onOpenShoppingList: () => void;
+  onOpenAISettings: () => void;
+  onSignOut: () => void;
+  onPlanRecipe: (recipe: Recipe) => void;
 }
 
+const FEATURED_CATEGORIES: RecipeCategoryId[] = ['desayunos', 'almuerzos', 'cenas'];
+
 export function CategorySelectScreen({
-    appVersion,
-    voiceEnabled,
-    speechSupported,
-    aiPrompt,
-    aiError,
-    aiSuccess,
-    isCheckingClarifications,
-    isGeneratingRecipe,
-    availableRecipes,
-    onVoiceToggle,
-    onAiPromptChange,
-    onGenerateRecipe,
-    onCategorySelect,
-    onOpenDesignSystem,
-    recipeCategories,
-    catalogViewMode,
-    onCatalogViewModeChange,
-    userLists,
-    activeListId,
-    onActiveListChange,
-    onCreateList,
-    onRenameList,
-    onDeleteList,
+  appVersion,
+  voiceEnabled,
+  speechSupported,
+  currentUserEmail,
+  aiError,
+  aiSuccess,
+  recipeCategories,
+  recentRecipes,
+  favoriteRecipeIds,
+  onVoiceToggle,
+  onOpenAIWizard,
+  onOpenRecipeSearch,
+  onCategorySelect,
+  onRecipeOpen,
+  onToggleFavorite,
+  onOpenMyRecipes,
+  onOpenFavorites,
+  onOpenWeeklyPlan,
+  onOpenShoppingList,
+  onOpenAISettings,
+  onSignOut,
+  onPlanRecipe,
 }: CategorySelectScreenProps) {
-    return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-900 to-black flex items-center justify-center p-4">
-            <div className="w-full max-w-lg">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6 md:mb-8">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg">
-                            <ChefHat className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <h1 className="text-xl md:text-2xl font-bold text-white">Chef Bot Pro</h1>
-                            <span className="text-[11px] md:text-xs text-slate-400 mb-0.5">{appVersion}</span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onVoiceToggle}
-                        className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center border transition-colors ${voiceEnabled ? 'bg-orange-900/40 border-orange-600' : 'bg-slate-800 border-slate-700'
-                            }`}
-                        title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
-                    >
-                        {voiceEnabled ? (
-                            <Volume2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
-                        ) : (
-                            <VolumeX className="w-4 h-4 md:w-5 md:h-5 text-slate-300" />
-                        )}
-                    </button>
-                </div>
+  const featuredCategories = recipeCategories.filter((category) => FEATURED_CATEGORIES.includes(category.id));
+  const otherCategories = recipeCategories.filter((category) => !FEATURED_CATEGORIES.includes(category.id));
 
-                {/* Primary Action */}
-                <div className="mb-4">
-                    <button
-                        onClick={onOpenDesignSystem}
-                        className="w-full bg-slate-800/70 text-slate-200 py-2.5 rounded-xl border border-slate-600 hover:border-cyan-400 hover:text-cyan-300 transition-colors text-sm font-semibold"
-                    >
-                        Abrir Sistema de Diseño (temporal)
-                    </button>
-                </div>
+  return (
+    <MainShellLayout
+      activeItem="home"
+      currentUserEmail={currentUserEmail}
+      onGoHome={() => undefined}
+      onGoMyRecipes={onOpenMyRecipes}
+      onGoFavorites={onOpenFavorites}
+      onGoWeeklyPlan={onOpenWeeklyPlan}
+      onGoShoppingList={onOpenShoppingList}
+      onGoSettings={onOpenAISettings}
+      onSignOut={onSignOut}
+    >
+      <div className="relative min-h-screen overflow-hidden px-6 py-8 md:px-10">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.18),_transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.1),transparent_60%)] dark:bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.22),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'linear-gradient(rgba(236,91,19,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(236,91,19,0.18) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
 
-                <div className="mb-4 rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => onCatalogViewModeChange('platform')}
-                            className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${catalogViewMode === 'platform'
-                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                                : 'bg-slate-800 border-slate-700 text-slate-300'
-                                }`}
-                        >
-                            Plataforma
-                        </button>
-                        <button
-                            onClick={() => onCatalogViewModeChange('my-lists')}
-                            className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${catalogViewMode === 'my-lists'
-                                ? 'bg-orange-500/20 border-orange-500 text-orange-300'
-                                : 'bg-slate-800 border-slate-700 text-slate-300'
-                                }`}
-                        >
-                            Mis listas
-                        </button>
-                    </div>
-                    {catalogViewMode === 'my-lists' && (
-                        <div className="mt-3 space-y-2">
-                            <select
-                                value={activeListId ?? ''}
-                                onChange={(event) => onActiveListChange(event.target.value)}
-                                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100"
-                            >
-                                {userLists.map((list) => (
-                                    <option key={list.id} value={list.id}>
-                                        {list.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="flex gap-2">
-                                <button onClick={onCreateList} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200">
-                                    Nueva lista
-                                </button>
-                                <button onClick={onRenameList} className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-xs text-slate-200">
-                                    Renombrar
-                                </button>
-                                <button onClick={onDeleteList} className="px-3 py-1.5 rounded-lg bg-red-900/40 border border-red-600/60 text-xs text-red-200">
-                                    Eliminar
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div className="mb-5 md:mb-6 bg-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-700 space-y-3">
-                    <p className="text-sm md:text-base text-white font-semibold">
-                        Crear nueva receta con IA
-                    </p>
-                    <textarea
-                        value={aiPrompt}
-                        onChange={(e) => onAiPromptChange(e.target.value)}
-                        placeholder="Ej: salmón al ajillo en sartén, con tiempos para 1, 2 y 4 porciones"
-                        className="w-full min-h-24 bg-slate-800 border border-slate-600 rounded-xl p-3 text-sm md:text-base text-white placeholder:text-slate-400 focus:outline-none focus:border-orange-500"
-                    />
-                    {aiError && <p className="text-sm text-red-400">{aiError}</p>}
-                    {aiSuccess && <p className="text-sm text-green-400">{aiSuccess}</p>}
-                    <button
-                        onClick={onGenerateRecipe}
-                        disabled={isGeneratingRecipe || isCheckingClarifications}
-                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        {isCheckingClarifications
-                            ? 'Consultando preguntas...'
-                            : isGeneratingRecipe
-                                ? 'Generando receta...'
-                                : 'Agregar receta con IA'}
-                    </button>
-                </div>
-
-                {/* Categories */}
-                <div className="mb-4 md:mb-5">
-                    <p className="text-sm md:text-base text-slate-300 font-semibold">Recetas por categoría</p>
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="text-orange-400 text-xs md:text-sm font-semibold tracking-wider uppercase">
-                        CATEGORÍAS
-                    </h3>
-
-                    {recipeCategories.map((category) => {
-                        const recipeCount = availableRecipes.filter((recipe) => recipe.categoryId === category.id).length;
-                        if (recipeCount === 0) return null;
-
-                        return (
-                            <button
-                                key={category.id}
-                                onClick={() => onCategorySelect(category.id)}
-                                className="w-full bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl md:rounded-3xl p-4 md:p-6 border border-slate-700 hover:border-orange-500 transition-all hover:scale-[1.02] flex items-center gap-3 md:gap-4"
-                            >
-                                <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl md:rounded-2xl flex items-center justify-center text-2xl md:text-3xl shadow-lg">
-                                    {category.icon}
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <h3 className="text-lg md:text-xl font-bold text-white mb-1">
-                                        {category.name}
-                                    </h3>
-                                    <p className="text-xs md:text-sm text-slate-400">{category.description}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="w-8 h-8 md:w-10 md:h-10 bg-slate-700 rounded-full flex items-center justify-center">
-                                        <span className="text-xs md:text-sm text-orange-300 font-bold">{recipeCount}</span>
-                                    </div>
-                                    <div className="w-8 h-8 md:w-10 md:h-10 bg-slate-700 rounded-full flex items-center justify-center">
-                                        <UtensilsCrossed className="w-4 h-4 md:w-5 md:h-5 text-slate-400" />
-                                    </div>
-                                </div>
-                            </button>
-                        )
-                    })}
-                </div>
+        <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col">
+          <div className="mb-8 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Inicio</p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Versión {appVersion}</p>
             </div>
+            <button
+              onClick={onVoiceToggle}
+              className={`flex size-12 items-center justify-center rounded-full border transition-colors ${voiceEnabled ? 'border-primary/40 bg-primary/10 text-primary' : 'border-primary/10 bg-card/70 text-slate-500 dark:text-slate-400'}`}
+              title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
+            >
+              {voiceEnabled ? <Volume2 className="size-5" /> : <VolumeX className="size-5" />}
+            </button>
+          </div>
+
+          <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center text-center">
+            <div className="space-y-5">
+              <h2 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">
+                ¿Qué cocinamos hoy?
+              </h2>
+              <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 md:text-lg">
+                Cuéntale a tu sous-chef IA qué tienes en casa, qué se te antoja o qué quieres resolver rápido, y deja que te proponga la receta ideal.
+              </p>
+            </div>
+
+            <div className="relative mt-10">
+              <div className="absolute inset-0 rounded-full bg-primary/35 blur-[42px]" />
+              <button
+                className="relative flex items-center gap-3 rounded-full bg-primary px-8 py-5 text-xl font-extrabold text-primary-foreground shadow-[0_18px_48px_rgba(236,91,19,0.35)] transition-transform hover:scale-[1.03] active:scale-[0.98] md:px-10 md:text-2xl"
+                onClick={onOpenAIWizard}
+              >
+                <Sparkles className="size-7" />
+                Crear receta con IA
+              </button>
+            </div>
+
+            <div className="mt-5 w-full max-w-2xl rounded-[1.75rem] border border-primary/10 bg-card/80 p-4 text-left shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Búsqueda rápida</p>
+                  <h3 className="mt-2 text-lg font-bold text-slate-900 dark:text-slate-100">Encuentra una idea por nombre y genera la receta al instante</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Busca platos como ceviche, milanesa o lomo saltado y arranca el wizard IA con esa base ya seleccionada.
+                  </p>
+                </div>
+                <button
+                  onClick={onOpenRecipeSearch}
+                  className="shrink-0 rounded-full border border-primary/20 bg-white px-5 py-3 text-sm font-bold text-primary transition-colors hover:bg-primary/10 dark:bg-background"
+                >
+                  Buscar recetas
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-8 w-full max-w-3xl rounded-[2rem] border border-primary/10 bg-white/75 p-5 shadow-xl shadow-primary/5 backdrop-blur dark:bg-[#221610]/80">
+              <div className="text-left">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Wizard guiado en 3 pasos</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Empieza con tu idea, añade ingredientes o comensales si quieres, y deja que la IA te haga las preguntas justas antes de cocinar.
+                </p>
+              </div>
+              {aiError && <p className="mt-3 text-sm font-medium text-red-500">{aiError}</p>}
+              {aiSuccess && <p className="mt-3 text-sm font-medium text-emerald-600 dark:text-emerald-400">{aiSuccess}</p>}
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={onOpenAIWizard}
+                  className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Abrir asistente IA
+                </button>
+              </div>
+            </div>
+
+            <section className="mt-12 w-full max-w-4xl">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                {featuredCategories.map((category) => (
+                  <button
+                    key={category.id}
+                    onClick={() => onCategorySelect(category.id)}
+                    className="group flex flex-col items-center gap-4 rounded-[2rem] p-2 transition-transform hover:-translate-y-1"
+                  >
+                    <div className="flex size-28 items-center justify-center rounded-full border-2 border-primary/10 bg-card shadow-lg transition-all group-hover:border-primary group-hover:bg-primary/5 md:size-32">
+                      <span className="text-5xl">{category.icon}</span>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-slate-800 dark:text-slate-200">{category.name}</p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{category.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {otherCategories.length > 0 && (
+                <div className="mt-8 text-left">
+                  <p className="mb-3 text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">Más categorías</p>
+                  <div className="flex flex-wrap gap-3">
+                    {otherCategories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => onCategorySelect(category.id)}
+                        className="rounded-full border border-primary/10 bg-card/80 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-primary hover:text-primary dark:text-slate-300"
+                      >
+                        {category.icon} {category.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="mt-14 w-full text-left">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200">Creaciones recientes</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Tus recetas privadas creadas con IA, listas para reusar o ajustar.</p>
+                </div>
+                <button className="text-sm font-semibold text-primary hover:underline" onClick={onOpenMyRecipes}>
+                  Ver todas
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {recentRecipes.map((recipe) => {
+                  const isFavorite = favoriteRecipeIds.has(recipe.id);
+                  return (
+                    <div
+                      key={recipe.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onRecipeOpen(recipe)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onRecipeOpen(recipe);
+                        }
+                      }}
+                      className="flex cursor-pointer items-center gap-4 rounded-[1.5rem] border border-primary/10 bg-white/60 p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-lg dark:bg-white/5"
+                    >
+                      <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-3xl">
+                        {recipe.icon}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{recipe.name}</h4>
+                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{recipe.description}</p>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                          {recipe.createdAt ? `Creada ${new Date(recipe.createdAt).toLocaleDateString()}` : 'Receta privada'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleFavorite(recipe.id);
+                        }}
+                        className={`flex size-11 items-center justify-center rounded-full border transition-colors ${isFavorite ? 'border-primary/30 bg-primary/10 text-primary' : 'border-primary/10 bg-background text-slate-500 dark:text-slate-400'}`}
+                        title={isFavorite ? 'Quitar de favoritos' : 'Guardar en favoritos'}
+                      >
+                        {isFavorite ? <Heart className="size-5 fill-current" /> : <HeartOff className="size-5" />}
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onPlanRecipe(recipe);
+                        }}
+                        className="flex items-center rounded-full border border-primary/10 bg-background px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/8"
+                      >
+                        Planificar
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {recentRecipes.length === 0 && (
+                  <div className="rounded-[1.5rem] border border-dashed border-primary/20 bg-white/40 p-6 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400 md:col-span-2">
+                    Aún no tienes recetas privadas creadas con IA. Genera una desde el bloque principal y aparecerá aquí.
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
-    );
+      </div>
+    </MainShellLayout>
+  );
 }

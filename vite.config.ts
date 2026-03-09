@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -11,6 +11,13 @@ const RECIPES_ROUTE = '/api/recipes'
 let localGoogleApiKey = ''
 let localGoogleModel = ''
 let localOpenAIApiKey = ''
+
+type RecipeContextDraft = {
+  prompt?: unknown
+  servings?: unknown
+  availableIngredients?: unknown
+  avoidIngredients?: unknown
+}
 
 async function readRequestBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
@@ -24,6 +31,46 @@ function sendJson(res: ServerResponse, statusCode: number, payload: unknown): vo
   res.statusCode = statusCode
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.end(JSON.stringify(payload))
+}
+
+function extractContextTokens(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (item && typeof item === 'object' && typeof (item as { value?: unknown }).value === 'string') {
+        return ((item as { value: string }).value || '').trim()
+      }
+      return ''
+    })
+    .filter(Boolean)
+}
+
+function buildStructuredUserPrompt(rawPrompt: string, rawContext: RecipeContextDraft | null): string {
+  const prompt = rawPrompt.trim()
+  if (!rawContext || typeof rawContext !== 'object') {
+    return prompt
+  }
+
+  const servings =
+    typeof rawContext.servings === 'number' && Number.isFinite(rawContext.servings) && rawContext.servings > 0
+      ? Math.round(rawContext.servings)
+      : null
+  const availableIngredients = extractContextTokens(rawContext.availableIngredients)
+  const avoidIngredients = extractContextTokens(rawContext.avoidIngredients)
+  const lines = [prompt]
+
+  if (servings !== null) {
+    lines.push(`- Comensales objetivo: ${servings}`)
+  }
+  if (availableIngredients.length > 0) {
+    lines.push(`- Ingredientes disponibles: ${availableIngredients.join(', ')}`)
+  }
+  if (avoidIngredients.length > 0) {
+    lines.push(`- Ingredientes a evitar: ${avoidIngredients.join(', ')}`)
+  }
+
+  return lines.join('\n')
 }
 
 async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -45,8 +92,8 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
   let mode: 'generate' | 'clarify' = 'generate'
   try {
     const bodyText = await readRequestBody(req)
-    const body = bodyText ? (JSON.parse(bodyText) as { prompt?: string; mode?: string }) : {}
-    userPrompt = body.prompt?.trim() ?? ''
+    const body = bodyText ? (JSON.parse(bodyText) as { prompt?: string; mode?: string; context?: RecipeContextDraft | null }) : {}
+    userPrompt = buildStructuredUserPrompt(body.prompt?.trim() ?? '', body.context ?? null)
     mode = body.mode === 'clarify' ? 'clarify' : 'generate'
   } catch {
     sendJson(res, 400, { error: 'Body JSON invalido.' })
@@ -198,6 +245,11 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
       try {
         const completion = (await googleResponse.json()) as {
           candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+          usageMetadata?: {
+            promptTokenCount?: number
+            candidatesTokenCount?: number
+            totalTokenCount?: number
+          }
         }
         const content = completion.candidates?.[0]?.content?.parts?.[0]?.text
         if (!content) {
@@ -205,6 +257,17 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
           return
         }
         const parsed = JSON.parse(content)
+        const usage = {
+          provider: 'google_gemini',
+          model,
+          authMode: 'platform_key',
+          promptTokens: completion.usageMetadata?.promptTokenCount ?? 0,
+          outputTokens: completion.usageMetadata?.candidatesTokenCount ?? 0,
+          totalTokens: completion.usageMetadata?.totalTokenCount ?? 0,
+          budgetMode: 'none',
+          remainingPercent: null,
+          requestKind: mode,
+        }
         sendJson(
           res,
           200,
@@ -214,8 +277,18 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
                 questions: Array.isArray((parsed as { questions?: unknown }).questions)
                   ? (parsed as { questions: unknown[] }).questions
                   : [],
+                suggestedTitle: typeof (parsed as { suggestedTitle?: unknown }).suggestedTitle === 'string'
+                  ? (parsed as { suggestedTitle: string }).suggestedTitle
+                  : undefined,
+                tip: typeof (parsed as { tip?: unknown }).tip === 'string'
+                  ? (parsed as { tip: string }).tip
+                  : undefined,
+                usage,
               }
-            : parsed,
+            : {
+                recipe: parsed,
+                usage,
+              },
         )
         return
       } catch {
@@ -256,6 +329,7 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
   try {
     const completion = (await openAIResponse.json()) as {
       choices?: Array<{ message?: { content?: string } }>
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
     }
     const content = completion.choices?.[0]?.message?.content
     if (!content) {
@@ -263,6 +337,17 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
       return
     }
     const parsed = JSON.parse(content)
+    const usage = {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      authMode: 'platform_key',
+      promptTokens: completion.usage?.prompt_tokens ?? 0,
+      outputTokens: completion.usage?.completion_tokens ?? 0,
+      totalTokens: completion.usage?.total_tokens ?? 0,
+      budgetMode: 'none',
+      remainingPercent: null,
+      requestKind: mode,
+    }
     sendJson(
       res,
       200,
@@ -272,8 +357,18 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
             questions: Array.isArray((parsed as { questions?: unknown }).questions)
               ? (parsed as { questions: unknown[] }).questions
               : [],
+            suggestedTitle: typeof (parsed as { suggestedTitle?: unknown }).suggestedTitle === 'string'
+              ? (parsed as { suggestedTitle: string }).suggestedTitle
+              : undefined,
+            tip: typeof (parsed as { tip?: unknown }).tip === 'string'
+              ? (parsed as { tip: string }).tip
+              : undefined,
+            usage,
           }
-        : parsed,
+        : {
+            recipe: parsed,
+            usage,
+          },
     )
   } catch {
     sendJson(res, 502, { error: 'No se pudo interpretar la respuesta de OpenAI.' })
@@ -365,24 +460,33 @@ function aiRecipeApiPlugin(): Plugin {
   }
 }
 
-export default defineConfig({
-  define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.0.0'),
-  },
-  plugins: [
-    // The React and Tailwind plugins are both required for Make, even if
-    // Tailwind is not being actively used – do not remove them
-    react(),
-    tailwindcss(),
-    aiRecipeApiPlugin(),
-  ],
-  resolve: {
-    alias: {
-      // Alias @ to the src directory
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  for (const [key, value] of Object.entries(env)) {
+    if (process.env[key] === undefined) {
+      process.env[key] = value
+    }
+  }
 
-  // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  assetsInclude: ['**/*.svg', '**/*.csv'],
+  return {
+    define: {
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.0.0'),
+    },
+    plugins: [
+      // The React and Tailwind plugins are both required for Make, even if
+      // Tailwind is not being actively used – do not remove them
+      react(),
+      tailwindcss(),
+      aiRecipeApiPlugin(),
+    ],
+    resolve: {
+      alias: {
+        // Alias @ to the src directory
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+
+    // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
+    assetsInclude: ['**/*.svg', '**/*.csv'],
+  }
 })

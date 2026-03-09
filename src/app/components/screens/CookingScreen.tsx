@@ -1,5 +1,5 @@
 import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient, Recipe } from '../../../types';
-import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight } from 'lucide-react';
+import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight, ListChecks, SlidersHorizontal } from 'lucide-react';
 
 interface CookingScreenProps {
   appVersion: string;
@@ -33,6 +33,9 @@ interface CookingScreenProps {
   onJumpToSubStep: (stepIndex: number, subStepIndex: number) => void;
   onContinue: () => void;
   onConfirmNextUnit: () => void;
+  onOpenIngredients: () => void;
+  onOpenSetup: () => void;
+  onPlanRecipe: () => void;
   currentIngredients: Ingredient[];
   activeIngredientSelection: Record<string, boolean>;
   activeRecipeContent: RecipeContent;
@@ -101,6 +104,9 @@ export function CookingScreen({
   onTogglePause,
   onContinue,
   onConfirmNextUnit,
+  onOpenIngredients,
+  onOpenSetup,
+  onPlanRecipe,
   currentIngredients,
   activeIngredientSelection,
   activeRecipeContent,
@@ -195,8 +201,9 @@ export function CookingScreen({
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_center,_#1e1e1e_0%,_#0a0a0a_100%)] text-slate-100 antialiased">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.03] [background-image:radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.16),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_58%)] dark:bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.18),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_58%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05] [background-image:radial-gradient(rgba(236,91,19,0.6)_1px,transparent_1px)] [background-size:24px_24px]" />
 
       <div className="relative z-10 h-1.5 w-full bg-white/5">
         <div
@@ -206,9 +213,9 @@ export function CookingScreen({
       </div>
 
       <div className="relative z-20 flex h-[calc(100vh-6px)] overflow-hidden">
-        <aside className="hidden w-72 shrink-0 flex-col border-r border-white/5 bg-black/30 backdrop-blur-2xl lg:flex">
-          <div className="border-b border-white/5 p-7">
-            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-orange-400">Ingredientes</h3>
+        <aside className="hidden w-72 shrink-0 flex-col border-r border-primary/10 bg-card/80 backdrop-blur-2xl lg:flex">
+          <div className="border-b border-primary/10 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Ingredientes</h3>
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Lista activa</p>
           </div>
           <div className="flex-1 space-y-5 overflow-y-auto p-6">
@@ -217,8 +224,8 @@ export function CookingScreen({
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-xl border text-lg ${
                     consumedIngredientKeys.has(getIngredientKey(ingredient.name))
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                      : 'border-white/10 bg-white/5 text-orange-400'
+                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500'
+                      : 'border-primary/10 bg-background/80 text-primary'
                   }`}
                 >
                   {ingredient.emoji || '•'}
@@ -227,13 +234,13 @@ export function CookingScreen({
                   <p
                     className={`truncate text-sm font-bold ${
                       consumedIngredientKeys.has(getIngredientKey(ingredient.name))
-                        ? 'text-emerald-300 line-through'
-                        : 'text-white'
+                        ? 'text-emerald-600 line-through dark:text-emerald-400'
+                        : 'text-slate-900 dark:text-slate-100'
                     }`}
                   >
                     {ingredient.name}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {ingredient.portions[portion]}
                     {consumedIngredientKeys.has(getIngredientKey(ingredient.name)) ? ' · usado' : ''}
                   </p>
@@ -247,47 +254,69 @@ export function CookingScreen({
           <header className="flex items-center justify-between px-8 py-6 lg:px-10 lg:py-8">
             <div className="flex items-center gap-4">
               <div>
-                <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-white">
+                <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                   <span className="text-4xl leading-none lg:text-5xl">{recipeIcon}</span>
                   <span>{recipeName}</span>
                 </h1>
               </div>
             </div>
-            <button
-              onClick={onChangeMission}
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-white/10"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reiniciar
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <button
+                onClick={onOpenIngredients}
+                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+              >
+                <ListChecks className="h-4 w-4" />
+                Ingredientes
+              </button>
+              <button
+                onClick={onOpenSetup}
+                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Configurar
+              </button>
+              <button
+                onClick={onPlanRecipe}
+                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+              >
+                Planificar
+              </button>
+              <button
+                onClick={onChangeMission}
+                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-6 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reiniciar
+              </button>
+            </div>
           </header>
 
           <section className="flex flex-1 flex-col items-center justify-center px-4 text-center">
-            <div className="mb-6 inline-flex items-center rounded-full border border-orange-500/30 bg-orange-500/10 px-5 py-2 backdrop-blur-md">
-              <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-orange-400">
+            <div className="mb-6 inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-5 py-2 backdrop-blur-md">
+              <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-primary">
                 Subpaso {currentPosition} de {totalSubSteps}
               </span>
             </div>
 
-            <h2 className="mb-4 text-5xl font-extrabold tracking-tight text-slate-50 lg:text-6xl">{currentTitle}</h2>
-            <p className="mb-8 max-w-lg text-lg font-medium leading-relaxed text-slate-400">{currentNotes}</p>
+            <h2 className="mb-4 text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 lg:text-6xl">{currentTitle}</h2>
+            <p className="mb-8 max-w-lg text-lg font-medium leading-relaxed text-slate-600 dark:text-slate-400">{currentNotes}</p>
 
             {currentIsTimer ? (
               <div className="relative mb-10 flex items-center justify-center">
-                <div className="absolute h-72 w-72 rounded-full bg-orange-600/15 blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
+                <div className="absolute h-72 w-72 rounded-full bg-primary/20 blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
                 <div className="relative">
-                  <div className="text-[6rem] font-extrabold leading-none tracking-tight text-orange-500 drop-shadow-[0_0_40px_rgba(249,115,22,0.5)] lg:text-[9rem]">
+                  <div className="text-[6rem] font-extrabold leading-none tracking-tight text-primary drop-shadow-[0_0_40px_rgba(236,91,19,0.24)] lg:text-[9rem]">
                     {formatClock(timeRemaining)}
                   </div>
-                  <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.45em] text-orange-500/80">
+                  <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.45em] text-primary/80">
                     Minutos restantes
                   </div>
                 </div>
               </div>
             ) : hasPortionValue ? (
-              <div className="mb-10 w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6">
-                <p className="text-3xl font-bold text-white">{String(portionValue)}</p>
-                <p className="mt-2 text-sm text-slate-400">Cantidad estimada</p>
+              <div className="mb-10 w-full max-w-md rounded-3xl border border-primary/10 bg-card/80 p-6">
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">{String(portionValue)}</p>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Cantidad estimada</p>
               </div>
             ) : null}
 
@@ -296,8 +325,8 @@ export function CookingScreen({
                 onClick={handleQuickAction}
                 className={`flex flex-1 items-center justify-center gap-3 rounded-[2rem] border py-5 text-lg font-extrabold transition-all active:scale-95 ${
                   currentIsTimer && isRunning
-                    ? 'border-red-400/30 bg-red-500 text-white hover:bg-red-600'
-                    : 'border-orange-400/30 bg-orange-500 text-white shadow-[0_0_30px_rgba(249,115,22,0.25)] hover:bg-orange-400'
+                    ? 'border-red-400/20 bg-red-500 text-white hover:bg-red-600'
+                    : 'border-primary/20 bg-primary text-white shadow-[0_0_30px_rgba(236,91,19,0.22)] hover:bg-primary/92'
                 }`}
               >
                 {currentIsTimer && isRunning ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
@@ -308,7 +337,7 @@ export function CookingScreen({
                 disabled={isLastSubStep}
                 title="Saltar subpaso"
                 aria-label="Saltar subpaso"
-                className="flex w-20 items-center justify-center rounded-[2rem] border border-white/10 bg-white/5 text-slate-200 transition-all hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex w-20 items-center justify-center rounded-[2rem] border border-primary/10 bg-card/80 text-slate-700 transition-all hover:bg-primary/8 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200"
               >
                 <ChevronsRight className="h-7 w-7" />
               </button>
@@ -316,42 +345,42 @@ export function CookingScreen({
           </section>
         </main>
 
-        <aside className="hidden w-80 shrink-0 flex-col border-l border-white/5 bg-black/30 backdrop-blur-2xl xl:flex">
-          <div className="border-b border-white/5 p-7">
-            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-slate-400">Siguiente subpaso</h3>
+        <aside className="hidden w-80 shrink-0 flex-col border-l border-primary/10 bg-card/80 backdrop-blur-2xl xl:flex">
+          <div className="border-b border-primary/10 p-7">
+            <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-primary/85">Siguiente subpaso</h3>
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Vista previa</p>
           </div>
           <div className="space-y-6 p-7">
             {nextItem ? (
               <>
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/20 bg-orange-500/10">
-                  <ArrowRight className="h-7 w-7 text-orange-500" />
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+                  <ArrowRight className="h-7 w-7 text-primary" />
                 </div>
                 <div>
-                  <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.15em] text-orange-500/80">
+                  <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.15em] text-primary/80">
                     Subpaso {currentPosition + 1} de {totalSubSteps}
                   </p>
-                  <h4 className="mb-3 text-2xl font-bold leading-tight text-white">{nextItem.subStep.subStepName}</h4>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-sm leading-relaxed text-slate-300">
+                  <h4 className="mb-3 text-2xl font-bold leading-tight text-slate-900 dark:text-white">{nextItem.subStep.subStepName}</h4>
+                  <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
+                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                       {nextItem.subStep.notes || 'Continúa con este subpaso.'}
                     </p>
                   </div>
                 </div>
                 {nextEstimatedLabel && (
-                  <div className="pt-4 text-sm font-semibold text-slate-500">
+                  <div className="pt-4 text-sm font-semibold text-slate-500 dark:text-slate-400">
                     {nextEstimatedLabel}
                   </div>
                 )}
               </>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                 <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">No hay más subpasos</p>
               </div>
             )}
           </div>
           <div className="mt-auto p-7">
-            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 opacity-50">
+            <div className="flex items-center justify-between rounded-2xl border border-primary/10 bg-background/80 p-4 opacity-60">
               <span className="text-xs font-bold uppercase tracking-widest">Preview bloqueado</span>
               <span className="text-lg">🔒</span>
             </div>

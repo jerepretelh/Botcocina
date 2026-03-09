@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_SUPABASE_ENABLED?: string;
+  readonly VITE_AI_MOCK_MODE?: string;
 }
 
 interface ImportMeta {

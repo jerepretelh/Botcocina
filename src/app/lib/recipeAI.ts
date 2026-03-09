@@ -1,4 +1,5 @@
-import { CookingEquipment } from '../../types';
+import type { AIRecipeContextDraft, AIUsageMetadata, CookingEquipment } from '../../types';
+import { authenticatedJsonFetch } from './authenticatedApi';
 
 export type FireLevel = 'low' | 'medium' | 'high';
 
@@ -59,71 +60,37 @@ export interface AIClarificationQuestion {
   max?: number;
   step?: number;
   unit?: string;
+  presentationVariant?: 'cards' | 'stepper' | 'textarea';
+  emoji?: string;
+  section?: string;
 }
 
 export interface AIClarificationResult {
   needsClarification: boolean;
   questions: AIClarificationQuestion[];
+  suggestedTitle?: string;
+  tip?: string;
+  usage?: AIUsageMetadata;
 }
 
-export async function generateRecipeWithAI(prompt: string): Promise<GeneratedRecipe> {
-  const response = await fetch('/api/ai/recipe', {
+export async function generateRecipeWithAI(prompt: string, context?: AIRecipeContextDraft): Promise<{
+  recipe: GeneratedRecipe;
+  usage?: AIUsageMetadata;
+}> {
+  const payload = await authenticatedJsonFetch<{ recipe: GeneratedRecipe; usage?: AIUsageMetadata }>('/api/ai/recipe', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, context }),
   });
 
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    // keep null payload and throw a fallback error below
-  }
-
-  if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-        payload !== null &&
-        'error' in payload &&
-        typeof (payload as { error?: unknown }).error === 'string'
-        ? (payload as { error: string }).error
-        : 'No se pudo generar la receta con IA.';
-    throw new Error(message);
-  }
-
-  return payload as GeneratedRecipe;
+  return payload;
 }
 
 export async function requestRecipeClarificationWithAI(
   prompt: string,
+  context?: AIRecipeContextDraft,
 ): Promise<AIClarificationResult> {
-  const response = await fetch('/api/ai/recipe', {
+  return authenticatedJsonFetch<AIClarificationResult>('/api/ai/recipe', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ prompt, mode: 'clarify' }),
+    body: JSON.stringify({ prompt, context, mode: 'clarify' }),
   });
-
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch {
-    // keep null payload and throw a fallback error below
-  }
-
-  if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-        payload !== null &&
-        'error' in payload &&
-        typeof (payload as { error?: unknown }).error === 'string'
-        ? (payload as { error: string }).error
-        : 'No se pudo consultar preguntas previas con IA.';
-    throw new Error(message);
-  }
-
-  return payload as AIClarificationResult;
 }

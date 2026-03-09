@@ -3,6 +3,7 @@ import {
     RecipeCategoryId,
     AmountUnit,
     Ingredient,
+    UserRecipeCookingConfig,
     Screen,
     RecipeStep,
     SubStep,
@@ -14,19 +15,11 @@ import {
     ClarificationQuantityUnit,
 } from '../../types';
 import { AIClarificationQuestion } from '../lib/recipeAI';
+import { buildCookingSessionState } from '../lib/cookingSession';
 import {
     buildInitialIngredientSelection,
-    buildEggFrySteps,
-    ensureEquipmentTransitionSubSteps,
-    buildCookingSteps,
-    getLoopItemCount,
-    isLoopableStep,
-    hasExplicitUnitFlow,
-    removeRedundantEggInsertSubStep,
     clampNumber,
-    mapCountToPortion,
 } from '../utils/recipeHelpers';
-import { applyTimerScale } from '../utils/timerUtils';
 import { requestRecipeClarificationWithAI, generateRecipeWithAI } from '../lib/recipeAI';
 import { buildRecipeId, ensureRecipeShape, normalizeText, inferSizingFromClarifications, inferPeopleCountFromClarifications, inferPortionFromPrompt } from '../utils/recipeHelpers';
 
@@ -100,6 +93,21 @@ interface UseThermomixHandlersProps {
     resolveClarificationUnit: (question: AIClarificationQuestion) => string;
     APPROX_GRAMS_PER_UNIT: number;
     portionValue: number | string | null;
+    getSavedRecipeConfig: (recipeId: string) => UserRecipeCookingConfig | null;
+    resolveRecipeSetupBehavior: (recipe: Recipe, config: UserRecipeCookingConfig | null) => 'servings_only' | 'servings_or_quantity' | 'saved_config_first';
+    saveUserRecipeConfig: (config: Omit<UserRecipeCookingConfig, 'createdAt' | 'updatedAt'>) => Promise<unknown>;
+    recipeUserId: string | null;
+    activePlannedRecipeItemId: string | null;
+    savePlannedRecipeConfig: (configSnapshot: {
+        quantityMode: QuantityMode;
+        peopleCount: number | null;
+        amountUnit: AmountUnit | null;
+        availableCount: number | null;
+        selectedOptionalIngredients: string[];
+        sourceContextSummary: UserRecipeCookingConfig['sourceContextSummary'];
+        resolvedPortion: Portion;
+        scaleFactor: number;
+    }) => Promise<unknown>;
 }
 
 export function useThermomixHandlers(props: UseThermomixHandlersProps) {
@@ -171,23 +179,50 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         activeStepLoop,
         resolveClarificationUnit,
         APPROX_GRAMS_PER_UNIT,
+        getSavedRecipeConfig,
+        resolveRecipeSetupBehavior,
+        saveUserRecipeConfig,
+        recipeUserId,
+        activePlannedRecipeItemId,
+        savePlannedRecipeConfig,
     } = props;
 
     const handleRecipeSelect = (recipe: Recipe) => {
         const content = recipeContentById[recipe.id];
+        const savedConfig = getSavedRecipeConfig(recipe.id);
+        const setupBehavior = resolveRecipeSetupBehavior(recipe, savedConfig);
         if (content && !ingredientSelectionByRecipe[recipe.id]) {
+            const baseSelection = buildInitialIngredientSelection(content.ingredients);
+            const optionalKeys = savedConfig?.selectedOptionalIngredients ?? null;
+            const hydratedSelection = optionalKeys
+                ? Object.fromEntries(
+                    Object.entries(baseSelection).map(([key, value]) => {
+                        const ingredient = content.ingredients.find((item) => item.name.toLowerCase().replace(/\s+/g, '_') === key);
+                        if (ingredient?.indispensable) return [key, true];
+                        return [key, optionalKeys.includes(key)];
+                    }),
+                )
+                : baseSelection;
             setIngredientSelectionByRecipe((prev: any) => ({
                 ...prev,
-                [recipe.id]: buildInitialIngredientSelection(content.ingredients),
+                [recipe.id]: hydratedSelection,
             }));
         }
         setCookingSteps(null);
         setActiveStepLoop(null);
         setSelectedRecipe(recipe);
-        setQuantityMode('people');
-        setPeopleCount(2);
-        setAvailableCount(2);
-        setAmountUnit('units');
+        if (savedConfig && (setupBehavior === 'saved_config_first' || setupBehavior === 'servings_or_quantity')) {
+            const shouldUseHave = setupBehavior !== 'servings_only' && savedConfig.quantityMode === 'have';
+            setQuantityMode(shouldUseHave ? 'have' : 'people');
+            setPeopleCount(savedConfig.peopleCount ?? 2);
+            setAvailableCount(savedConfig.availableCount ?? 2);
+            setAmountUnit(savedConfig.amountUnit ?? 'units');
+        } else {
+            setQuantityMode('people');
+            setPeopleCount(2);
+            setAvailableCount(2);
+            setAmountUnit('units');
+        }
         setProduceType('blanca');
         setProduceSize('medium');
         setTimerScaleFactor(1);
@@ -232,6 +267,37 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         );
         setIngredientsBackScreen('recipe-setup');
         setScreen('ingredients');
+        if (selectedRecipe && recipeUserId) {
+            void saveUserRecipeConfig({
+                userId: recipeUserId,
+                recipeId: selectedRecipe.id,
+                quantityMode,
+                peopleCount: quantityMode === 'people' ? peopleCount : peopleCount,
+                amountUnit: quantityMode === 'have' ? amountUnit : null,
+                availableCount: quantityMode === 'have' ? availableCount : null,
+                selectedOptionalIngredients: currentIngredients
+                    .filter((ingredient) => !ingredient.indispensable)
+                    .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
+                    .filter((key) => activeIngredientSelection[key] ?? true),
+                sourceContextSummary: getSavedRecipeConfig(selectedRecipe.id)?.sourceContextSummary ?? null,
+                lastUsedAt: new Date().toISOString(),
+            });
+        }
+        if (selectedRecipe && activePlannedRecipeItemId) {
+            void savePlannedRecipeConfig({
+                quantityMode,
+                peopleCount,
+                amountUnit: quantityMode === 'have' ? amountUnit : null,
+                availableCount: quantityMode === 'have' ? availableCount : null,
+                selectedOptionalIngredients: currentIngredients
+                    .filter((ingredient) => !ingredient.indispensable)
+                    .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
+                    .filter((key) => activeIngredientSelection[key] ?? true),
+                sourceContextSummary: getSavedRecipeConfig(selectedRecipe.id)?.sourceContextSummary ?? null,
+                resolvedPortion: setupPortionPreview,
+                scaleFactor: setupScaleFactor,
+            });
+        }
     };
 
     const handleSetupAmountUnitChange = (nextUnit: AmountUnit) => {
@@ -252,50 +318,65 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
     };
 
     const handleStartCooking = () => {
-        const eggTargetCount = quantityMode === 'have'
-            ? (amountUnit === 'grams'
-                ? Math.max(1, Math.round(availableCount / 55))
-                : availableCount)
-            : peopleCount;
-        const sourceSteps = selectedRecipe?.id === 'huevo-frito'
-            ? buildEggFrySteps(eggTargetCount)
-            : activeRecipeContent.steps;
+        const session = buildCookingSessionState({
+            selectedRecipe,
+            activeRecipeContentSteps: activeRecipeContent.steps,
+            currentIngredients,
+            activeIngredientSelection,
+            quantityMode,
+            amountUnit,
+            availableCount,
+            peopleCount,
+            portion,
+            timerScaleFactor,
+        });
 
-        let selectedSteps = removeRedundantEggInsertSubStep(
-            ensureEquipmentTransitionSubSteps(
-                buildCookingSteps(
-                    sourceSteps,
-                    currentIngredients,
-                    activeIngredientSelection,
-                ),
-                selectedRecipe?.equipment
-            ),
-            selectedRecipe?.id,
-        );
-        if (timerScaleFactor !== 1) {
-            selectedSteps = applyTimerScale(selectedSteps, timerScaleFactor);
-        }
-        const loopItems = selectedRecipe?.id === 'papas-fritas' ? 3 : getLoopItemCount(currentIngredients, portion);
-        const shouldDisableLoop =
-            selectedRecipe?.id === 'huevo-frito' || hasExplicitUnitFlow(selectedSteps);
-        const loopStepIndex = !shouldDisableLoop && loopItems > 1
-            ? selectedSteps.findIndex((step) => isLoopableStep(step))
-            : -1;
-
-        if (loopStepIndex >= 0) {
-            setActiveStepLoop({
-                stepIndex: loopStepIndex,
-                totalItems: loopItems,
-                currentItem: 1,
-            });
-        } else {
-            setActiveStepLoop(null);
-        }
-
-        setCookingSteps(selectedSteps);
+        setCookingSteps(session.steps);
+        setActiveStepLoop(session.activeStepLoop);
         setScreen('cooking');
         setCurrentStepIndex(0);
         setCurrentSubStepIndex(0);
+        if (selectedRecipe && recipeUserId) {
+            void saveUserRecipeConfig({
+                userId: recipeUserId,
+                recipeId: selectedRecipe.id,
+                quantityMode,
+                peopleCount,
+                amountUnit: quantityMode === 'have' ? amountUnit : null,
+                availableCount: quantityMode === 'have' ? availableCount : null,
+                selectedOptionalIngredients: currentIngredients
+                    .filter((ingredient) => !ingredient.indispensable)
+                    .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
+                    .filter((key) => activeIngredientSelection[key] ?? true),
+                sourceContextSummary: getSavedRecipeConfig(selectedRecipe.id)?.sourceContextSummary ?? null,
+                lastUsedAt: new Date().toISOString(),
+            });
+        }
+        if (selectedRecipe && activePlannedRecipeItemId) {
+            void savePlannedRecipeConfig({
+                quantityMode,
+                peopleCount,
+                amountUnit: quantityMode === 'have' ? amountUnit : null,
+                availableCount: quantityMode === 'have' ? availableCount : null,
+                selectedOptionalIngredients: currentIngredients
+                    .filter((ingredient) => !ingredient.indispensable)
+                    .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
+                    .filter((key) => activeIngredientSelection[key] ?? true),
+                sourceContextSummary: getSavedRecipeConfig(selectedRecipe.id)?.sourceContextSummary ?? null,
+                resolvedPortion: portion,
+                scaleFactor: timerScaleFactor,
+            });
+        }
+    };
+
+    const handleOpenIngredientsFromCooking = () => {
+        setIngredientsBackScreen('cooking');
+        setScreen('ingredients');
+    };
+
+    const handleOpenSetupFromCooking = () => {
+        setIngredientsBackScreen('recipe-setup');
+        setScreen('recipe-setup');
     };
 
     const handleChangeMission = () => {
@@ -447,5 +528,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         handleJumpToSubStep,
         handleIngredientToggle,
         handleAnswerChange,
+        handleOpenIngredientsFromCooking,
+        handleOpenSetupFromCooking,
     };
 }
