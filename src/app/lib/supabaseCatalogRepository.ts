@@ -1,7 +1,7 @@
 import type { Recipe, RecipeContent, RecipeStep, SubStep } from '../../types';
-import { defaultRecipes, initialRecipeContent } from '../data/recipes';
 import { isSupabaseEnabled, supabaseClient } from './supabaseClient';
 import type { CatalogRepository, RecipesCatalogPayload } from './catalogRepository';
+import { loadLocalRecipeCatalog } from './localRecipeCatalog';
 
 type DbRecipe = {
   id: string;
@@ -94,12 +94,14 @@ function mapSubstepsToSteps(substeps: DbSubstep[]): RecipeStep[] {
 
 export const supabaseCatalogRepository: CatalogRepository = {
   async fetchCatalog(): Promise<RecipesCatalogPayload> {
+    const localCatalog = await loadLocalRecipeCatalog();
+
     if (!isSupabaseEnabled || !supabaseClient) {
       return {
         source: 'local-dev',
         warning: 'Supabase no configurado. Usando catálogo local.',
-        recipes: defaultRecipes,
-        recipeContentById: initialRecipeContent,
+        recipes: localCatalog.defaultRecipes,
+        recipeContentById: localCatalog.initialRecipeContent,
       };
     }
 
@@ -129,8 +131,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
         return {
           source: 'local-dev',
           warning: `No se pudo leer catálogo Supabase (${detail}). Usando catálogo local.`,
-          recipes: defaultRecipes,
-          recipeContentById: initialRecipeContent,
+          recipes: localCatalog.defaultRecipes,
+          recipeContentById: localCatalog.initialRecipeContent,
         };
       }
 
@@ -141,8 +143,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
         return {
           source: 'local-dev',
           warning: 'Supabase no tiene recetas publicadas. Usando catálogo local.',
-          recipes: defaultRecipes,
-          recipeContentById: initialRecipeContent,
+          recipes: localCatalog.defaultRecipes,
+          recipeContentById: localCatalog.initialRecipeContent,
         };
       }
 
@@ -164,8 +166,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
         return {
           source: 'local-dev',
           warning: `No se pudo leer detalle de recetas Supabase (${detail}). Usando catálogo local.`,
-          recipes: defaultRecipes,
-          recipeContentById: initialRecipeContent,
+          recipes: localCatalog.defaultRecipes,
+          recipeContentById: localCatalog.initialRecipeContent,
         };
       }
 

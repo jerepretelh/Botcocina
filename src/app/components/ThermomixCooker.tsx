@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Recipe, RecipeCategoryId, Screen, WeeklyPlanItem, WeeklyPlanItemConfigSnapshot } from '../../types';
-import {
-  recipeCategories,
-} from '../data/recipes';
+import { recipeCategories } from '../data/recipeCategories';
 
 import {
   getIngredientKey,
@@ -32,21 +30,31 @@ import { useThermomixHandlers } from '../hooks/useThermomixHandlers';
 
 import { CategorySelectScreen } from './screens/CategorySelectScreen';
 import { RecipeSelectScreen } from './screens/RecipeSelectScreen';
-import { RecipeSetupScreen } from './screens/RecipeSetupScreen';
 import { IngredientsScreen } from './screens/IngredientsScreen';
-import { CookingScreen } from './screens/CookingScreen';
-import { AIClarifyScreen } from './screens/AIClarifyScreen';
-import { DesignSystemScreen } from './screens/DesignSystemScreen';
-import { AISettingsScreen } from './screens/AISettingsScreen';
-import { PlanRecipeSheet } from './screens/PlanRecipeSheet';
 import { RecipeLibraryScreen } from './screens/RecipeLibraryScreen';
-import { WeeklyPlanScreen } from './screens/WeeklyPlanScreen';
-import { ShoppingListScreen } from './screens/ShoppingListScreen';
-import { RecipeSeedSearchScreen } from './screens/RecipeSeedSearchScreen';
-import { ReleasesScreen } from './screens/ReleasesScreen';
 import { formatVersionLabel } from '../lib/appMetadata';
 
 const APPROX_GRAMS_PER_UNIT = 250;
+const RecipeSetupScreen = lazy(() => import('./screens/RecipeSetupScreen').then((module) => ({ default: module.RecipeSetupScreen })));
+const CookingScreen = lazy(() => import('./screens/CookingScreen').then((module) => ({ default: module.CookingScreen })));
+const AIClarifyScreen = lazy(() => import('./screens/AIClarifyScreen').then((module) => ({ default: module.AIClarifyScreen })));
+const DesignSystemScreen = lazy(() => import('./screens/DesignSystemScreen').then((module) => ({ default: module.DesignSystemScreen })));
+const AISettingsScreen = lazy(() => import('./screens/AISettingsScreen').then((module) => ({ default: module.AISettingsScreen })));
+const RecipeSeedSearchScreen = lazy(() => import('./screens/RecipeSeedSearchScreen').then((module) => ({ default: module.RecipeSeedSearchScreen })));
+const WeeklyPlanScreen = lazy(() => import('./screens/WeeklyPlanScreen').then((module) => ({ default: module.WeeklyPlanScreen })));
+const ShoppingListScreen = lazy(() => import('./screens/ShoppingListScreen').then((module) => ({ default: module.ShoppingListScreen })));
+const ReleasesScreen = lazy(() => import('./screens/ReleasesScreen').then((module) => ({ default: module.ReleasesScreen })));
+const PlanRecipeSheet = lazy(() => import('./screens/PlanRecipeSheet').then((module) => ({ default: module.PlanRecipeSheet })));
+
+function ScreenFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center px-6 py-12">
+      <div className="rounded-[1.5rem] border border-primary/10 bg-card/80 px-6 py-4 text-sm font-medium text-slate-500 shadow-sm dark:text-slate-400">
+        Cargando pantalla...
+      </div>
+    </div>
+  );
+}
 
 interface ThermomixCookerProps {
   auth: ReturnType<typeof useAuthSession>;
@@ -595,26 +603,28 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     currentRecipeData: cookingProgress.currentRecipeData,
   });
 
-  const planRecipeSheet = (
-    <PlanRecipeSheet
-      open={isPlanSheetOpen}
-      recipe={planningRecipe}
-      recipeContent={planningRecipe ? recipeSelection.recipeContentById[planningRecipe.id] ?? null : null}
-      initialSnapshot={planningInitialSnapshot ?? (planningRecipe ? weeklyPlan.getDefaultPlanSnapshot(planningRecipe) : null)}
-      editingItem={editingPlanItem}
-      onOpenChange={(open) => {
-        setIsPlanSheetOpen(open);
-        if (!open) {
-          setPlanningRecipe(null);
-          setEditingPlanItem(null);
-          setPlanningInitialSnapshot(null);
-        }
-      }}
-      onSave={async (input) => {
-        await weeklyPlan.saveItem(input);
-      }}
-    />
-  );
+  const planRecipeSheet = isPlanSheetOpen ? (
+    <Suspense fallback={null}>
+      <PlanRecipeSheet
+        open={isPlanSheetOpen}
+        recipe={planningRecipe}
+        recipeContent={planningRecipe ? recipeSelection.recipeContentById[planningRecipe.id] ?? null : null}
+        initialSnapshot={planningInitialSnapshot ?? (planningRecipe ? weeklyPlan.getDefaultPlanSnapshot(planningRecipe) : null)}
+        editingItem={editingPlanItem}
+        onOpenChange={(open) => {
+          setIsPlanSheetOpen(open);
+          if (!open) {
+            setPlanningRecipe(null);
+            setEditingPlanItem(null);
+            setPlanningInitialSnapshot(null);
+          }
+        }}
+        onSave={async (input) => {
+          await weeklyPlan.saveItem(input);
+        }}
+      />
+    </Suspense>
+  ) : null;
 
   // Render Logic
   if (screen === 'category-select') {
@@ -654,65 +664,73 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   if (screen === 'design-system') {
     return (
-      <DesignSystemScreen onBack={() => recipeSelection.setScreen('category-select')} />
+      <Suspense fallback={<ScreenFallback />}>
+        <DesignSystemScreen onBack={() => recipeSelection.setScreen('category-select')} />
+      </Suspense>
     );
   }
 
   if (screen === 'recipe-seed-search') {
     return (
-      <RecipeSeedSearchScreen
-        currentUserEmail={auth.user?.email ?? null}
-        categories={recipeCategories}
-        searchTerm={recipeSeedSearchTerm}
-        selectedCategoryId={recipeSeedCategoryFilter}
-        seeds={recipeSeeds.seeds}
-        isLoading={recipeSeeds.isLoading}
-        warning={recipeSeeds.warning}
-        onSearchTermChange={setRecipeSeedSearchTerm}
-        onSelectCategory={setRecipeSeedCategoryFilter}
-        onSelectSeed={(seed) => {
-          aiRecipeGen.startWizardFromSeed(seed);
-        }}
-        onBack={() => recipeSelection.goBackScreen('category-select')}
-        onGoHome={() => recipeSelection.setScreen('category-select')}
-        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-        onGoFavorites={() => recipeSelection.setScreen('favorites')}
-        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-        onSignOut={() => void auth.signOut()}
-      />
+      <Suspense fallback={<ScreenFallback />}>
+        <RecipeSeedSearchScreen
+          currentUserEmail={auth.user?.email ?? null}
+          categories={recipeCategories}
+          searchTerm={recipeSeedSearchTerm}
+          selectedCategoryId={recipeSeedCategoryFilter}
+          seeds={recipeSeeds.seeds}
+          isLoading={recipeSeeds.isLoading}
+          warning={recipeSeeds.warning}
+          onSearchTermChange={setRecipeSeedSearchTerm}
+          onSelectCategory={setRecipeSeedCategoryFilter}
+          onSelectSeed={(seed) => {
+            aiRecipeGen.startWizardFromSeed(seed);
+          }}
+          onBack={() => recipeSelection.goBackScreen('category-select')}
+          onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onGoFavorites={() => recipeSelection.setScreen('favorites')}
+          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
   }
 
   if (screen === 'ai-settings') {
     return (
-      <AISettingsScreen
-        currentUserEmail={auth.user?.email ?? null}
-        onGoHome={() => recipeSelection.setScreen('category-select')}
-        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-        onGoFavorites={() => recipeSelection.setScreen('favorites')}
-        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-        onOpenReleases={() => recipeSelection.setScreen('releases')}
-        onSignOut={() => void auth.signOut()}
-      />
+      <Suspense fallback={<ScreenFallback />}>
+        <AISettingsScreen
+          currentUserEmail={auth.user?.email ?? null}
+          onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onGoFavorites={() => recipeSelection.setScreen('favorites')}
+          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+          onOpenReleases={() => recipeSelection.setScreen('releases')}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
   }
 
   if (screen === 'releases') {
     return (
-      <ReleasesScreen
-        currentUserEmail={auth.user?.email ?? null}
-        onGoHome={() => recipeSelection.setScreen('category-select')}
-        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-        onGoFavorites={() => recipeSelection.setScreen('favorites')}
-        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-        onSignOut={() => void auth.signOut()}
-      />
+      <Suspense fallback={<ScreenFallback />}>
+        <ReleasesScreen
+          currentUserEmail={auth.user?.email ?? null}
+          onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onGoFavorites={() => recipeSelection.setScreen('favorites')}
+          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
   }
 
@@ -773,30 +791,32 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   if (screen === 'weekly-plan') {
     return (
       <>
-        <WeeklyPlanScreen
-          currentUserEmail={auth.user?.email ?? null}
-          plan={weeklyPlan.plan}
-          items={weeklyPlan.items}
-          recipesById={Object.fromEntries(recipeSelection.availableRecipes.map((recipe) => [recipe.id, recipe]))}
-          isLoading={weeklyPlan.isLoading}
-          error={weeklyPlan.error}
-          onGoHome={() => recipeSelection.setScreen('category-select')}
-          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-          onGoFavorites={() => recipeSelection.setScreen('favorites')}
-          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-          onSignOut={() => void auth.signOut()}
-          onEditPlanItem={(item) => {
-            const recipe = item.recipeId ? recipeSelection.availableRecipes.find((candidate) => candidate.id === item.recipeId) ?? null : null;
-            if (!recipe) return;
-            openPlanSheetForRecipe(recipe, item);
-          }}
-          onRemovePlanItem={(itemId) => void weeklyPlan.removeItem(itemId)}
-          onOpenRecipeFromPlan={(item) => applyPlannedRecipeSnapshot(item, 'recipe-setup')}
-          onCookFromPlan={(item) => applyPlannedRecipeSnapshot(item, 'cooking')}
-          onCreateNextWeek={() => void weeklyPlan.createNextWeek()}
-        />
+        <Suspense fallback={<ScreenFallback />}>
+          <WeeklyPlanScreen
+            currentUserEmail={auth.user?.email ?? null}
+            plan={weeklyPlan.plan}
+            items={weeklyPlan.items}
+            recipesById={Object.fromEntries(recipeSelection.availableRecipes.map((recipe) => [recipe.id, recipe]))}
+            isLoading={weeklyPlan.isLoading}
+            error={weeklyPlan.error}
+            onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+            onGoFavorites={() => recipeSelection.setScreen('favorites')}
+            onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+            onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+            onSignOut={() => void auth.signOut()}
+            onEditPlanItem={(item) => {
+              const recipe = item.recipeId ? recipeSelection.availableRecipes.find((candidate) => candidate.id === item.recipeId) ?? null : null;
+              if (!recipe) return;
+              openPlanSheetForRecipe(recipe, item);
+            }}
+            onRemovePlanItem={(itemId) => void weeklyPlan.removeItem(itemId)}
+            onOpenRecipeFromPlan={(item) => applyPlannedRecipeSnapshot(item, 'recipe-setup')}
+            onCookFromPlan={(item) => applyPlannedRecipeSnapshot(item, 'cooking')}
+            onCreateNextWeek={() => void weeklyPlan.createNextWeek()}
+          />
+        </Suspense>
         {planRecipeSheet}
       </>
     );
@@ -805,37 +825,39 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   if (screen === 'shopping-list') {
     return (
       <>
-        <ShoppingListScreen
-          currentUserEmail={auth.user?.email ?? null}
-          plan={weeklyPlan.plan}
-          shoppingList={weeklyPlan.shoppingList}
-          shoppingItems={weeklyPlan.shoppingItems}
-          shoppingTrip={weeklyPlan.shoppingTrip}
-          shoppingTripItems={weeklyPlan.shoppingTripItems}
-          aggregation={weeklyPlan.aggregation}
-          variance={weeklyPlan.shoppingVariance}
-          isLoading={weeklyPlan.isLoading}
-          error={weeklyPlan.error}
-          onGoHome={() => recipeSelection.setScreen('category-select')}
-          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-          onGoFavorites={() => recipeSelection.setScreen('favorites')}
-          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-          onSignOut={() => void auth.signOut()}
-          onRegenerateShopping={() => void weeklyPlan.regenerateShopping()}
-          onToggleShoppingItem={(itemId, nextChecked) => void weeklyPlan.updateShoppingItemState(itemId, { isChecked: nextChecked })}
-          onUpdateShoppingItem={(itemId, input) => void weeklyPlan.updateShoppingItemState(itemId, input)}
-          onAddManualItem={(itemName, quantityText) => void weeklyPlan.addManualShoppingItem(itemName, quantityText)}
-          onRemoveShoppingItem={(itemId) => void weeklyPlan.removeShoppingItem(itemId)}
-          onStartShoppingTrip={() => void weeklyPlan.startShoppingTripFromList()}
-          onToggleTripItemInCart={(itemId, nextChecked) => void weeklyPlan.toggleTripItemInCart(itemId, nextChecked)}
-          onMarkTripItemSkipped={(itemId) => void weeklyPlan.markTripItemSkipped(itemId)}
-          onUpdateTripItem={(itemId, input) => void weeklyPlan.updateTripItemActuals(itemId, input)}
-          onAddExtraTripItem={(itemName, quantityText, lineTotal) => void weeklyPlan.addExtraTripItem(itemName, quantityText, lineTotal)}
-          onUpdateTripMeta={(input) => void weeklyPlan.updateShoppingTripMeta(input)}
-          onCheckoutTrip={(finalTotal, storeName) => void weeklyPlan.checkoutTrip(finalTotal, storeName)}
-        />
+        <Suspense fallback={<ScreenFallback />}>
+          <ShoppingListScreen
+            currentUserEmail={auth.user?.email ?? null}
+            plan={weeklyPlan.plan}
+            shoppingList={weeklyPlan.shoppingList}
+            shoppingItems={weeklyPlan.shoppingItems}
+            shoppingTrip={weeklyPlan.shoppingTrip}
+            shoppingTripItems={weeklyPlan.shoppingTripItems}
+            aggregation={weeklyPlan.aggregation}
+            variance={weeklyPlan.shoppingVariance}
+            isLoading={weeklyPlan.isLoading}
+            error={weeklyPlan.error}
+            onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+            onGoFavorites={() => recipeSelection.setScreen('favorites')}
+            onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+            onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+            onSignOut={() => void auth.signOut()}
+            onRegenerateShopping={() => void weeklyPlan.regenerateShopping()}
+            onToggleShoppingItem={(itemId, nextChecked) => void weeklyPlan.updateShoppingItemState(itemId, { isChecked: nextChecked })}
+            onUpdateShoppingItem={(itemId, input) => void weeklyPlan.updateShoppingItemState(itemId, input)}
+            onAddManualItem={(itemName, quantityText) => void weeklyPlan.addManualShoppingItem(itemName, quantityText)}
+            onRemoveShoppingItem={(itemId) => void weeklyPlan.removeShoppingItem(itemId)}
+            onStartShoppingTrip={() => void weeklyPlan.startShoppingTripFromList()}
+            onToggleTripItemInCart={(itemId, nextChecked) => void weeklyPlan.toggleTripItemInCart(itemId, nextChecked)}
+            onMarkTripItemSkipped={(itemId) => void weeklyPlan.markTripItemSkipped(itemId)}
+            onUpdateTripItem={(itemId, input) => void weeklyPlan.updateTripItemActuals(itemId, input)}
+            onAddExtraTripItem={(itemName, quantityText, lineTotal) => void weeklyPlan.addExtraTripItem(itemName, quantityText, lineTotal)}
+            onUpdateTripMeta={(input) => void weeklyPlan.updateShoppingTripMeta(input)}
+            onCheckoutTrip={(finalTotal, storeName) => void weeklyPlan.checkoutTrip(finalTotal, storeName)}
+          />
+        </Suspense>
         {planRecipeSheet}
       </>
     );
@@ -876,85 +898,89 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   if (screen === 'ai-clarify') {
     return (
-      <AIClarifyScreen
-        contextDraft={aiRecipeGen.aiContextDraft}
-        wizardStep={aiRecipeGen.aiWizardStep}
-        questions={aiRecipeGen.aiClarificationQuestions}
-        answers={aiRecipeGen.aiClarificationAnswers}
-        numberModes={aiRecipeGen.aiClarificationNumberModes}
-        quantityUnits={aiRecipeGen.aiClarificationQuantityUnits}
-        selectedSeed={aiRecipeGen.selectedRecipeSeed}
-        suggestedTitle={aiRecipeGen.aiClarificationSuggestedTitle}
-        tip={aiRecipeGen.aiClarificationTip}
-        aiError={aiRecipeGen.aiError}
-        isCheckingClarifications={aiRecipeGen.isCheckingClarifications}
-        onContextPromptChange={aiRecipeGen.handleAiPromptChange}
-        isMockModeEnabled={aiRecipeGen.isAiMockModeEnabled}
-        onContextServingsChange={(value) =>
-          aiRecipeGen.setAiContextDraft((prev) => ({ ...prev, servings: value }))
-        }
-        onAddAvailableIngredient={aiRecipeGen.addAvailableIngredient}
-        onRemoveAvailableIngredient={aiRecipeGen.removeAvailableIngredient}
-        onAddAvoidIngredient={aiRecipeGen.addAvoidIngredient}
-        onRemoveAvoidIngredient={aiRecipeGen.removeAvoidIngredient}
-        onAnswerChange={handlers.handleAnswerChange}
-        onNumberModeChange={aiRecipeGen.setAiClarificationNumberModes}
-        onQuantityUnitChange={aiRecipeGen.setAiClarificationQuantityUnits}
-        onBack={aiRecipeGen.handleAiWizardBack}
-        onContinue={aiRecipeGen.handleAiContextContinue}
-        onGenerate={aiRecipeGen.handleGenerateRecipe}
-        onLoadMockExample={() => aiRecipeGen.applyMockScenarioToContext('milanesa')}
-        onSkipToMockRefinement={() => aiRecipeGen.jumpToMockRefinement('milanesa')}
-        onGenerateMockRecipe={() => void aiRecipeGen.generateMockRecipeDirect('milanesa')}
-        isGenerating={aiRecipeGen.isGeneratingRecipe}
-        resolveUnit={aiRecipeGen.resolveClarificationUnit}
-      />
+      <Suspense fallback={<ScreenFallback />}>
+        <AIClarifyScreen
+          contextDraft={aiRecipeGen.aiContextDraft}
+          wizardStep={aiRecipeGen.aiWizardStep}
+          questions={aiRecipeGen.aiClarificationQuestions}
+          answers={aiRecipeGen.aiClarificationAnswers}
+          numberModes={aiRecipeGen.aiClarificationNumberModes}
+          quantityUnits={aiRecipeGen.aiClarificationQuantityUnits}
+          selectedSeed={aiRecipeGen.selectedRecipeSeed}
+          suggestedTitle={aiRecipeGen.aiClarificationSuggestedTitle}
+          tip={aiRecipeGen.aiClarificationTip}
+          aiError={aiRecipeGen.aiError}
+          isCheckingClarifications={aiRecipeGen.isCheckingClarifications}
+          onContextPromptChange={aiRecipeGen.handleAiPromptChange}
+          isMockModeEnabled={aiRecipeGen.isAiMockModeEnabled}
+          onContextServingsChange={(value) =>
+            aiRecipeGen.setAiContextDraft((prev) => ({ ...prev, servings: value }))
+          }
+          onAddAvailableIngredient={aiRecipeGen.addAvailableIngredient}
+          onRemoveAvailableIngredient={aiRecipeGen.removeAvailableIngredient}
+          onAddAvoidIngredient={aiRecipeGen.addAvoidIngredient}
+          onRemoveAvoidIngredient={aiRecipeGen.removeAvoidIngredient}
+          onAnswerChange={handlers.handleAnswerChange}
+          onNumberModeChange={aiRecipeGen.setAiClarificationNumberModes}
+          onQuantityUnitChange={aiRecipeGen.setAiClarificationQuantityUnits}
+          onBack={aiRecipeGen.handleAiWizardBack}
+          onContinue={aiRecipeGen.handleAiContextContinue}
+          onGenerate={aiRecipeGen.handleGenerateRecipe}
+          onLoadMockExample={() => aiRecipeGen.applyMockScenarioToContext('milanesa')}
+          onSkipToMockRefinement={() => aiRecipeGen.jumpToMockRefinement('milanesa')}
+          onGenerateMockRecipe={() => void aiRecipeGen.generateMockRecipeDirect('milanesa')}
+          isGenerating={aiRecipeGen.isGeneratingRecipe}
+          resolveUnit={aiRecipeGen.resolveClarificationUnit}
+        />
+      </Suspense>
     );
   }
 
   if (screen === 'recipe-setup') {
     return (
       <>
-      <RecipeSetupScreen
-        selectedRecipe={recipeSelection.selectedRecipe}
-        setupBehavior={selectedRecipeSetupBehavior}
-        savedConfig={selectedRecipeSavedConfig}
-        savedContextSummary={selectedRecipeSavedSummary}
-        quantityMode={recipeSelection.quantityMode}
-        setQuantityMode={recipeSelection.setQuantityMode}
-        amountUnit={recipeSelection.amountUnit}
-        onAmountUnitChange={handlers.handleSetupAmountUnitChange}
-        peopleCount={recipeSelection.peopleCount}
-        setPeopleCount={recipeSelection.setPeopleCount}
-        availableCount={recipeSelection.availableCount}
-        setAvailableCount={recipeSelection.setAvailableCount}
-        isTubersBoilRecipe={portions.isTubersBoilRecipe}
-        produceType={recipeSelection.produceType}
-        setProduceType={recipeSelection.setProduceType}
-        produceSize={recipeSelection.produceSize}
-        setProduceSize={recipeSelection.setProduceSize}
-        setupPortionPreview={portions.setupPortionPreview}
-        setupScaleFactor={portions.setupScaleFactor}
-        onBack={() => recipeSelection.goBackScreen('recipe-select')}
-        onContinue={handlers.handleSetupContinue}
-        onPlanRecipe={() => {
-          if (recipeSelection.selectedRecipe) {
-            openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
-              quantityMode: recipeSelection.quantityMode,
-              peopleCount: recipeSelection.peopleCount,
-              amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
-              availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
-              selectedOptionalIngredients: recipeSelection.currentIngredients
-                .filter((ingredient) => !ingredient.indispensable)
-                .map((ingredient) => getIngredientKey(ingredient.name))
-                .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
-              sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
-              resolvedPortion: portions.setupPortionPreview,
-              scaleFactor: portions.setupScaleFactor,
-            });
-          }
-        }}
-      />
+      <Suspense fallback={<ScreenFallback />}>
+        <RecipeSetupScreen
+          selectedRecipe={recipeSelection.selectedRecipe}
+          setupBehavior={selectedRecipeSetupBehavior}
+          savedConfig={selectedRecipeSavedConfig}
+          savedContextSummary={selectedRecipeSavedSummary}
+          quantityMode={recipeSelection.quantityMode}
+          setQuantityMode={recipeSelection.setQuantityMode}
+          amountUnit={recipeSelection.amountUnit}
+          onAmountUnitChange={handlers.handleSetupAmountUnitChange}
+          peopleCount={recipeSelection.peopleCount}
+          setPeopleCount={recipeSelection.setPeopleCount}
+          availableCount={recipeSelection.availableCount}
+          setAvailableCount={recipeSelection.setAvailableCount}
+          isTubersBoilRecipe={portions.isTubersBoilRecipe}
+          produceType={recipeSelection.produceType}
+          setProduceType={recipeSelection.setProduceType}
+          produceSize={recipeSelection.produceSize}
+          setProduceSize={recipeSelection.setProduceSize}
+          setupPortionPreview={portions.setupPortionPreview}
+          setupScaleFactor={portions.setupScaleFactor}
+          onBack={() => recipeSelection.goBackScreen('recipe-select')}
+          onContinue={handlers.handleSetupContinue}
+          onPlanRecipe={() => {
+            if (recipeSelection.selectedRecipe) {
+              openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
+                quantityMode: recipeSelection.quantityMode,
+                peopleCount: recipeSelection.peopleCount,
+                amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
+                availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
+                selectedOptionalIngredients: recipeSelection.currentIngredients
+                  .filter((ingredient) => !ingredient.indispensable)
+                  .map((ingredient) => getIngredientKey(ingredient.name))
+                  .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
+                sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
+                resolvedPortion: portions.setupPortionPreview,
+                scaleFactor: portions.setupScaleFactor,
+              });
+            }
+          }}
+        />
+      </Suspense>
       {planRecipeSheet}
       </>
     );
@@ -990,62 +1016,64 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   return (
     <>
-    <CookingScreen
-      appVersion={appVersion}
-      voiceEnabled={voiceEnabled}
-      onVoiceToggle={voice.handleVoiceToggle}
-      speechSupported={voice.speechSupported}
-      onChangeMission={handlers.handleChangeMission}
-      currentRecipeData={cookingProgress.currentRecipeData}
-      currentStepIndex={cookingProgress.currentStepIndex}
-      currentSubStepIndex={cookingProgress.currentSubStepIndex}
-      currentSubStep={cookingProgress.currentSubStep}
-      isRunning={cookingProgress.isRunning}
-      timeRemaining={cookingProgress.timeRemaining}
-      onTogglePause={handlers.handleTogglePause}
-      onPrevious={handlers.handlePrevious}
-      onNext={handlers.handleNext}
-      onJumpToSubStep={handlers.handleJumpToSubStep}
-      onContinue={handlers.handleContinue}
-      onConfirmNextUnit={handlers.handleConfirmNextUnit}
-      onOpenIngredients={handlers.handleOpenIngredientsFromCooking}
-      onOpenSetup={handlers.handleOpenSetupFromCooking}
-      onPlanRecipe={() => {
-        if (recipeSelection.selectedRecipe) {
-          openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
-            quantityMode: recipeSelection.quantityMode,
-            peopleCount: recipeSelection.peopleCount,
-            amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
-            availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
-            selectedOptionalIngredients: recipeSelection.currentIngredients
-              .filter((ingredient) => !ingredient.indispensable)
-              .map((ingredient) => getIngredientKey(ingredient.name))
-              .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
-            sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
-            resolvedPortion: recipeSelection.portion,
-            scaleFactor: cookingProgress.timerScaleFactor,
-          });
-        }
-      }}
-      activeStepLoop={cookingProgress.activeStepLoop}
-      portion={recipeSelection.portion}
-      awaitingNextUnitConfirmation={cookingProgress.awaitingNextUnitConfirmation}
-      flipPromptVisible={cookingProgress.flipPromptVisible}
-      flipPromptCountdown={cookingProgress.flipPromptCountdown}
-      stirPromptVisible={cookingProgress.stirPromptVisible}
-      stirPromptCountdown={cookingProgress.stirPromptCountdown}
-      effectiveReminderTitle={effectiveReminderTitle}
-      effectiveReminderMessage={effectiveReminderMessage}
-      isRetirarSubStep={isRetirarSubStep}
-      retirarTitle={retirarTitle}
-      retirarMessage={retirarMessage}
-      currentStep={cookingProgress.currentStep}
-      portionValue={portionValue}
-      currentIngredients={recipeSelection.currentIngredients}
-      activeIngredientSelection={recipeSelection.activeIngredientSelection}
-      activeRecipeContent={recipeSelection.activeRecipeContent}
-      selectedRecipe={recipeSelection.selectedRecipe}
-    />
+    <Suspense fallback={<ScreenFallback />}>
+      <CookingScreen
+        appVersion={appVersion}
+        voiceEnabled={voiceEnabled}
+        onVoiceToggle={voice.handleVoiceToggle}
+        speechSupported={voice.speechSupported}
+        onChangeMission={handlers.handleChangeMission}
+        currentRecipeData={cookingProgress.currentRecipeData}
+        currentStepIndex={cookingProgress.currentStepIndex}
+        currentSubStepIndex={cookingProgress.currentSubStepIndex}
+        currentSubStep={cookingProgress.currentSubStep}
+        isRunning={cookingProgress.isRunning}
+        timeRemaining={cookingProgress.timeRemaining}
+        onTogglePause={handlers.handleTogglePause}
+        onPrevious={handlers.handlePrevious}
+        onNext={handlers.handleNext}
+        onJumpToSubStep={handlers.handleJumpToSubStep}
+        onContinue={handlers.handleContinue}
+        onConfirmNextUnit={handlers.handleConfirmNextUnit}
+        onOpenIngredients={handlers.handleOpenIngredientsFromCooking}
+        onOpenSetup={handlers.handleOpenSetupFromCooking}
+        onPlanRecipe={() => {
+          if (recipeSelection.selectedRecipe) {
+            openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
+              quantityMode: recipeSelection.quantityMode,
+              peopleCount: recipeSelection.peopleCount,
+              amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
+              availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
+              selectedOptionalIngredients: recipeSelection.currentIngredients
+                .filter((ingredient) => !ingredient.indispensable)
+                .map((ingredient) => getIngredientKey(ingredient.name))
+                .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
+              sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
+              resolvedPortion: recipeSelection.portion,
+              scaleFactor: cookingProgress.timerScaleFactor,
+            });
+          }
+        }}
+        activeStepLoop={cookingProgress.activeStepLoop}
+        portion={recipeSelection.portion}
+        awaitingNextUnitConfirmation={cookingProgress.awaitingNextUnitConfirmation}
+        flipPromptVisible={cookingProgress.flipPromptVisible}
+        flipPromptCountdown={cookingProgress.flipPromptCountdown}
+        stirPromptVisible={cookingProgress.stirPromptVisible}
+        stirPromptCountdown={cookingProgress.stirPromptCountdown}
+        effectiveReminderTitle={effectiveReminderTitle}
+        effectiveReminderMessage={effectiveReminderMessage}
+        isRetirarSubStep={isRetirarSubStep}
+        retirarTitle={retirarTitle}
+        retirarMessage={retirarMessage}
+        currentStep={cookingProgress.currentStep}
+        portionValue={portionValue}
+        currentIngredients={recipeSelection.currentIngredients}
+        activeIngredientSelection={recipeSelection.activeIngredientSelection}
+        activeRecipeContent={recipeSelection.activeRecipeContent}
+        selectedRecipe={recipeSelection.selectedRecipe}
+      />
+    </Suspense>
     {planRecipeSheet}
     </>
   );

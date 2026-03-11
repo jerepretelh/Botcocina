@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { List, Lock, Volume2, VolumeX } from 'lucide-react';
 import { Recipe, Ingredient, QuantityMode, AmountUnit, Portion, RecipeStep } from '../../../types';
 import { getIngredientKey, splitIngredientQuantity, normalizeText } from '../../utils/recipeHelpers';
-import { RoadmapModal } from '../ui/RoadmapModal';
 import { ProductBottomBar, ProductContainer, ProductHeader, ProductPage, ProductSurface } from '../ui/product-system';
+
+const RoadmapModal = lazy(() => import('../ui/RoadmapModal').then((module) => ({ default: module.RoadmapModal })));
 
 interface IngredientsScreenProps {
     appVersion: string;
@@ -194,13 +195,17 @@ export function IngredientsScreen({
                 </button>
             </ProductBottomBar>
 
-            <RoadmapModal
-                isOpen={isRoadmapOpen}
-                onClose={() => setIsRoadmapOpen(false)}
-                title={`Ruta: ${selectedRecipe?.name}`}
-                steps={currentRecipeData}
-                portion={portion}
-            />
+            {isRoadmapOpen ? (
+                <Suspense fallback={null}>
+                    <RoadmapModal
+                        isOpen={isRoadmapOpen}
+                        onClose={() => setIsRoadmapOpen(false)}
+                        title={`Ruta: ${selectedRecipe?.name}`}
+                        steps={currentRecipeData}
+                        portion={portion}
+                    />
+                </Suspense>
+            ) : null}
         </ProductPage>
     );
 }

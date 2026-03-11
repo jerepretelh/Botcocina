@@ -484,6 +484,26 @@ export default defineConfig(({ mode }) => {
         environment: appEnvironment,
       }),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('/@supabase/')) return 'vendor-supabase'
+            if (
+              id.includes('/@radix-ui/') ||
+              id.includes('/lucide-react/') ||
+              id.includes('/class-variance-authority/') ||
+              id.includes('/clsx/') ||
+              id.includes('/tailwind-merge/')
+            ) {
+              return 'vendor-ui-heavy'
+            }
+            return 'vendor'
+          },
+        },
+      },
+    },
     plugins: [
       // The React and Tailwind plugins are both required for Make, even if
       // Tailwind is not being actively used – do not remove them

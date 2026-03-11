@@ -9,16 +9,17 @@ import {
     AmountUnit,
     Portion,
 } from '../../types';
-import { defaultRecipes, initialRecipeContent, recipeCategories } from '../data/recipes';
+import { recipeCategories } from '../data/recipeCategories';
 import { buildInitialIngredientSelection } from '../utils/recipeHelpers';
 import { fetchRecipesCatalog } from '../lib/recipesCatalog';
+import { loadLocalRecipeCatalog } from '../lib/localRecipeCatalog';
 import type { CatalogSource } from '../../types';
 
 export function useRecipeSelection() {
     const [screen, setScreenState] = useState<Screen>('category-select');
     const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
-    const [availableRecipes, setAvailableRecipes] = useState<Recipe[]>(defaultRecipes);
-    const [recipeContentById, setRecipeContentById] = useState<Record<string, RecipeContent>>(initialRecipeContent);
+    const [availableRecipes, setAvailableRecipes] = useState<Recipe[]>([]);
+    const [recipeContentById, setRecipeContentById] = useState<Record<string, RecipeContent>>({});
     const [selectedCategory, setSelectedCategory] = useState<RecipeCategoryId | null>(null);
     const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
     const [ingredientsBackScreen, setIngredientsBackScreen] = useState<IngredientsBackScreen>('recipe-setup');
@@ -37,9 +38,18 @@ export function useRecipeSelection() {
     const [portion, setPortion] = useState<Portion>(2);
     const [peopleCount, setPeopleCount] = useState(2);
     const [availableCount, setAvailableCount] = useState(1);
+    const defaultActiveRecipeContent: RecipeContent = {
+        tip: 'Selecciona una receta para ver sus ingredientes y pasos.',
+        ingredients: [],
+        steps: [],
+        portionLabels: {
+            singular: 'porción',
+            plural: 'porciones',
+        },
+    };
 
     const activeRecipeId = selectedRecipe?.id ?? 'arroz';
-    const activeRecipeContent = recipeContentById[activeRecipeId] ?? initialRecipeContent.arroz;
+    const activeRecipeContent = recipeContentById[activeRecipeId] ?? defaultActiveRecipeContent;
     const currentIngredients = activeRecipeContent.ingredients;
     const currentTip = activeRecipeContent.tip;
 
@@ -64,6 +74,11 @@ export function useRecipeSelection() {
 
         const syncCatalog = async () => {
             setIsSyncingCatalog(true);
+            const localCatalog = await loadLocalRecipeCatalog();
+            if (cancelled) return;
+            setAvailableRecipes(localCatalog.defaultRecipes);
+            setRecipeContentById(localCatalog.initialRecipeContent);
+
             const result = await fetchRecipesCatalog();
             if (cancelled) return;
             setAvailableRecipes(result.recipes);

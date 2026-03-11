@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState, type MouseEvent } from 'react';
 import { Bookmark, BookmarkCheck, Heart, List, Volume2, VolumeX } from 'lucide-react';
 import { CatalogViewMode, Recipe, RecipeCategory, RecipeStep } from '../../../types';
-import { RoadmapModal } from '../ui/RoadmapModal';
-import { initialRecipeContent } from '../../data/recipes';
 import { MainShellLayout } from './MainShellLayout';
+import { loadLocalRecipeCatalog } from '../../lib/localRecipeCatalog';
 import { ProductContainer, ProductEmptyState, ProductHeader, ProductPage, ProductSurface } from '../ui/product-system';
+
+const RoadmapModal = lazy(() => import('../ui/RoadmapModal').then((module) => ({ default: module.RoadmapModal })));
 
 interface RecipeSelectScreenProps {
     appVersion: string;
@@ -60,15 +61,14 @@ export function RecipeSelectScreen({
     onOpenRecipeSearch,
 }: RecipeSelectScreenProps) {
     const [roadmapRecipe, setRoadmapRecipe] = useState<Recipe | null>(null);
+    const [roadmapSteps, setRoadmapSteps] = useState<RecipeStep[]>([]);
 
-    const handleViewRoadmap = (e: React.MouseEvent, recipe: Recipe) => {
+    const handleViewRoadmap = async (e: MouseEvent, recipe: Recipe) => {
         e.stopPropagation();
+        const localCatalog = await loadLocalRecipeCatalog();
+        setRoadmapSteps(localCatalog.initialRecipeContent[recipe.id]?.steps ?? []);
         setRoadmapRecipe(recipe);
     };
-
-    const roadmapSteps: RecipeStep[] = roadmapRecipe
-        ? initialRecipeContent[roadmapRecipe.id]?.steps || []
-        : [];
 
     return (
         <MainShellLayout
@@ -228,13 +228,17 @@ export function RecipeSelectScreen({
                 </ProductContainer>
             </ProductPage>
 
-            <RoadmapModal
-                isOpen={!!roadmapRecipe}
-                onClose={() => setRoadmapRecipe(null)}
-                title={`Ruta: ${roadmapRecipe?.name}`}
-                steps={roadmapSteps}
-                portion={1}
-            />
+            {roadmapRecipe ? (
+                <Suspense fallback={null}>
+                    <RoadmapModal
+                        isOpen={!!roadmapRecipe}
+                        onClose={() => setRoadmapRecipe(null)}
+                        title={`Ruta: ${roadmapRecipe?.name}`}
+                        steps={roadmapSteps}
+                        portion={1}
+                    />
+                </Suspense>
+            ) : null}
         </MainShellLayout>
     );
 }

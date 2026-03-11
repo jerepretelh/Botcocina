@@ -1,7 +1,7 @@
 import { Portion, QuantityMode, AmountUnit, ClarificationNumberMode, ClarificationQuantityUnit, RecipeStep, SubStep, Ingredient, FaceTimerPair, RecipeContent, RecipeCategory, Recipe, CookingEquipment } from '../../types';
 import { AIClarificationQuestion, GeneratedRecipe, GeneratedRecipeStep, GeneratedSubStep } from '../lib/recipeAI';
 import { parseTimerSeconds } from './timerUtils';
-import { huevoFritoRecipeData } from '../data/recipes';
+import { huevoFritoRecipeData } from '../data/recipeStepTemplates';
 
 export function buildRecipeId(name: string): string {
   const slug = name
