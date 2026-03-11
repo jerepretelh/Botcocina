@@ -126,24 +126,12 @@ export function CategorySelectScreen({
               </div>
             </div>
 
-            <div className="mt-8 w-full max-w-3xl rounded-[2rem] border border-primary/10 bg-white/75 p-5 shadow-xl shadow-primary/5 backdrop-blur dark:bg-[#221610]/80">
-              <div className="text-left">
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Wizard guiado en 3 pasos</p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Empieza con tu idea, añade ingredientes o comensales si quieres, y deja que la IA te haga las preguntas justas antes de cocinar.
-                </p>
+            {(aiError || aiSuccess) && (
+              <div className="mt-8 w-full max-w-3xl rounded-[1.5rem] border border-primary/10 bg-white/70 p-4 text-left shadow-sm dark:bg-[#221610]/70">
+                {aiError ? <p className="text-sm font-medium text-red-500">{aiError}</p> : null}
+                {aiSuccess ? <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{aiSuccess}</p> : null}
               </div>
-              {aiError && <p className="mt-3 text-sm font-medium text-red-500">{aiError}</p>}
-              {aiSuccess && <p className="mt-3 text-sm font-medium text-emerald-600 dark:text-emerald-400">{aiSuccess}</p>}
-              <div className="mt-5 flex justify-end">
-                <button
-                  onClick={onOpenAIWizard}
-                  className="rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Abrir asistente IA
-                </button>
-              </div>
-            </div>
+            )}
 
             <section className="mt-12 w-full max-w-4xl">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">

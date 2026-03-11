@@ -43,8 +43,9 @@ import { RecipeLibraryScreen } from './screens/RecipeLibraryScreen';
 import { WeeklyPlanScreen } from './screens/WeeklyPlanScreen';
 import { ShoppingListScreen } from './screens/ShoppingListScreen';
 import { RecipeSeedSearchScreen } from './screens/RecipeSeedSearchScreen';
+import { ReleasesScreen } from './screens/ReleasesScreen';
+import { formatVersionLabel } from '../lib/appMetadata';
 
-const APP_VERSION = "v1.0.0"; // Fallback for __APP_VERSION__
 const APPROX_GRAMS_PER_UNIT = 250;
 
 interface ThermomixCookerProps {
@@ -95,6 +96,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     categoryId: recipeSeedCategoryFilter,
     limit: 48,
   });
+  const appVersion = formatVersionLabel();
 
   const aiRecipeGen = useAIRecipeGeneration({
     availableRecipes: recipeSelection.availableRecipes,
@@ -230,6 +232,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('ai-settings');
       return;
     }
+    if (normalizedPath === '/releases') {
+      recipeSelection.setScreenDirect('releases');
+      return;
+    }
     if (normalizedPath === '/mis-recetas') {
       recipeSelection.setScreenDirect('my-recipes');
       return;
@@ -308,6 +314,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           ? '/buscar-recetas'
         : screen === 'ai-settings'
           ? '/ajustes/ia'
+        : screen === 'releases'
+          ? '/releases'
         : screen === 'my-recipes'
           ? '/mis-recetas'
         : screen === 'favorites'
@@ -613,7 +621,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     return (
       <>
         <CategorySelectScreen
-          appVersion={APP_VERSION}
+          appVersion={appVersion}
           voiceEnabled={voiceEnabled}
           onVoiceToggle={voice.handleVoiceToggle}
           speechSupported={voice.speechSupported}
@@ -687,8 +695,23 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
         onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
         onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+        onOpenReleases={() => recipeSelection.setScreen('releases')}
         onSignOut={() => void auth.signOut()}
-        onOpenRecipeSearch={() => recipeSelection.setScreen('recipe-seed-search')}
+      />
+    );
+  }
+
+  if (screen === 'releases') {
+    return (
+      <ReleasesScreen
+        currentUserEmail={auth.user?.email ?? null}
+        onGoHome={() => recipeSelection.setScreen('category-select')}
+        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+        onGoFavorites={() => recipeSelection.setScreen('favorites')}
+        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+        onSignOut={() => void auth.signOut()}
       />
     );
   }
@@ -787,7 +810,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           plan={weeklyPlan.plan}
           shoppingList={weeklyPlan.shoppingList}
           shoppingItems={weeklyPlan.shoppingItems}
+          shoppingTrip={weeklyPlan.shoppingTrip}
+          shoppingTripItems={weeklyPlan.shoppingTripItems}
           aggregation={weeklyPlan.aggregation}
+          variance={weeklyPlan.shoppingVariance}
           isLoading={weeklyPlan.isLoading}
           error={weeklyPlan.error}
           onGoHome={() => recipeSelection.setScreen('category-select')}
@@ -802,6 +828,13 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onUpdateShoppingItem={(itemId, input) => void weeklyPlan.updateShoppingItemState(itemId, input)}
           onAddManualItem={(itemName, quantityText) => void weeklyPlan.addManualShoppingItem(itemName, quantityText)}
           onRemoveShoppingItem={(itemId) => void weeklyPlan.removeShoppingItem(itemId)}
+          onStartShoppingTrip={() => void weeklyPlan.startShoppingTripFromList()}
+          onToggleTripItemInCart={(itemId, nextChecked) => void weeklyPlan.toggleTripItemInCart(itemId, nextChecked)}
+          onMarkTripItemSkipped={(itemId) => void weeklyPlan.markTripItemSkipped(itemId)}
+          onUpdateTripItem={(itemId, input) => void weeklyPlan.updateTripItemActuals(itemId, input)}
+          onAddExtraTripItem={(itemName, quantityText, lineTotal) => void weeklyPlan.addExtraTripItem(itemName, quantityText, lineTotal)}
+          onUpdateTripMeta={(input) => void weeklyPlan.updateShoppingTripMeta(input)}
+          onCheckoutTrip={(finalTotal, storeName) => void weeklyPlan.checkoutTrip(finalTotal, storeName)}
         />
         {planRecipeSheet}
       </>
@@ -812,7 +845,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     return (
       <>
       <RecipeSelectScreen
-        appVersion={APP_VERSION}
+        appVersion={appVersion}
         voiceEnabled={voiceEnabled}
         onVoiceToggle={voice.handleVoiceToggle}
         speechSupported={voice.speechSupported}
@@ -930,7 +963,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   if (screen === 'ingredients') {
     return (
       <IngredientsScreen
-        appVersion={APP_VERSION}
+        appVersion={appVersion}
         voiceEnabled={voiceEnabled}
         onVoiceToggle={voice.handleVoiceToggle}
         speechSupported={voice.speechSupported}
@@ -958,7 +991,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   return (
     <>
     <CookingScreen
-      appVersion={APP_VERSION}
+      appVersion={appVersion}
       voiceEnabled={voiceEnabled}
       onVoiceToggle={voice.handleVoiceToggle}
       speechSupported={voice.speechSupported}

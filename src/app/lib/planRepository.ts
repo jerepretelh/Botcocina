@@ -2,6 +2,9 @@ import type {
   ShoppingList,
   ShoppingListItem,
   ShoppingListItemSourceType,
+  ShoppingTrip,
+  ShoppingTripItem,
+  ShoppingTripItemStatus,
   WeeklyPlan,
   WeeklyPlanItem,
   WeeklyPlanItemConfigSnapshot,
@@ -64,6 +67,40 @@ type DbShoppingListItem = {
   updated_at: string;
 };
 
+type DbShoppingTrip = {
+  id: string;
+  user_id: string;
+  shopping_list_id: string;
+  weekly_plan_id: string | null;
+  status: 'active' | 'checked_out' | 'cancelled';
+  store_name: string | null;
+  started_at: string;
+  checked_out_at: string | null;
+  estimated_total: number | string | null;
+  final_total: number | string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type DbShoppingTripItem = {
+  id: string;
+  shopping_trip_id: string;
+  shopping_list_item_id: string | null;
+  planned_item_name_snapshot: string | null;
+  actual_item_name: string;
+  planned_quantity_text: string | null;
+  actual_quantity_text: string | null;
+  unit_price: number | string | null;
+  line_total: number | string | null;
+  status: ShoppingTripItemStatus;
+  is_in_cart: boolean;
+  is_extra: boolean;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface ShoppingListItemInput {
   itemName: string;
   quantityText: string | null;
@@ -81,6 +118,22 @@ export interface WeeklyPlanItemInput {
   notes?: string | null;
   sortOrder?: number;
   configSnapshot: WeeklyPlanItemConfigSnapshot;
+}
+
+export interface ShoppingTripItemInput {
+  actualItemName?: string;
+  actualQuantityText?: string | null;
+  unitPrice?: number | null;
+  lineTotal?: number | null;
+  status?: ShoppingTripItemStatus;
+  isInCart?: boolean;
+  notes?: string | null;
+}
+
+function parseMoney(value: number | string | null): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function ensureReady() {
@@ -153,6 +206,44 @@ function mapShoppingListItem(row: DbShoppingListItem): ShoppingListItem {
     sourceRecipeId: row.source_recipe_id,
     sourceType: row.source_type,
     sourcePlanItemId: row.source_plan_item_id,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapShoppingTrip(row: DbShoppingTrip): ShoppingTrip {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    shoppingListId: row.shopping_list_id,
+    weeklyPlanId: row.weekly_plan_id,
+    status: row.status,
+    storeName: row.store_name,
+    startedAt: row.started_at,
+    checkedOutAt: row.checked_out_at,
+    estimatedTotal: parseMoney(row.estimated_total),
+    finalTotal: parseMoney(row.final_total),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapShoppingTripItem(row: DbShoppingTripItem): ShoppingTripItem {
+  return {
+    id: row.id,
+    shoppingTripId: row.shopping_trip_id,
+    shoppingListItemId: row.shopping_list_item_id,
+    plannedItemNameSnapshot: row.planned_item_name_snapshot,
+    actualItemName: row.actual_item_name,
+    plannedQuantityText: row.planned_quantity_text,
+    actualQuantityText: row.actual_quantity_text,
+    unitPrice: parseMoney(row.unit_price),
+    lineTotal: parseMoney(row.line_total),
+    status: row.status,
+    isInCart: row.is_in_cart,
+    isExtra: row.is_extra,
+    notes: row.notes,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -371,4 +462,175 @@ export async function deleteShoppingListItem(itemId: string): Promise<void> {
   const client = ensureReady();
   const { error } = await client.from('shopping_list_items').delete().eq('id', itemId);
   if (error) throw new Error(error.message || 'No se pudo eliminar el item de compras.');
+}
+
+export async function getActiveShoppingTrip(shoppingListId: string): Promise<ShoppingTrip | null> {
+  const client = ensureReady();
+  const { data, error } = await client
+    .from('shopping_trips')
+    .select('id,user_id,shopping_list_id,weekly_plan_id,status,store_name,started_at,checked_out_at,estimated_total,final_total,created_at,updated_at')
+    .eq('shopping_list_id', shoppingListId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message || 'No se pudo cargar la compra en curso.');
+  return data ? mapShoppingTrip(data as DbShoppingTrip) : null;
+}
+
+export async function getShoppingTripById(tripId: string): Promise<ShoppingTrip | null> {
+  const client = ensureReady();
+  const { data, error } = await client
+    .from('shopping_trips')
+    .select('id,user_id,shopping_list_id,weekly_plan_id,status,store_name,started_at,checked_out_at,estimated_total,final_total,created_at,updated_at')
+    .eq('id', tripId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message || 'No se pudo cargar la compra.');
+  return data ? mapShoppingTrip(data as DbShoppingTrip) : null;
+}
+
+export async function getShoppingTripItems(shoppingTripId: string): Promise<ShoppingTripItem[]> {
+  const client = ensureReady();
+  const { data, error } = await client
+    .from('shopping_trip_items')
+    .select('id,shopping_trip_id,shopping_list_item_id,planned_item_name_snapshot,actual_item_name,planned_quantity_text,actual_quantity_text,unit_price,line_total,status,is_in_cart,is_extra,notes,sort_order,created_at,updated_at')
+    .eq('shopping_trip_id', shoppingTripId)
+    .order('sort_order', { ascending: true });
+
+  if (error) throw new Error(error.message || 'No se pudieron cargar los items de la compra.');
+  return ((data ?? []) as DbShoppingTripItem[]).map(mapShoppingTripItem);
+}
+
+export async function createShoppingTrip(
+  userId: string,
+  shoppingList: ShoppingList,
+  shoppingItems: ShoppingListItem[],
+): Promise<ShoppingTrip> {
+  const client = ensureReady();
+  const active = await getActiveShoppingTrip(shoppingList.id);
+  if (active) return active;
+
+  const { data, error } = await client
+    .from('shopping_trips')
+    .insert({
+      user_id: userId,
+      shopping_list_id: shoppingList.id,
+      weekly_plan_id: shoppingList.weeklyPlanId,
+      status: 'active',
+      estimated_total: 0,
+    })
+    .select('id,user_id,shopping_list_id,weekly_plan_id,status,store_name,started_at,checked_out_at,estimated_total,final_total,created_at,updated_at')
+    .single();
+
+  if (error || !data) throw new Error(error?.message || 'No se pudo iniciar la compra real.');
+
+  const trip = mapShoppingTrip(data as DbShoppingTrip);
+
+  if (shoppingItems.length > 0) {
+    const { error: itemsError } = await client.from('shopping_trip_items').insert(
+      shoppingItems.map((item) => ({
+        shopping_trip_id: trip.id,
+        shopping_list_item_id: item.id,
+        planned_item_name_snapshot: item.itemName,
+        actual_item_name: item.itemName,
+        planned_quantity_text: item.quantityText,
+        actual_quantity_text: item.quantityText,
+        status: 'pending',
+        is_in_cart: false,
+        is_extra: false,
+        sort_order: item.sortOrder,
+      })),
+    );
+    if (itemsError) throw new Error(itemsError.message || 'No se pudo preparar la compra real.');
+  }
+
+  return trip;
+}
+
+export async function updateShoppingTripItem(
+  itemId: string,
+  input: ShoppingTripItemInput,
+): Promise<void> {
+  const client = ensureReady();
+  const { error } = await client
+    .from('shopping_trip_items')
+    .update({
+      actual_item_name: input.actualItemName,
+      actual_quantity_text: input.actualQuantityText,
+      unit_price: input.unitPrice,
+      line_total: input.lineTotal,
+      status: input.status,
+      is_in_cart: input.isInCart,
+      notes: input.notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+
+  if (error) throw new Error(error.message || 'No se pudo actualizar el item de la compra.');
+}
+
+export async function createExtraShoppingTripItem(
+  shoppingTripId: string,
+  input: {
+    actualItemName: string;
+    actualQuantityText?: string | null;
+    lineTotal?: number | null;
+    notes?: string | null;
+    sortOrder: number;
+  },
+): Promise<ShoppingTripItem> {
+  const client = ensureReady();
+  const { data, error } = await client
+    .from('shopping_trip_items')
+    .insert({
+      shopping_trip_id: shoppingTripId,
+      actual_item_name: input.actualItemName,
+      actual_quantity_text: input.actualQuantityText ?? null,
+      line_total: input.lineTotal ?? null,
+      status: 'in_cart',
+      is_in_cart: true,
+      is_extra: true,
+      notes: input.notes ?? null,
+      sort_order: input.sortOrder,
+    })
+    .select('id,shopping_trip_id,shopping_list_item_id,planned_item_name_snapshot,actual_item_name,planned_quantity_text,actual_quantity_text,unit_price,line_total,status,is_in_cart,is_extra,notes,sort_order,created_at,updated_at')
+    .single();
+
+  if (error || !data) throw new Error(error?.message || 'No se pudo agregar el producto extra.');
+  return mapShoppingTripItem(data as DbShoppingTripItem);
+}
+
+export async function updateShoppingTrip(
+  tripId: string,
+  input: Partial<Pick<ShoppingTrip, 'storeName' | 'estimatedTotal' | 'finalTotal' | 'status'>> & {
+    checkedOutAt?: string | null;
+  },
+): Promise<void> {
+  const client = ensureReady();
+  const { error } = await client
+    .from('shopping_trips')
+    .update({
+      store_name: input.storeName,
+      estimated_total: input.estimatedTotal,
+      final_total: input.finalTotal,
+      status: input.status,
+      checked_out_at: input.checkedOutAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', tripId);
+
+  if (error) throw new Error(error.message || 'No se pudo actualizar la compra.');
+}
+
+export async function checkoutShoppingTrip(
+  tripId: string,
+  input: { finalTotal: number | null; storeName?: string | null },
+): Promise<void> {
+  await updateShoppingTrip(tripId, {
+    finalTotal: input.finalTotal,
+    estimatedTotal: input.finalTotal,
+    storeName: input.storeName ?? null,
+    status: 'checked_out',
+    checkedOutAt: new Date().toISOString(),
+  });
 }

@@ -468,9 +468,21 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  const vercelEnvironment = (process.env.VERCEL_ENV || '').trim().toLowerCase()
+  const appEnvironment =
+    mode === 'development'
+      ? 'development'
+      : vercelEnvironment === 'preview'
+        ? 'preview'
+        : 'production'
+
   return {
     define: {
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.0.0'),
+      __APP_METADATA__: JSON.stringify({
+        version: process.env.npm_package_version || '0.0.0',
+        environment: appEnvironment,
+      }),
     },
     plugins: [
       // The React and Tailwind plugins are both required for Make, even if

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { KeyRound, LoaderCircle, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { KeyRound, LoaderCircle, Rocket, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import type { AIProviderSettings, AIUsageSnapshot } from '../../../types';
 import { deleteStoredGoogleKey, fetchAISettings, updateAISettings, validateStoredOrNewGoogleKey } from '../../lib/aiSettings';
+import { appBuildMetadata, formatVersionLabel, getEnvironmentLabel } from '../../lib/appMetadata';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -27,6 +28,7 @@ interface AISettingsScreenProps {
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
   onGoSettings: () => void;
+  onOpenReleases: () => void;
   onSignOut: () => void;
 }
 
@@ -73,6 +75,7 @@ export function AISettingsScreen({
   onGoWeeklyPlan,
   onGoShoppingList,
   onGoSettings,
+  onOpenReleases,
   onSignOut,
 }: AISettingsScreenProps) {
   const [settings, setSettings] = useState<AIProviderSettings | null>(null);
@@ -446,6 +449,29 @@ export function AISettingsScreen({
             </CardContent>
           </Card>
         </div>
+
+        <Card className="text-foreground">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Rocket className="h-5 w-5 text-primary" />
+              Versión y releases
+            </CardTitle>
+            <CardDescription>
+              Consulta qué build está corriendo y revisa el historial de actualizaciones publicadas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">{formatVersionLabel()}</p>
+              <Badge variant="outline" className="border-primary/10 text-slate-600 dark:text-slate-300">
+                Entorno {getEnvironmentLabel(appBuildMetadata.environment)}
+              </Badge>
+            </div>
+            <Button variant="outline" onClick={onOpenReleases}>
+              Ver actualizaciones
+            </Button>
+          </CardContent>
+        </Card>
         </ProductContainer>
       </ProductPage>
     </MainShellLayout>

@@ -1,5 +1,6 @@
-export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
+export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
+export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
 export type RecipeCategoryId = 'desayunos' | 'almuerzos' | 'cenas' | 'airfryer' | 'frituras' | 'arroces' | 'hervidos' | 'sopas' | 'personalizadas';
 export type QuantityMode = 'people' | 'have';
@@ -22,6 +23,8 @@ export type WeeklyPlanView = 'calendar' | 'list';
 export type ShoppingListView = 'totalized' | 'by_recipe';
 export type WeeklyPlanSlot = 'desayuno' | 'almuerzo' | 'cena';
 export type ShoppingListItemSourceType = 'plan_auto' | 'manual';
+export type ShoppingTripStatus = 'active' | 'checked_out' | 'cancelled';
+export type ShoppingTripItemStatus = 'pending' | 'in_cart' | 'skipped';
 
 export type IngredientsBackScreen = 'recipe-setup' | 'ai-clarify' | 'cooking';
 
@@ -49,6 +52,15 @@ export interface RecipeSeed {
 }
 
 export interface RecipeSeedSearchResult extends RecipeSeed {}
+
+export interface AppRelease {
+    version: string;
+    title: string;
+    date: string;
+    summary: string;
+    changes: string[];
+    environmentNote?: string | null;
+}
 
 export interface SavedRecipeContextSummary {
     prompt?: string | null;
@@ -134,6 +146,51 @@ export interface ShoppingListItem {
     sortOrder: number;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface ShoppingTrip {
+    id: string;
+    userId: string;
+    shoppingListId: string;
+    weeklyPlanId: string | null;
+    status: ShoppingTripStatus;
+    storeName: string | null;
+    startedAt: string;
+    checkedOutAt: string | null;
+    estimatedTotal: number | null;
+    finalTotal: number | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ShoppingTripItem {
+    id: string;
+    shoppingTripId: string;
+    shoppingListItemId: string | null;
+    plannedItemNameSnapshot: string | null;
+    actualItemName: string;
+    plannedQuantityText: string | null;
+    actualQuantityText: string | null;
+    unitPrice: number | null;
+    lineTotal: number | null;
+    status: ShoppingTripItemStatus;
+    isInCart: boolean;
+    isExtra: boolean;
+    notes: string | null;
+    sortOrder: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ShoppingVarianceSummary {
+    plannedCount: number;
+    pendingCount: number;
+    inCartCount: number;
+    changedCount: number;
+    skippedCount: number;
+    extraCount: number;
+    runningTotal: number;
+    finalTotal: number | null;
 }
 
 export interface NormalizedIngredientAmount {
