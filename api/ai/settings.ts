@@ -8,7 +8,7 @@ import {
   requireAuthenticatedServerContext,
   sendJson,
   upsertAIProviderSettings,
-} from './shared'
+} from './shared.js'
 
 function normalizeNullableNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null

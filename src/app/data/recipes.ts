@@ -1,4 +1,4 @@
-import { Recipe, RecipeCategory, Ingredient as BaseIngredient, RecipeStep, RecipeContent } from '../../types';
+import type { Recipe, RecipeCategory, Ingredient as BaseIngredient, RecipeStep, RecipeContent } from '../../types/index.js';
 
 export const recipes: Recipe[] = [
   {
@@ -1258,4 +1258,3 @@ export const initialRecipeContent: Record<string, RecipeContent> = {
 };
 
 export const defaultRecipes: Recipe[] = recipes;
-

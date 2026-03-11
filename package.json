@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "typecheck:vercel-api": "tsc -p tsconfig.api.json --noEmit",
     "catalog:validate": "tsx scripts/validate_catalog.ts",
     "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",
     "catalog:release:prepare": "npm run catalog:validate && npm run seed:catalog:generate",

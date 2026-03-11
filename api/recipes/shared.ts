@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { Recipe, RecipeContent, RecipeStep, SubStep } from '../../src/types'
-import { defaultRecipes, initialRecipeContent } from '../../src/app/data/recipes'
+import type { Recipe, RecipeContent, RecipeStep, SubStep } from '../../src/shared/recipeCatalog.js'
+import { defaultRecipes, initialRecipeContent } from '../../src/shared/recipeCatalog.js'
 import { createClient } from '@supabase/supabase-js'
+import type { Database, DbRecipeIngredientRow, DbRecipeRow, DbRecipeSubstepRow } from '../shared/database.js'
 
 type JsonRecipePayload = {
   recipes: Recipe[]
@@ -537,7 +538,7 @@ async function loadFromSupabaseServer(): Promise<JsonRecipePayload | null> {
   const cfg = supabaseServerConfig()
   if (!cfg) return null
 
-  const sb = createClient(cfg.url, cfg.key)
+  const sb = createClient<Database>(cfg.url, cfg.key)
   const [recipesRes, ingredientsRes, substepsRes] = await Promise.all([
     sb
       .from('recipes')
@@ -554,10 +555,10 @@ async function loadFromSupabaseServer(): Promise<JsonRecipePayload | null> {
 
   if (recipesRes.error || ingredientsRes.error || substepsRes.error) return null
 
-  const recipesRows = recipesRes.data ?? []
+  const recipesRows = (recipesRes.data ?? []) as DbRecipeRow[]
   if (recipesRows.length === 0) return null
-  const ingredientsRows = ingredientsRes.data ?? []
-  const substepsRows = substepsRes.data ?? []
+  const ingredientsRows = (ingredientsRes.data ?? []) as DbRecipeIngredientRow[]
+  const substepsRows = (substepsRes.data ?? []) as DbRecipeSubstepRow[]
 
   const ingredientsByRecipe = new Map<string, typeof ingredientsRows>()
   for (const item of ingredientsRows) {
