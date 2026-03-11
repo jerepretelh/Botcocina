@@ -9,7 +9,7 @@ import {
   readRequestBody,
   requireAuthenticatedServerContext,
   sendJson,
-} from './shared'
+} from './shared.js'
 
 type GoogleGenerateResponse = {
   candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>

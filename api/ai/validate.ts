@@ -12,7 +12,7 @@ import {
   updateKeyValidationState,
   validateGoogleApiKey,
   decryptApiKey,
-} from './shared'
+} from './shared.js'
 
 export default async function handler(req: any, res: any): Promise<void> {
   if (req.method !== 'POST') {

@@ -1,5 +1,14 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type {
+  Database,
+  DbAIProviderSecret,
+  DbAIProviderSettings,
+  DbAIRequestUsage,
+  DbInsertAIProviderSecret,
+  DbInsertAIProviderSettings,
+  DbInsertAIRequestUsage,
+} from '../shared/database.js'
 
 export const DEFAULT_GOOGLE_MODEL = 'gemini-2.5-flash'
 export const SUPPORTED_GOOGLE_MODELS = [
@@ -16,44 +25,7 @@ export type AIProvider = 'google_gemini' | 'openai'
 export type AIRequestKind = 'generate' | 'clarify' | 'validate'
 export type AIRequestStatus = 'success' | 'failed' | 'blocked'
 
-type ServiceClient = ReturnType<typeof createClient>
-
-type DbAIProviderSettings = {
-  user_id: string
-  ai_provider: 'google_gemini'
-  auth_mode: AIAuthMode
-  google_model: string
-  token_budget_mode: AIBudgetMode
-  monthly_token_limit: number | null
-  budget_amount: number | null
-  is_key_configured: boolean
-  key_last4: string | null
-  last_key_check_at: string | null
-  last_key_check_status: AIKeyCheckStatus
-  last_key_check_error: string | null
-}
-
-type DbAIProviderSecret = {
-  encrypted_key: string
-  key_iv: string
-  key_tag: string
-}
-
-type DbAIRequestUsage = {
-  id: string
-  provider: AIProvider
-  model: string
-  auth_mode: AIAuthMode
-  request_kind: AIRequestKind
-  request_status: AIRequestStatus
-  prompt_token_count: number
-  candidates_token_count: number
-  total_token_count: number
-  remaining_percent: number | null
-  error_code: string | null
-  error_message: string | null
-  created_at: string
-}
+type ServiceClient = SupabaseClient<Database>
 
 export type AIProviderSettingsResponse = {
   aiProvider: 'google_gemini'
@@ -387,7 +359,7 @@ export async function upsertAIProviderSettings(
     budgetAmount: number | null
   },
 ): Promise<void> {
-  const payload = {
+  const payload: DbInsertAIProviderSettings = {
     user_id: userId,
     ai_provider: 'google_gemini',
     auth_mode: input.authMode,
@@ -408,21 +380,18 @@ export async function saveEncryptedApiKey(
   apiKey: string,
 ): Promise<void> {
   const encrypted = encryptApiKey(apiKey)
-  const result = await serviceClient.from('ai_provider_secrets').upsert(
-    {
+  const secretPayload: DbInsertAIProviderSecret = {
       user_id: userId,
       ai_provider: 'google_gemini',
       encrypted_key: encrypted.encryptedKey,
       key_iv: encrypted.iv,
       key_tag: encrypted.tag,
       updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id' },
-  )
+    }
+  const result = await serviceClient.from('ai_provider_secrets').upsert(secretPayload, { onConflict: 'user_id' })
   if (result.error) throw result.error
 
-  const settingsResult = await serviceClient.from('ai_provider_settings').upsert(
-    {
+  const settingsPayload: DbInsertAIProviderSettings = {
       user_id: userId,
       ai_provider: 'google_gemini',
       is_key_configured: true,
@@ -430,9 +399,8 @@ export async function saveEncryptedApiKey(
       last_key_check_status: 'unknown',
       last_key_check_error: null,
       updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id' },
-  )
+    }
+  const settingsResult = await serviceClient.from('ai_provider_settings').upsert(settingsPayload, { onConflict: 'user_id' })
   if (settingsResult.error) throw settingsResult.error
 }
 
@@ -452,7 +420,7 @@ export async function deleteStoredApiKey(serviceClient: ServiceClient, userId: s
           last_key_check_at: null,
           last_key_check_error: null,
           updated_at: new Date().toISOString(),
-        },
+        } as DbInsertAIProviderSettings,
         { onConflict: 'user_id' },
       ),
   ])
@@ -471,8 +439,7 @@ export async function updateKeyValidationState(
     isKeyConfigured?: boolean
   },
 ): Promise<void> {
-  const result = await serviceClient.from('ai_provider_settings').upsert(
-    {
+  const payload: DbInsertAIProviderSettings = {
       user_id: userId,
       ai_provider: 'google_gemini',
       is_key_configured: input.isKeyConfigured ?? true,
@@ -481,9 +448,8 @@ export async function updateKeyValidationState(
       last_key_check_status: input.status,
       last_key_check_error: input.errorMessage,
       updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id' },
-  )
+    }
+  const result = await serviceClient.from('ai_provider_settings').upsert(payload, { onConflict: 'user_id' })
   if (result.error) throw result.error
 }
 
@@ -534,7 +500,7 @@ export async function logAIUsage(
     errorMessage?: string | null
   },
 ): Promise<void> {
-  const result = await serviceClient.from('ai_request_usage').insert({
+  const payload: DbInsertAIRequestUsage = {
     user_id: userId,
     provider: input.provider,
     model: input.model,
@@ -548,7 +514,8 @@ export async function logAIUsage(
     remaining_percent: input.remainingPercent ?? null,
     error_code: input.errorCode ?? null,
     error_message: input.errorMessage ?? null,
-  })
+  }
+  const result = await serviceClient.from('ai_request_usage').insert(payload)
   if (result.error) throw result.error
 }
 
