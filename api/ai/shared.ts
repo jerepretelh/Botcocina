@@ -78,6 +78,27 @@ export type AuthenticatedServerContext = {
   userId: string
 }
 
+function isMissingAIInfraError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown }
+  const code = typeof candidate.code === 'string' ? candidate.code : ''
+  const haystack = [
+    typeof candidate.message === 'string' ? candidate.message : '',
+    typeof candidate.details === 'string' ? candidate.details : '',
+    typeof candidate.hint === 'string' ? candidate.hint : '',
+  ]
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    haystack.includes('could not find the table') ||
+    haystack.includes('relation') ||
+    haystack.includes('schema cache')
+  )
+}
+
 export function sendJson(res: any, statusCode: number, payload: unknown): void {
   if (typeof res.status === 'function' && typeof res.json === 'function') {
     res.status(statusCode).json(payload)
@@ -240,6 +261,9 @@ export async function getAIProviderSettings(
     .maybeSingle()
 
   if (result.error) {
+    if (isMissingAIInfraError(result.error)) {
+      return defaultSettings()
+    }
     throw result.error
   }
 
@@ -257,6 +281,9 @@ export async function getStoredSecret(
     .maybeSingle()
 
   if (result.error) {
+    if (isMissingAIInfraError(result.error)) {
+      return null
+    }
     throw result.error
   }
 
@@ -290,8 +317,25 @@ export async function getAIUsageSnapshot(
       .limit(8),
   ])
 
-  if (monthResult.error) throw monthResult.error
-  if (recentResult.error) throw recentResult.error
+  if (monthResult.error || recentResult.error) {
+    if (isMissingAIInfraError(monthResult.error) || isMissingAIInfraError(recentResult.error)) {
+      return {
+        budgetMode: settings.tokenBudgetMode,
+        monthlyTokenLimit: settings.monthlyTokenLimit,
+        budgetAmount: settings.budgetAmount,
+        currentMonthTokens: 0,
+        currentMonthRequests: 0,
+        avgTokensPerRequest: 0,
+        lastRequestAt: null,
+        lastRequestTokens: null,
+        remainingPercent: settings.tokenBudgetMode === 'app_limit' && settings.monthlyTokenLimit ? 100 : null,
+        budgetStatusText: 'El historial de uso aún no está disponible en este entorno.',
+        recentRequests: [],
+      }
+    }
+    if (monthResult.error) throw monthResult.error
+    if (recentResult.error) throw recentResult.error
+  }
 
   const monthRows = (monthResult.data ?? []) as Array<{
     total_token_count: number
@@ -516,7 +560,10 @@ export async function logAIUsage(
     error_message: input.errorMessage ?? null,
   }
   const result = await serviceClient.from('ai_request_usage').insert(payload)
-  if (result.error) throw result.error
+  if (result.error) {
+    if (isMissingAIInfraError(result.error)) return
+    throw result.error
+  }
 }
 
 export async function getCurrentMonthTokenUsage(
@@ -529,7 +576,10 @@ export async function getCurrentMonthTokenUsage(
     .eq('user_id', userId)
     .gte('created_at', currentMonthStartIso())
 
-  if (result.error) throw result.error
+  if (result.error) {
+    if (isMissingAIInfraError(result.error)) return 0
+    throw result.error
+  }
 
   return (result.data ?? [])
     .filter((row) => row.request_status === 'success')
