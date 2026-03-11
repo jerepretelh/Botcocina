@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 declare const __APP_VERSION__: string;
+declare const __APP_METADATA__: {
+  version: string;
+  environment: 'production' | 'preview' | 'development';
+};
 
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;

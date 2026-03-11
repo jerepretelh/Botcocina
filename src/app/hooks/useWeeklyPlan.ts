@@ -5,6 +5,9 @@ import type {
   ShoppingAggregationResult,
   ShoppingList,
   ShoppingListItem,
+  ShoppingTrip,
+  ShoppingTripItem,
+  ShoppingVarianceSummary,
   UserRecipeCookingConfig,
   WeeklyPlan,
   WeeklyPlanItem,
@@ -13,15 +16,23 @@ import type {
 } from '../../types';
 import {
   createManualShoppingListItem,
+  createShoppingTrip,
+  createExtraShoppingTripItem,
   createWeeklyPlan,
   deleteShoppingListItem,
   deleteWeeklyPlanItem,
   ensureWeeklyPlan,
+  getActiveShoppingTrip,
+  getShoppingTripById,
   getOrCreateShoppingList,
   getShoppingListItems,
+  getShoppingTripItems,
   getWeekStartDate,
   getWeeklyPlanItems,
+  checkoutShoppingTrip,
   saveWeeklyPlanItem,
+  updateShoppingTrip,
+  updateShoppingTripItem,
   updateShoppingListItem,
   replaceShoppingListItems,
   type WeeklyPlanItemInput,
@@ -88,6 +99,8 @@ export function useWeeklyPlan({
   const [items, setItems] = useState<WeeklyPlanItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingList | null>(null);
   const [shoppingItems, setShoppingItems] = useState<ShoppingListItem[]>([]);
+  const [shoppingTrip, setShoppingTrip] = useState<ShoppingTrip | null>(null);
+  const [shoppingTripItems, setShoppingTripItems] = useState<ShoppingTripItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,6 +121,32 @@ export function useWeeklyPlan({
     () => shoppingItems.filter((item) => item.sourceType === 'manual'),
     [shoppingItems],
   );
+  const shoppingVariance = useMemo<ShoppingVarianceSummary>(() => {
+    const plannedItems = shoppingTripItems.filter((item) => !item.isExtra);
+    const pendingCount = plannedItems.filter((item) => item.status === 'pending').length;
+    const skippedCount = plannedItems.filter((item) => item.status === 'skipped').length;
+    const inCartItems = shoppingTripItems.filter((item) => item.status === 'in_cart');
+    const changedCount = plannedItems.filter((item) => {
+      if (item.status !== 'in_cart') return false;
+      const plannedName = (item.plannedItemNameSnapshot ?? '').trim().toLowerCase();
+      const actualName = item.actualItemName.trim().toLowerCase();
+      const plannedQty = (item.plannedQuantityText ?? '').trim().toLowerCase();
+      const actualQty = (item.actualQuantityText ?? '').trim().toLowerCase();
+      return plannedName !== actualName || plannedQty !== actualQty;
+    }).length;
+    const runningTotal = shoppingTripItems.reduce((sum, item) => sum + (item.lineTotal ?? 0), 0);
+
+    return {
+      plannedCount: plannedItems.length,
+      pendingCount,
+      inCartCount: inCartItems.length,
+      changedCount,
+      skippedCount,
+      extraCount: shoppingTripItems.filter((item) => item.isExtra).length,
+      runningTotal,
+      finalTotal: shoppingTrip?.finalTotal ?? null,
+    };
+  }, [shoppingTrip?.finalTotal, shoppingTripItems]);
 
   const syncShopping = useCallback(async (nextPlan: WeeklyPlan, nextItems: WeeklyPlanItem[]) => {
     if (!userId) return;
@@ -128,6 +167,21 @@ export function useWeeklyPlan({
     setShoppingItems(refreshedItems);
   }, [recipeContentById, recipesById, userId]);
 
+  const refreshTrip = useCallback(async (currentShoppingList: ShoppingList | null) => {
+    if (!currentShoppingList) {
+      setShoppingTrip(null);
+      setShoppingTripItems([]);
+      return;
+    }
+    const activeTrip = await getActiveShoppingTrip(currentShoppingList.id);
+    setShoppingTrip(activeTrip);
+    if (!activeTrip) {
+      setShoppingTripItems([]);
+      return;
+    }
+    setShoppingTripItems(await getShoppingTripItems(activeTrip.id));
+  }, []);
+
   const refresh = useCallback(async () => {
     if (!userId) return;
     setIsLoading(true);
@@ -141,6 +195,7 @@ export function useWeeklyPlan({
       setItems(nextItems);
       setShoppingList(ensuredShopping);
       setShoppingItems(nextShoppingItems);
+      await refreshTrip(ensuredShopping);
       if (nextShoppingItems.length === 0 && nextItems.length > 0) {
         await syncShopping(nextPlan, nextItems);
       }
@@ -149,7 +204,7 @@ export function useWeeklyPlan({
     } finally {
       setIsLoading(false);
     }
-  }, [syncShopping, userId]);
+  }, [refreshTrip, syncShopping, userId]);
 
   useEffect(() => {
     void refresh();
@@ -185,6 +240,9 @@ export function useWeeklyPlan({
   const regenerateShopping = useCallback(async () => {
     if (!plan) return;
     await syncShopping(plan, items);
+    if (shoppingList) {
+      setShoppingItems(await getShoppingListItems(shoppingList.id));
+    }
   }, [items, plan, syncShopping]);
 
   const createNextWeek = useCallback(async () => {
@@ -198,6 +256,8 @@ export function useWeeklyPlan({
     const ensuredShopping = await getOrCreateShoppingList(userId, nextPlan.id);
     setShoppingList(ensuredShopping);
     setShoppingItems([]);
+    setShoppingTrip(null);
+    setShoppingTripItems([]);
   }, [plan?.weekStartDate, userId]);
 
   const updateShoppingItemState = useCallback(async (
@@ -229,6 +289,78 @@ export function useWeeklyPlan({
     setShoppingItems(await getShoppingListItems(shoppingList.id));
   }, [shoppingList]);
 
+  const startShoppingTripFromList = useCallback(async () => {
+    if (!userId || !shoppingList) return null;
+    const trip = await createShoppingTrip(userId, shoppingList, shoppingItems);
+    setShoppingTrip(trip);
+    setShoppingTripItems(await getShoppingTripItems(trip.id));
+    return trip;
+  }, [shoppingItems, shoppingList, userId]);
+
+  const refreshCurrentTrip = useCallback(async () => {
+    if (!shoppingTrip) return;
+    const refreshedTrip = await getShoppingTripById(shoppingTrip.id);
+    setShoppingTrip(refreshedTrip);
+    setShoppingTripItems(refreshedTrip ? await getShoppingTripItems(refreshedTrip.id) : []);
+  }, [shoppingTrip]);
+
+  const updateTripItemActuals = useCallback(async (
+    itemId: string,
+    input: Partial<Pick<ShoppingTripItem, 'actualItemName' | 'actualQuantityText' | 'lineTotal' | 'notes' | 'status' | 'isInCart'>>,
+  ) => {
+    await updateShoppingTripItem(itemId, {
+      actualItemName: input.actualItemName,
+      actualQuantityText: input.actualQuantityText,
+      lineTotal: input.lineTotal,
+      notes: input.notes,
+      status: input.status,
+      isInCart: input.isInCart,
+    });
+    await refreshCurrentTrip();
+  }, [refreshCurrentTrip]);
+
+  const toggleTripItemInCart = useCallback(async (itemId: string, nextInCart: boolean) => {
+    await updateShoppingTripItem(itemId, {
+      status: nextInCart ? 'in_cart' : 'pending',
+      isInCart: nextInCart,
+    });
+    await refreshCurrentTrip();
+  }, [refreshCurrentTrip]);
+
+  const markTripItemSkipped = useCallback(async (itemId: string) => {
+    await updateShoppingTripItem(itemId, {
+      status: 'skipped',
+      isInCart: false,
+    });
+    await refreshCurrentTrip();
+  }, [refreshCurrentTrip]);
+
+  const addExtraTripItem = useCallback(async (itemName: string, quantityText: string | null, lineTotal: number | null) => {
+    if (!shoppingTrip) return null;
+    const trimmedName = itemName.trim();
+    if (!trimmedName) return null;
+    await createExtraShoppingTripItem(shoppingTrip.id, {
+      actualItemName: trimmedName,
+      actualQuantityText: quantityText?.trim() || null,
+      lineTotal,
+      sortOrder: shoppingTripItems.length,
+    });
+    await refreshCurrentTrip();
+    return true;
+  }, [refreshCurrentTrip, shoppingTrip, shoppingTripItems.length]);
+
+  const updateShoppingTripMeta = useCallback(async (input: Partial<Pick<ShoppingTrip, 'storeName' | 'estimatedTotal' | 'finalTotal'>>) => {
+    if (!shoppingTrip) return;
+    await updateShoppingTrip(shoppingTrip.id, input);
+    await refreshCurrentTrip();
+  }, [refreshCurrentTrip, shoppingTrip]);
+
+  const checkoutTrip = useCallback(async (finalTotal: number | null, storeName: string | null) => {
+    if (!shoppingTrip) return;
+    await checkoutShoppingTrip(shoppingTrip.id, { finalTotal, storeName });
+    await refreshCurrentTrip();
+  }, [refreshCurrentTrip, shoppingTrip]);
+
   const getDefaultPlanSnapshot = useCallback((recipe: Recipe) => {
     return buildDefaultSnapshot(recipe, userRecipeConfigsByRecipeId[recipe.id] ?? null);
   }, [userRecipeConfigsByRecipeId]);
@@ -238,9 +370,12 @@ export function useWeeklyPlan({
     items,
     shoppingList,
     shoppingItems,
+    shoppingTrip,
+    shoppingTripItems,
     autoShoppingItems,
     manualShoppingItems,
     aggregation,
+    shoppingVariance,
     isLoading,
     error,
     refresh,
@@ -251,6 +386,13 @@ export function useWeeklyPlan({
     updateShoppingItemState,
     addManualShoppingItem,
     removeShoppingItem,
+    startShoppingTripFromList,
+    updateTripItemActuals,
+    toggleTripItemInCart,
+    markTripItemSkipped,
+    addExtraTripItem,
+    updateShoppingTripMeta,
+    checkoutTrip,
     getDefaultPlanSnapshot,
   };
 }

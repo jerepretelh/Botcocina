@@ -169,7 +169,7 @@ const arrozPolloScenario: AIMockScenario = {
 const SCENARIOS: AIMockScenario[] = [milanesaScenario, arrozPolloScenario];
 
 export function isAIMockModeEnabled(): boolean {
-  return import.meta.env.DEV || (import.meta.env.VITE_AI_MOCK_MODE ?? 'false').toLowerCase() === 'true';
+  return import.meta.env.DEV || (import.meta.env.VITE_AI_MOCK_MODE ?? 'false').trim().toLowerCase() === 'true';
 }
 
 export function getAIMockScenario(id: AIMockScenarioId): AIMockScenario | undefined {

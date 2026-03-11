@@ -522,7 +522,7 @@ async function fetchCsv(url: string): Promise<string> {
 }
 
 function supabaseServerConfig(): { url: string; key: string } | null {
-  const enabled = (process.env.SUPABASE_ENABLED ?? process.env.VITE_SUPABASE_ENABLED ?? 'false').toLowerCase() === 'true'
+  const enabled = (process.env.SUPABASE_ENABLED ?? process.env.VITE_SUPABASE_ENABLED ?? 'false').trim().toLowerCase() === 'true'
   if (!enabled) return null
   const url = process.env.SUPABASE_URL?.trim() || process.env.VITE_SUPABASE_URL?.trim()
   const key =
@@ -666,7 +666,7 @@ async function resolveRecipesPayload(): Promise<{ source: 'supabase' | 'sheets' 
   }
 
   const allowSheetsFallback =
-    (process.env.ALLOW_SHEETS_FALLBACK ?? 'false').toLowerCase() === 'true' &&
+    (process.env.ALLOW_SHEETS_FALLBACK ?? 'false').trim().toLowerCase() === 'true' &&
     (process.env.NODE_ENV ?? 'development').toLowerCase() !== 'production'
   if (!allowSheetsFallback) {
     return {
