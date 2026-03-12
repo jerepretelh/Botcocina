@@ -2,6 +2,17 @@ import type { AppRelease } from '../../types';
 
 export const appReleases: AppRelease[] = [
   {
+    version: '0.0.3',
+    title: 'Estabilidad del núcleo culinario y fixes de navegación',
+    date: '2026-03-12',
+    summary: 'Se corrigieron regresiones del flujo de cocina, se estabilizó el wizard IA y se mejoró la navegación interna en móvil.',
+    changes: [
+      'El wizard IA ya no rebota silenciosamente a Inicio y mantiene un manejo de errores más claro al finalizar la generación.',
+      'El paso Ingredientes -> Cooking volvió a funcionar sin depender de persistencias opcionales de Supabase.',
+      'La ruta de Ajustes quedó unificada y el PlanRecipeSheet ya no se filtra a otras pantallas al cambiar de contexto.',
+    ],
+  },
+  {
     version: '0.0.2',
     title: 'Versionado visible y centro de releases',
     date: '2026-03-11',
