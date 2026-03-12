@@ -25,6 +25,7 @@ interface ShoppingListScreenProps {
   isLoading: boolean;
   error: string | null;
   onGoHome: () => void;
+  onGoGlobalRecipes: () => void;
   onGoMyRecipes: () => void;
   onGoFavorites: () => void;
   onGoShoppingList: () => void;
@@ -320,6 +321,7 @@ export function ShoppingListScreen({
   isLoading,
   error,
   onGoHome,
+  onGoGlobalRecipes,
   onGoMyRecipes,
   onGoFavorites,
   onGoShoppingList,
@@ -390,6 +392,7 @@ export function ShoppingListScreen({
       activeItem="shopping-list"
       currentUserEmail={currentUserEmail}
       onGoHome={onGoHome}
+      onGoGlobalRecipes={onGoGlobalRecipes}
       onGoMyRecipes={onGoMyRecipes}
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
