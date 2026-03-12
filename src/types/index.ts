@@ -1,4 +1,4 @@
-export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
+export type Screen = 'category-select' | 'global-recipes' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
@@ -71,6 +71,20 @@ export interface RecipeSeed {
 }
 
 export interface RecipeSeedSearchResult extends RecipeSeed {}
+
+export interface MixedRecipeSearchResult {
+    id: string;
+    kind: 'recipe' | 'seed';
+    title: string;
+    description: string;
+    categoryLabel: string;
+    categoryIcon: string;
+    metaLabel: string;
+    actionLabel: string;
+    highlightableText: string;
+    recipe?: Recipe;
+    seed?: RecipeSeed;
+}
 
 export interface AppRelease {
     version: string;

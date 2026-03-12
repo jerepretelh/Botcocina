@@ -15,6 +15,7 @@ interface WeeklyPlanScreenProps {
   isLoading: boolean;
   error: string | null;
   onGoHome: () => void;
+  onGoGlobalRecipes: () => void;
   onGoMyRecipes: () => void;
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
@@ -46,6 +47,7 @@ export function WeeklyPlanScreen({
   isLoading,
   error,
   onGoHome,
+  onGoGlobalRecipes,
   onGoMyRecipes,
   onGoFavorites,
   onGoWeeklyPlan,
@@ -87,6 +89,7 @@ export function WeeklyPlanScreen({
       activeItem="weekly-plan"
       currentUserEmail={currentUserEmail}
       onGoHome={onGoHome}
+      onGoGlobalRecipes={onGoGlobalRecipes}
       onGoMyRecipes={onGoMyRecipes}
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}

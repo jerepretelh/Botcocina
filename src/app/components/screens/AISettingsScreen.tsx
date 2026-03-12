@@ -23,6 +23,7 @@ import { ProductContainer, ProductHeader, ProductPage } from '../ui/product-syst
 interface AISettingsScreenProps {
   currentUserEmail: string | null;
   onGoHome: () => void;
+  onGoGlobalRecipes: () => void;
   onGoMyRecipes: () => void;
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
@@ -97,6 +98,7 @@ function formatDate(value: string | null): string {
 export function AISettingsScreen({
   currentUserEmail,
   onGoHome,
+  onGoGlobalRecipes,
   onGoMyRecipes,
   onGoFavorites,
   onGoWeeklyPlan,
@@ -232,6 +234,7 @@ export function AISettingsScreen({
         activeItem="settings"
         currentUserEmail={currentUserEmail}
         onGoHome={onGoHome}
+        onGoGlobalRecipes={onGoGlobalRecipes}
         onGoMyRecipes={onGoMyRecipes}
         onGoFavorites={onGoFavorites}
         onGoWeeklyPlan={onGoWeeklyPlan}
@@ -255,6 +258,7 @@ export function AISettingsScreen({
       activeItem="settings"
       currentUserEmail={currentUserEmail}
       onGoHome={onGoHome}
+      onGoGlobalRecipes={onGoGlobalRecipes}
       onGoMyRecipes={onGoMyRecipes}
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}

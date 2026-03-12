@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Heart,
   Home,
+  LibraryBig,
   Menu,
   Settings,
   ShoppingBasket,
@@ -19,12 +20,13 @@ import {
   SheetTrigger,
 } from '../ui/sheet';
 
-type NavItem = 'home' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'settings';
+type NavItem = 'home' | 'global-recipes' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'settings';
 
 interface MainShellLayoutProps {
   activeItem: NavItem;
   currentUserEmail: string | null;
   onGoHome: () => void;
+  onGoGlobalRecipes: () => void;
   onGoMyRecipes: () => void;
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
@@ -59,6 +61,8 @@ function getPageLabel(activeItem: NavItem): string {
       return 'Inicio';
     case 'my-recipes':
       return 'Mis recetas';
+    case 'global-recipes':
+      return 'Recetas globales';
     case 'favorites':
       return 'Favoritos';
     case 'weekly-plan':
@@ -76,6 +80,7 @@ export function MainShellLayout({
   activeItem,
   currentUserEmail,
   onGoHome,
+  onGoGlobalRecipes,
   onGoMyRecipes,
   onGoFavorites,
   onGoWeeklyPlan,
@@ -86,6 +91,7 @@ export function MainShellLayout({
 }: MainShellLayoutProps) {
   const desktopItems: NavActionItem[] = [
     { id: 'home', label: 'Inicio', icon: Home, onClick: onGoHome },
+    { id: 'global-recipes', label: 'Recetas globales', icon: LibraryBig, onClick: onGoGlobalRecipes },
     { id: 'my-recipes', label: 'Mis recetas', icon: BookHeart, onClick: onGoMyRecipes },
     { id: 'favorites', label: 'Favoritos', icon: Heart, onClick: onGoFavorites },
     { id: 'weekly-plan', label: 'Planificación', icon: CalendarDays, onClick: onGoWeeklyPlan },
@@ -94,12 +100,12 @@ export function MainShellLayout({
 
   const mobileItems = [
     { id: 'home', label: 'Inicio', icon: Home, onClick: onGoHome },
-    { id: 'my-recipes', label: 'Recetas', icon: BookHeart, onClick: onGoMyRecipes },
+    { id: 'global-recipes', label: 'Recetas', icon: LibraryBig, onClick: onGoGlobalRecipes },
     { id: 'weekly-plan', label: 'Plan', icon: CalendarDays, onClick: onGoWeeklyPlan },
     { id: 'shopping-list', label: 'Compras', icon: ShoppingBasket, onClick: onGoShoppingList },
   ] as const;
 
-  const moreActive = activeItem === 'favorites' || activeItem === 'settings';
+  const moreActive = activeItem === 'my-recipes' || activeItem === 'favorites' || activeItem === 'settings';
   const pageLabel = getPageLabel(activeItem);
 
   return (
@@ -206,6 +212,14 @@ export function MainShellLayout({
                     </div>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={onGoMyRecipes}
+                    className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'my-recipes')}`}
+                  >
+                    <BookHeart className="size-5" />
+                    Mis recetas
+                  </button>
                   <button
                     type="button"
                     onClick={onGoFavorites}

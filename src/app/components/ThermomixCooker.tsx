@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { Recipe, RecipeCategoryId, Screen, WeeklyPlanItem, WeeklyPlanItemConfigSnapshot } from '../../types';
+import { MixedRecipeSearchResult, Recipe, RecipeCategoryId, Screen, WeeklyPlanItem, WeeklyPlanItemConfigSnapshot } from '../../types';
 import { recipeCategories } from '../data/recipeCategories';
 
 import {
@@ -25,15 +25,17 @@ import { trackProductEvent } from '../lib/productEvents';
 import { buildSavedRecipeSummary, deriveRecipeSetupBehavior } from '../lib/recipeSetupBehavior';
 import { buildCookingSessionState } from '../lib/cookingSession';
 import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
+import { buildMixedRecipeSearchResults } from '../lib/mixedRecipeSearch';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
 import { useThermomixTimer } from '../hooks/useThermomixTimer';
 import { useThermomixHandlers } from '../hooks/useThermomixHandlers';
 
 import { CategorySelectScreen } from './screens/CategorySelectScreen';
-import { RecipeSelectScreen } from './screens/RecipeSelectScreen';
 import { IngredientsScreen } from './screens/IngredientsScreen';
 import { RecipeLibraryScreen } from './screens/RecipeLibraryScreen';
+import { GlobalRecipesScreen } from './screens/GlobalRecipesScreen';
+import { GlobalRecipesCategoryScreen } from './screens/GlobalRecipesCategoryScreen';
 import { formatVersionLabel } from '../lib/appMetadata';
 
 const APPROX_GRAMS_PER_UNIT = 250;
@@ -144,10 +146,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const [planSheetSourceScreen, setPlanSheetSourceScreen] = useState<Screen | null>(null);
   const [activePlannedRecipeItemId, setActivePlannedRecipeItemId] = useState<string | null>(null);
   const [recipeSeedSearchTerm, setRecipeSeedSearchTerm] = useState('');
-  const [recipeSeedCategoryFilter, setRecipeSeedCategoryFilter] = useState<RecipeCategoryId | null>(null);
   const recipeSeeds = useRecipeSeeds({
     searchTerm: recipeSeedSearchTerm,
-    categoryId: recipeSeedCategoryFilter,
     limit: 48,
   });
   const appVersion = formatVersionLabel();
@@ -218,6 +218,38 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const visibleRecipesForCurrentView = recipeSelection.selectedCategory
     ? recipesForCurrentView.filter((recipe) => matchesRecipeCategory(recipeSelection.selectedCategory, recipe.categoryId))
     : [];
+  const publicRecipes = useMemo(
+    () => uniqueAvailableRecipes.filter((recipe) => (recipe.visibility ?? 'public') === 'public'),
+    [uniqueAvailableRecipes],
+  );
+  const globalCategories = useMemo(
+    () =>
+      recipeCategories
+        .filter((category) => category.id !== 'personalizadas')
+        .map((category) => ({
+          category,
+          recipeCount: publicRecipes.filter((recipe) => matchesRecipeCategory(category.id, recipe.categoryId)).length,
+          ideaCount: recipeSeeds.seeds.filter((seed) => matchesRecipeCategory(category.id, seed.categoryId)).length,
+        }))
+        .filter((entry) => entry.recipeCount > 0 || entry.ideaCount > 0),
+    [publicRecipes, recipeSeeds.seeds],
+  );
+  const globalCategoryItems = useMemo(() => {
+    if (!recipeSelection.selectedCategory) return [];
+
+    const recipeItems = publicRecipes
+      .filter((recipe) => matchesRecipeCategory(recipeSelection.selectedCategory, recipe.categoryId))
+      .map((recipe) => ({ id: `recipe:${recipe.id}`, kind: 'recipe' as const, recipe }));
+    const seedItems = recipeSeeds.seeds
+      .filter((seed) => matchesRecipeCategory(recipeSelection.selectedCategory, seed.categoryId))
+      .map((seed) => ({ id: `seed:${seed.id}`, kind: 'seed' as const, seed }));
+
+    return [...recipeItems, ...seedItems].sort((a, b) => {
+      const aLabel = a.kind === 'recipe' ? a.recipe?.name ?? '' : a.seed?.name ?? '';
+      const bLabel = b.kind === 'recipe' ? b.recipe?.name ?? '' : b.seed?.name ?? '';
+      return aLabel.localeCompare(bLabel);
+    });
+  }, [publicRecipes, recipeSeeds.seeds, recipeSelection.selectedCategory]);
   const privateUserRecipes = dedupeRecipesBySignature(
     uniqueAvailableRecipes
     .filter((recipe) => recipe.ownerUserId === auth.userId && (recipe.visibility ?? 'public') === 'private')
@@ -229,6 +261,17 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     recipeSelection.recipeContentById,
   );
   const recentPrivateRecipes = privateUserRecipes.slice(0, 4);
+  const mixedSearchResults = useMemo(
+    () =>
+      buildMixedRecipeSearchResults({
+        query: recipeSeedSearchTerm,
+        recipes: uniqueAvailableRecipes,
+        seeds: recipeSeeds.seeds,
+        categories: recipeCategories,
+        limit: recipeSeedSearchTerm.trim() ? 8 : 10,
+      }),
+    [recipeSeedSearchTerm, uniqueAvailableRecipes, recipeSeeds.seeds],
+  );
   const favoriteRecipes = dedupeRecipesBySignature(
     uniqueAvailableRecipes.filter((recipe) => userFavorites.favoriteRecipeIds.has(recipe.id)),
     recipeSelection.recipeContentById,
@@ -334,6 +377,11 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('ai-clarify');
       return;
     }
+    if (normalizedPath === '/recetas-globales') {
+      recipeSelection.setSelectedCategory(null);
+      recipeSelection.setScreenDirect('global-recipes');
+      return;
+    }
     if (normalizedPath === '/buscar-recetas') {
       recipeSelection.setScreenDirect('recipe-seed-search');
       return;
@@ -367,7 +415,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       return;
     }
 
-    const categoryMatch = normalizedPath.match(/^\/categorias\/([^/]+)$/);
+    const categoryMatch = normalizedPath.match(/^\/(?:categorias|recetas-globales)\/([^/]+)$/);
     if (categoryMatch) {
       const categoryId = decodeURIComponent(categoryMatch[1]);
       const isValidCategory = recipeCategories.some((category) => category.id === categoryId);
@@ -421,6 +469,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     const targetPath =
       screen === 'category-select'
         ? '/'
+        : screen === 'global-recipes'
+          ? '/recetas-globales'
         : screen === 'design-system'
           ? '/design-system'
         : screen === 'recipe-seed-search'
@@ -438,7 +488,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         : screen === 'shopping-list'
           ? '/compras'
         : screen === 'recipe-select'
-          ? categoryId ? `/categorias/${categoryId}` : '/'
+          ? categoryId ? `/recetas-globales/${categoryId}` : '/recetas-globales'
           : screen === 'ai-clarify'
             ? '/ia/aclarar'
             : screen === 'recipe-setup' || screen === 'ingredients' || screen === 'cooking'
@@ -720,6 +770,17 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     recipeSelection.setScreen('recipe-setup');
   };
 
+  const handleSearchResultSelect = (result: MixedRecipeSearchResult) => {
+    if (result.kind === 'recipe' && result.recipe) {
+      handleRecipeOpen(result.recipe);
+      return;
+    }
+
+    if (result.kind === 'seed' && result.seed) {
+      aiRecipeGen.startWizardFromSeed(result.seed);
+    }
+  };
+
   useThermomixTimer({
     ...recipeSelection,
     ...cookingProgress,
@@ -774,13 +835,16 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             aiRecipeGen.setAiWizardStep('context');
             recipeSelection.setScreen('ai-clarify');
           }}
-          onOpenRecipeSearch={() => recipeSelection.setScreen('recipe-seed-search')}
-          recipeCategories={recipeCategories}
           recentRecipes={recentPrivateRecipes}
           favoriteRecipeIds={userFavorites.favoriteRecipeIds}
-          onCategorySelect={handlers.handleCategorySelect}
+          searchTerm={recipeSeedSearchTerm}
+          searchResults={mixedSearchResults}
+          searchIsLoading={recipeSeeds.isLoading}
+          onSearchTermChange={setRecipeSeedSearchTerm}
+          onSearchSelectResult={handleSearchResultSelect}
           onRecipeOpen={handleRecipeOpen}
           onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
+          onOpenGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
           onOpenMyRecipes={() => recipeSelection.setScreen('my-recipes')}
           onOpenFavorites={() => recipeSelection.setScreen('favorites')}
           onOpenWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -803,24 +867,41 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     );
   }
 
+  if (screen === 'global-recipes') {
+    return (
+      <GlobalRecipesScreen
+        currentUserEmail={auth.user?.email ?? null}
+        categories={globalCategories}
+        onSelectCategory={(category) => {
+          recipeSelection.setSelectedCategory(category.id);
+          recipeSelection.setScreen('recipe-select');
+        }}
+        onGoHome={() => recipeSelection.setScreen('category-select')}
+        onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
+        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+        onGoFavorites={() => recipeSelection.setScreen('favorites')}
+        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+        onSignOut={() => void auth.signOut()}
+      />
+    );
+  }
+
   if (screen === 'recipe-seed-search') {
     return (
       <Suspense fallback={<ScreenFallback />}>
         <RecipeSeedSearchScreen
           currentUserEmail={auth.user?.email ?? null}
-          categories={recipeCategories}
           searchTerm={recipeSeedSearchTerm}
-          selectedCategoryId={recipeSeedCategoryFilter}
-          seeds={recipeSeeds.seeds}
+          results={mixedSearchResults}
           isLoading={recipeSeeds.isLoading}
           warning={recipeSeeds.warning}
           onSearchTermChange={setRecipeSeedSearchTerm}
-          onSelectCategory={setRecipeSeedCategoryFilter}
-          onSelectSeed={(seed) => {
-            aiRecipeGen.startWizardFromSeed(seed);
-          }}
+          onSelectResult={handleSearchResultSelect}
           onBack={() => recipeSelection.goBackScreen('category-select')}
           onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
           onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -838,6 +919,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         <AISettingsScreen
           currentUserEmail={auth.user?.email ?? null}
           onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
           onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -856,6 +938,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         <ReleasesScreen
           currentUserEmail={auth.user?.email ?? null}
           onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
           onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -882,6 +965,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
           onPlanRecipe={(recipe) => openPlanSheetForRecipe(recipe)}
           onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
           onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -909,6 +993,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
         onPlanRecipe={(recipe) => openPlanSheetForRecipe(recipe)}
         onGoHome={() => recipeSelection.setScreen('category-select')}
+        onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
         onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
         onGoFavorites={() => recipeSelection.setScreen('favorites')}
         onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -933,6 +1018,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             isLoading={weeklyPlan.isLoading}
             error={weeklyPlan.error}
             onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
             onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
@@ -971,6 +1057,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             isLoading={weeklyPlan.isLoading}
             error={weeklyPlan.error}
             onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
             onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
@@ -999,32 +1086,25 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   if (screen === 'recipe-select') {
     return (
       <>
-      <RecipeSelectScreen
-        appVersion={appVersion}
-        voiceEnabled={voiceEnabled}
-        onVoiceToggle={voice.handleVoiceToggle}
-        speechSupported={voice.speechSupported}
-        selectedCategoryMeta={recipeSelection.selectedCategoryMeta}
-        onBack={() => recipeSelection.goBackScreen('category-select')}
-        visibleRecipes={visibleRecipesForCurrentView}
-        onRecipeSelect={handleRecipeOpen}
-        catalogViewMode={userLists.catalogViewMode}
-        activeListName={userLists.activeList?.name ?? null}
-        isRecipeInActiveList={(recipeId) => userLists.activeListRecipeIds.has(recipeId)}
-        onToggleRecipeInActiveList={(recipeId) => void userLists.toggleRecipeInActiveList(recipeId)}
-        isFavorite={(recipeId) => userFavorites.favoriteRecipeIds.has(recipeId)}
-        onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
-        onPlanRecipe={(recipe) => openPlanSheetForRecipe(recipe)}
-        currentUserEmail={auth.user?.email ?? null}
-        onGoHome={() => recipeSelection.setScreen('category-select')}
-        onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
-        onGoFavorites={() => recipeSelection.setScreen('favorites')}
-        onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
-        onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
-        onGoSettings={() => recipeSelection.setScreen('ai-settings')}
-        onSignOut={() => void auth.signOut()}
-      />
-      {planRecipeSheet}
+        <GlobalRecipesCategoryScreen
+          currentUserEmail={auth.user?.email ?? null}
+          category={recipeSelection.selectedCategoryMeta}
+          items={globalCategoryItems}
+          favoriteRecipeIds={userFavorites.favoriteRecipeIds}
+          onBack={() => recipeSelection.goBackScreen('global-recipes')}
+          onOpenRecipe={handleRecipeOpen}
+          onOpenSeed={(seed) => aiRecipeGen.startWizardFromSeed(seed)}
+          onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
+          onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
+          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onGoFavorites={() => recipeSelection.setScreen('favorites')}
+          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+          onSignOut={() => void auth.signOut()}
+        />
+        {planRecipeSheet}
       </>
     );
   }
