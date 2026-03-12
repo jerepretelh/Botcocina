@@ -1,4 +1,4 @@
-import { Portion, QuantityMode, AmountUnit, ClarificationNumberMode, ClarificationQuantityUnit, RecipeStep, SubStep, Ingredient, FaceTimerPair, RecipeContent, RecipeCategory, Recipe, CookingEquipment } from '../../types';
+import { Portion, QuantityMode, AmountUnit, ClarificationNumberIntent, ClarificationNumberMode, ClarificationQuantityUnit, RecipeStep, SubStep, Ingredient, FaceTimerPair, RecipeContent, RecipeCategory, Recipe, CookingEquipment } from '../../types';
 import { AIClarificationQuestion, GeneratedRecipe, GeneratedRecipeStep, GeneratedSubStep } from '../lib/recipeAI';
 import { parseTimerSeconds } from './timerUtils';
 import { huevoFritoRecipeData } from '../data/recipeStepTemplates';
@@ -72,15 +72,7 @@ export function inferPeopleCountFromClarifications(
   }
 
   const peopleQuestion = questions.find((question) => {
-    const text = normalizeText(`${question.id} ${question.question}`);
-    return (
-      text.includes('persona') ||
-      text.includes('personas') ||
-      text.includes('porcion') ||
-      text.includes('porciones') ||
-      text.includes('comensal') ||
-      text.includes('racion')
-    );
+    return inferClarificationNumberIntent(question) === 'servings';
   });
 
   if (!peopleQuestion) return null;
@@ -121,18 +113,11 @@ export function inferSizingFromClarifications(
     }
     if (!count || count < 1) continue;
 
-    const questionText = normalizeText(`${question.id} ${question.question}`);
+    const questionIntent = inferClarificationNumberIntent(question);
     const selectedMode = numberModes[question.id];
     const isPeople = selectedMode
       ? selectedMode === 'people'
-      : (
-        questionText.includes('persona') ||
-        questionText.includes('personas') ||
-        questionText.includes('porcion') ||
-        questionText.includes('porciones') ||
-        questionText.includes('comensal') ||
-        questionText.includes('racion')
-      );
+      : questionIntent === 'servings';
     const selectedQuantityUnit = quantityUnits[question.id] ?? 'units';
 
     return {
@@ -143,6 +128,24 @@ export function inferSizingFromClarifications(
   }
 
   return null;
+}
+
+export function inferClarificationNumberIntent(question: AIClarificationQuestion): ClarificationNumberIntent {
+  if (question.numberIntent) return question.numberIntent;
+
+  const text = normalizeText(`${question.id} ${question.question} ${question.unit ?? ''}`);
+  if (
+    text.includes('persona') ||
+    text.includes('personas') ||
+    text.includes('porcion') ||
+    text.includes('porciones') ||
+    text.includes('comensal') ||
+    text.includes('racion')
+  ) {
+    return 'servings';
+  }
+
+  return 'ingredient_base';
 }
 
 export function normalizeText(value: string): string {

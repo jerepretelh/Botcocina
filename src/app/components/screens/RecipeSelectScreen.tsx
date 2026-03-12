@@ -95,6 +95,7 @@ export function RecipeSelectScreen({
                         onBack={onBackToCategories}
                         actions={
                             <button
+                                type="button"
                                 onClick={onVoiceToggle}
                                 className={`flex size-12 items-center justify-center rounded-full border transition-colors ${voiceEnabled ? 'border-primary/30 bg-primary/10 text-primary' : 'border-primary/10 bg-card/70 text-slate-500 dark:text-slate-400'}`}
                                 title={speechSupported ? (voiceEnabled ? 'Desactivar voz' : 'Activar voz') : 'Tu navegador no soporta voz'}
@@ -152,6 +153,7 @@ export function RecipeSelectScreen({
                                                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{recipe.description}</p>
                                                 </div>
                                                 <button
+                                                    type="button"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onToggleFavorite(recipe.id);
@@ -179,6 +181,7 @@ export function RecipeSelectScreen({
                                     <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex gap-2">
                                             <button
+                                                type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onToggleRecipeInActiveList(recipe.id);
@@ -190,6 +193,7 @@ export function RecipeSelectScreen({
                                                 {isRecipeInActiveList(recipe.id) ? 'En lista' : 'Guardar'}
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onPlanRecipe(recipe);
@@ -200,6 +204,7 @@ export function RecipeSelectScreen({
                                                 Planificar
                                             </button>
                                             <button
+                                                type="button"
                                                 onClick={(e) => handleViewRoadmap(e, recipe)}
                                                 className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-card px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-primary/8 hover:text-primary dark:text-slate-200"
                                                 title="Ver ruta de cocción"
@@ -209,6 +214,7 @@ export function RecipeSelectScreen({
                                             </button>
                                         </div>
                                         <button
+                                            type="button"
                                             onClick={() => onRecipeSelect(recipe)}
                                             className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
                                         >
@@ -220,7 +226,18 @@ export function RecipeSelectScreen({
 
                             {visibleRecipes.length === 0 && (
                                 <div className="lg:col-span-2">
-                                    <ProductEmptyState message="Esta categoría aún no tiene recetas disponibles." />
+                                    <div className="space-y-4">
+                                        <ProductEmptyState message="Esta categoría aún no tiene recetas disponibles." />
+                                        <div className="flex justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={onOpenRecipeSearch}
+                                                className="rounded-full border border-primary/15 bg-card px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/8"
+                                            >
+                                                Buscar idea por nombre
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>

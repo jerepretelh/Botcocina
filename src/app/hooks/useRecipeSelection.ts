@@ -13,6 +13,7 @@ import { recipeCategories } from '../data/recipeCategories';
 import { buildInitialIngredientSelection } from '../utils/recipeHelpers';
 import { fetchRecipesCatalog } from '../lib/recipesCatalog';
 import { loadLocalRecipeCatalog } from '../lib/localRecipeCatalog';
+import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
 import type { CatalogSource } from '../../types';
 
 export function useRecipeSelection() {
@@ -59,7 +60,7 @@ export function useRecipeSelection() {
 
     const visibleRecipes = useMemo(() => {
         return selectedCategory
-            ? availableRecipes.filter((recipe) => recipe.categoryId === selectedCategory)
+            ? availableRecipes.filter((recipe) => matchesRecipeCategory(selectedCategory, recipe.categoryId))
             : [];
     }, [selectedCategory, availableRecipes]);
 

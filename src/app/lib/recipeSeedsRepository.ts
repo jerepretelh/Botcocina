@@ -1,6 +1,8 @@
 import type { RecipeCategoryId, RecipeSeed } from '../../types';
 import { defaultRecipeSeeds } from '../data/recipeSeeds';
 import { isSupabaseEnabled, supabaseClient } from './supabaseClient';
+import { getCompatibleCategoryIds } from './recipeCategoryMapping';
+import { canUseRecipeSeeds, disableRecipeSeedsForSession } from './supabaseOptionalFeatures';
 
 type DbRecipeSeed = {
   id: string;
@@ -21,6 +23,12 @@ export interface RecipeSeedSearchPayload {
 
 const DEFAULT_LIMIT = 24;
 
+function isMissingTableError(error: { message?: string | null; code?: string | null; details?: string | null } | null | undefined): boolean {
+  if (!error) return false;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return error.code === 'PGRST205' || message.includes('could not find the table') || message.includes('relation') && message.includes('does not exist');
+}
+
 function normalizeTerm(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -40,25 +48,28 @@ function mapSeed(row: DbRecipeSeed): RecipeSeed {
 
 function filterLocalSeeds(searchTerm: string, categoryId?: RecipeCategoryId | null, limit = DEFAULT_LIMIT): RecipeSeed[] {
   const normalized = normalizeTerm(searchTerm);
-  let seeds = defaultRecipeSeeds.filter((seed) => seed.isActive);
+  const allSeeds = defaultRecipeSeeds.filter((seed) => seed.isActive);
+  let seeds = allSeeds;
+  const compatibleIds = categoryId ? getCompatibleCategoryIds(categoryId) : [];
   if (categoryId) {
-    seeds = seeds.filter((seed) => seed.categoryId === categoryId);
+    seeds = seeds.filter((seed) => compatibleIds.includes(seed.categoryId));
   }
 
   if (!normalized) {
     return seeds.sort((a, b) => a.sortOrder - b.sortOrder).slice(0, limit);
   }
 
-  const scored = seeds
+  const rankSeeds = (entries: RecipeSeed[]) => entries
     .map((seed) => {
       const haystack = [seed.name, ...(seed.searchTerms ?? []), seed.shortDescription ?? ''].join(' ').toLowerCase();
       if (!haystack.includes(normalized)) return null;
       const exact = seed.name.toLowerCase() === normalized ? 100 : 0;
       const prefix = seed.name.toLowerCase().startsWith(normalized) ? 50 : 0;
       const alias = seed.searchTerms.some((term) => term.toLowerCase().includes(normalized)) ? 20 : 0;
+      const wordMatch = haystack.split(/\s+/).some((token) => token.startsWith(normalized)) ? 10 : 0;
       return {
         seed,
-        score: exact + prefix + alias - seed.sortOrder / 100,
+        score: exact + prefix + alias + wordMatch - seed.sortOrder / 100,
       };
     })
     .filter((entry): entry is { seed: RecipeSeed; score: number } => Boolean(entry))
@@ -66,7 +77,10 @@ function filterLocalSeeds(searchTerm: string, categoryId?: RecipeCategoryId | nu
     .slice(0, limit)
     .map((entry) => entry.seed);
 
-  return scored;
+  const scored = rankSeeds(seeds);
+  if (scored.length > 0 || !categoryId) return scored;
+
+  return rankSeeds(allSeeds);
 }
 
 export async function searchRecipeSeeds(
@@ -74,10 +88,10 @@ export async function searchRecipeSeeds(
   categoryId?: RecipeCategoryId | null,
   limit = DEFAULT_LIMIT,
 ): Promise<RecipeSeedSearchPayload> {
-  if (!isSupabaseEnabled || !supabaseClient) {
+  if (!isSupabaseEnabled || !supabaseClient || !canUseRecipeSeeds()) {
     return {
       source: 'local-dev',
-      warning: 'Supabase no configurado. Usando catálogo local de ideas.',
+      warning: !isSupabaseEnabled || !supabaseClient ? 'Supabase no configurado. Usando catálogo local de ideas.' : undefined,
       seeds: filterLocalSeeds(searchTerm, categoryId, limit),
     };
   }
@@ -91,7 +105,7 @@ export async function searchRecipeSeeds(
       .limit(limit);
 
     if (categoryId) {
-      query = query.eq('category_id', categoryId);
+      query = query.in('category_id', getCompatibleCategoryIds(categoryId));
     }
 
     const normalized = normalizeTerm(searchTerm);
@@ -103,6 +117,13 @@ export async function searchRecipeSeeds(
     const { data, error } = await query;
 
     if (error) {
+      if (isMissingTableError(error)) {
+        disableRecipeSeedsForSession();
+        return {
+          source: 'local-dev',
+          seeds: filterLocalSeeds(searchTerm, categoryId, limit),
+        };
+      }
       return {
         source: 'local-dev',
         warning: `No se pudo leer ideas de receta desde Supabase (${error.message}). Usando catálogo local.`,

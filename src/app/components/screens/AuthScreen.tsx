@@ -101,9 +101,9 @@ export function AuthScreen({ error, isConfigured, onSignIn, onSignUp }: AuthScre
 
   return (
     <ProductPage>
-      <ProductContainer className="flex min-h-[calc(100vh-2rem)] items-center justify-center">
-        <div className="grid w-full gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="flex flex-col justify-center space-y-6 rounded-[2rem] border border-primary/10 bg-card/85 p-8 shadow-xl backdrop-blur md:p-10">
+      <ProductContainer className="flex min-h-[100dvh] items-center justify-center py-6">
+        <div className="grid w-full gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
+          <section className="hidden flex-col justify-center space-y-6 rounded-[2rem] border border-primary/10 bg-card/85 p-8 shadow-xl backdrop-blur md:p-10 lg:flex">
             <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/12 ring-1 ring-primary/20">
               <ChefHat className="h-8 w-8 text-primary" />
             </div>
@@ -124,7 +124,7 @@ export function AuthScreen({ error, isConfigured, onSignIn, onSignUp }: AuthScre
           </section>
 
           <ProductSurface className="p-0">
-          <Card className="border-0 bg-transparent text-foreground shadow-none">
+            <Card className="border-0 bg-transparent text-foreground shadow-none">
             <CardHeader className="space-y-2">
               <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/10">
                 <ActiveIcon className="h-5 w-5 text-primary" />

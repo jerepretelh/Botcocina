@@ -1,0 +1,14 @@
+{
+  "browser": {
+    "launchOptions": {
+      "headless": false,
+      "channel": "msedge"
+    },
+    "contextOptions": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  }
+}

@@ -147,6 +147,19 @@ function buildEntry(
   };
 }
 
+function getAggregationKey(normalized: NormalizedIngredientAmount, itemId: string, index: number): string {
+  if (!normalized.isAmbiguous && normalized.canonicalUnit) {
+    return `${normalized.normalizedName}:${normalized.canonicalUnit}:${normalized.unitFamily}`;
+  }
+
+  const normalizedQuantity = normalizeText(normalized.quantityText).trim();
+  if (!normalizedQuantity) {
+    return `${normalized.normalizedName}:ambiguous:${itemId}:${index}`;
+  }
+
+  return `${normalized.normalizedName}:ambiguous:${normalizedQuantity}`;
+}
+
 export function buildWeeklyShoppingAggregation(
   items: WeeklyPlanItem[],
   recipeContentById: Record<string, RecipeContent>,
@@ -172,9 +185,7 @@ export function buildWeeklyShoppingAggregation(
       .filter((ingredient) => ingredient.indispensable || selectedKeys.size === 0 || selectedKeys.has(getIngredientKey(ingredient.name)))
       .map((ingredient) => normalizeIngredientLine(ingredient, item))
       .map((normalized, index) => {
-        const key = normalized.isAmbiguous
-          ? `${normalized.normalizedName}:${item.id}:${index}`
-          : `${normalized.normalizedName}:${normalized.canonicalUnit}:${normalized.unitFamily}`;
+        const key = getAggregationKey(normalized, item.id, index);
 
         const existing = totalizedMap.get(key);
         if (normalized.isAmbiguous || normalized.numericValue === null || !normalized.canonicalUnit) {

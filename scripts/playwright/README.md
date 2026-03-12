@@ -34,6 +34,35 @@ npm run dev -- --host 127.0.0.1 --port 4173
 ./scripts/playwright/automate_ai_recipe_flow.sh
 ```
 
+To force Microsoft Edge in mobile viewport:
+
+```bash
+./scripts/playwright/automate_ai_recipe_flow.sh --edge
+```
+
+Or use the direct Edge wrapper for manual flows:
+
+```bash
+./scripts/playwright/pw-edge-mobile.sh open http://127.0.0.1:4173/ --headed
+./scripts/playwright/pw-edge-mobile.sh snapshot
+```
+
+If you want to reuse an authenticated session, save state once:
+
+```bash
+./scripts/playwright/pw-edge-mobile.sh open http://127.0.0.1:4173/#/auth --headed
+# complete login in the opened browser
+./scripts/playwright/pw-edge-mobile.sh state-save output/playwright/auth/edge-mobile-state.json
+```
+
+Then reuse it in automations:
+
+```bash
+./scripts/playwright/automate_ai_recipe_flow.sh \
+  --edge \
+  --state-file output/playwright/auth/edge-mobile-state.json
+```
+
 3. Optional flags:
 
 ```bash
@@ -44,6 +73,8 @@ npm run dev -- --host 127.0.0.1 --port 4173
   --timeout 120 \
   --poll 2 \
   --artifacts-dir output/playwright/ai-recipe-workflow \
+  --edge \
+  --state-file output/playwright/auth/edge-mobile-state.json \
   --headed
 ```
 

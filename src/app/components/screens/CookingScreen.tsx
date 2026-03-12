@@ -212,7 +212,7 @@ export function CookingScreen({
         />
       </div>
 
-      <div className="relative z-20 flex h-[calc(100vh-6px)] overflow-hidden">
+      <div className="relative z-20 flex h-[calc(100dvh-6px)] overflow-hidden">
         <aside className="hidden w-72 shrink-0 flex-col border-r border-primary/10 bg-card/80 backdrop-blur-2xl lg:flex">
           <div className="border-b border-primary/10 p-7">
             <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Ingredientes</h3>
@@ -251,39 +251,39 @@ export function CookingScreen({
         </aside>
 
         <main className="relative flex flex-1 flex-col">
-          <header className="flex items-center justify-between px-8 py-6 lg:px-10 lg:py-8">
-            <div className="flex items-center gap-4">
+          <header className="flex flex-col gap-3 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-8">
+            <div className="flex items-center gap-3">
               <div>
-                <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-                  <span className="text-4xl leading-none lg:text-5xl">{recipeIcon}</span>
+                <h1 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+                  <span className="text-3xl leading-none lg:text-5xl">{recipeIcon}</span>
                   <span>{recipeName}</span>
                 </h1>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
               <button
                 onClick={onOpenIngredients}
-                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
               >
                 <ListChecks className="h-4 w-4" />
                 Ingredientes
               </button>
               <button
                 onClick={onOpenSetup}
-                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 Configurar
               </button>
               <button
                 onClick={onPlanRecipe}
-                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-4 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
               >
                 Planificar
               </button>
               <button
                 onClick={onChangeMission}
-                className="flex items-center gap-2 rounded-full border border-primary/15 bg-card/80 px-6 py-3 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
+                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reiniciar
@@ -291,21 +291,21 @@ export function CookingScreen({
             </div>
           </header>
 
-          <section className="flex flex-1 flex-col items-center justify-center px-4 text-center">
-            <div className="mb-6 inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-5 py-2 backdrop-blur-md">
+          <section className="flex flex-1 flex-col items-center justify-center px-4 text-center sm:px-5">
+            <div className="mb-5 inline-flex items-center rounded-full border border-primary/20 bg-primary/8 px-4 py-2 backdrop-blur-md">
               <span className="text-xs font-extrabold uppercase tracking-[0.15em] text-primary">
                 Subpaso {currentPosition} de {totalSubSteps}
               </span>
             </div>
 
-            <h2 className="mb-4 text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 lg:text-6xl">{currentTitle}</h2>
-            <p className="mb-8 max-w-lg text-lg font-medium leading-relaxed text-slate-600 dark:text-slate-400">{currentNotes}</p>
+            <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50 sm:text-4xl lg:text-6xl">{currentTitle}</h2>
+            <p className="mb-6 max-w-lg text-base font-medium leading-7 text-slate-600 dark:text-slate-400 sm:mb-8 sm:text-lg">{currentNotes}</p>
 
             {currentIsTimer ? (
               <div className="relative mb-10 flex items-center justify-center">
-                <div className="absolute h-72 w-72 rounded-full bg-primary/20 blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
+                <div className="absolute h-56 w-56 rounded-full bg-primary/20 blur-[80px] sm:h-72 sm:w-72 sm:blur-[100px] lg:h-96 lg:w-96 lg:blur-[120px]" />
                 <div className="relative">
-                  <div className="text-[6rem] font-extrabold leading-none tracking-tight text-primary drop-shadow-[0_0_40px_rgba(236,91,19,0.24)] lg:text-[9rem]">
+                  <div className="text-[4.4rem] font-extrabold leading-none tracking-tight text-primary drop-shadow-[0_0_40px_rgba(236,91,19,0.24)] sm:text-[6rem] lg:text-[9rem]">
                     {formatClock(timeRemaining)}
                   </div>
                   <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.45em] text-primary/80">
@@ -314,16 +314,16 @@ export function CookingScreen({
                 </div>
               </div>
             ) : hasPortionValue ? (
-              <div className="mb-10 w-full max-w-md rounded-3xl border border-primary/10 bg-card/80 p-6">
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">{String(portionValue)}</p>
+              <div className="mb-8 w-full max-w-md rounded-3xl border border-primary/10 bg-card/80 p-5">
+                <p className="text-2xl font-bold text-slate-900 dark:text-white sm:text-3xl">{String(portionValue)}</p>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Cantidad estimada</p>
               </div>
             ) : null}
 
-            <div className="relative z-20 mx-auto flex w-full max-w-sm gap-4">
+            <div className="relative z-20 mx-auto flex w-full max-w-sm gap-3">
               <button
                 onClick={handleQuickAction}
-                className={`flex flex-1 items-center justify-center gap-3 rounded-[2rem] border py-5 text-lg font-extrabold transition-all active:scale-95 ${
+                className={`flex flex-1 items-center justify-center gap-3 rounded-[1.5rem] border py-4 text-base font-extrabold transition-all active:scale-95 sm:rounded-[2rem] sm:py-5 sm:text-lg ${
                   currentIsTimer && isRunning
                     ? 'border-red-400/20 bg-red-500 text-white hover:bg-red-600'
                     : 'border-primary/20 bg-primary text-white shadow-[0_0_30px_rgba(236,91,19,0.22)] hover:bg-primary/92'
@@ -337,7 +337,7 @@ export function CookingScreen({
                 disabled={isLastSubStep}
                 title="Saltar subpaso"
                 aria-label="Saltar subpaso"
-                className="flex w-20 items-center justify-center rounded-[2rem] border border-primary/10 bg-card/80 text-slate-700 transition-all hover:bg-primary/8 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200"
+                className="flex w-18 items-center justify-center rounded-[1.5rem] border border-primary/10 bg-card/80 px-4 text-slate-700 transition-all hover:bg-primary/8 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 sm:w-20 sm:rounded-[2rem]"
               >
                 <ChevronsRight className="h-7 w-7" />
               </button>

@@ -236,8 +236,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
         return {
           source: 'local-dev',
           warning: 'Supabase devolvió recetas sin subpasos válidos. Usando catálogo local.',
-          recipes: defaultRecipes,
-          recipeContentById: initialRecipeContent,
+          recipes: localCatalog.defaultRecipes,
+          recipeContentById: localCatalog.initialRecipeContent,
         };
       }
 
@@ -250,8 +250,8 @@ export const supabaseCatalogRepository: CatalogRepository = {
       return {
         source: 'local-dev',
         warning: 'No se pudo sincronizar recetas con Supabase. Usando catálogo local.',
-        recipes: defaultRecipes,
-        recipeContentById: initialRecipeContent,
+        recipes: localCatalog.defaultRecipes,
+        recipeContentById: localCatalog.initialRecipeContent,
       };
     }
   },

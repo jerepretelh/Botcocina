@@ -50,6 +50,33 @@ const initialForm: SettingsFormState = {
   apiKeyInput: '',
 };
 
+const fallbackSettings: AIProviderSettings = {
+  provider: 'google_gemini',
+  authMode: 'platform_key',
+  googleModel: 'gemini-2.5-flash',
+  tokenBudgetMode: 'none',
+  monthlyTokenLimit: null,
+  budgetAmount: null,
+  isKeyConfigured: false,
+  keyLast4: null,
+  lastKeyCheckAt: null,
+  lastKeyCheckStatus: 'unknown',
+};
+
+const fallbackUsage: AIUsageSnapshot = {
+  provider: 'google_gemini',
+  model: 'gemini-2.5-flash',
+  budgetMode: 'none',
+  currentMonthTokens: 0,
+  currentMonthRequests: 0,
+  avgTokensPerRequest: 0,
+  lastRequestAt: null,
+  lastRequestTokens: 0,
+  remainingPercent: null,
+  budgetStatusText: 'Sin datos disponibles.',
+  recentRequests: [],
+};
+
 function statusTone(status: AIProviderSettings['lastKeyCheckStatus']): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'valid') return 'default';
   if (status === 'invalid') return 'destructive';
@@ -121,17 +148,21 @@ export function AISettingsScreen({
     void load();
   }, []);
 
-  const hasStoredKey = Boolean(settings?.isKeyConfigured);
+  const effectiveSettings = settings ?? fallbackSettings;
+  const effectiveUsage = usage ?? fallbackUsage;
+  const availableModels = supportedModels.length > 0 ? supportedModels : [effectiveSettings.googleModel];
+
+  const hasStoredKey = Boolean(effectiveSettings.isKeyConfigured);
   const remainingSummary = useMemo(() => {
-    if (!usage) return 'No disponible';
-    if (usage.budgetMode === 'app_limit') {
-      return formatPercent(usage.remainingPercent);
+    if (!effectiveUsage) return 'No disponible';
+    if (effectiveUsage.budgetMode === 'app_limit') {
+      return formatPercent(effectiveUsage.remainingPercent);
     }
-    if (usage.budgetMode === 'cloud_budget') {
+    if (effectiveUsage.budgetMode === 'cloud_budget') {
       return 'Pendiente de integración cloud';
     }
     return 'Sin límite configurado';
-  }, [usage]);
+  }, [effectiveUsage]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -238,8 +269,8 @@ export function AISettingsScreen({
             title="Configura tu proveedor y el consumo"
             description="Mantén la clave de la plataforma o conecta tu propia API key sin salir del lenguaje visual principal del producto."
             actions={
-              <Badge variant={statusTone(settings?.lastKeyCheckStatus ?? 'unknown')} className="capitalize">
-                Estado clave: {settings?.lastKeyCheckStatus ?? 'unknown'}
+              <Badge variant={statusTone(effectiveSettings.lastKeyCheckStatus)} className="capitalize">
+                Estado clave: {effectiveSettings.lastKeyCheckStatus}
               </Badge>
             }
           />
@@ -291,7 +322,7 @@ export function AISettingsScreen({
                       <SelectValue placeholder="Selecciona un modelo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {supportedModels.map((model) => (
+                      {availableModels.map((model) => (
                         <SelectItem key={model} value={model}>{model}</SelectItem>
                       ))}
                     </SelectContent>
@@ -306,7 +337,7 @@ export function AISettingsScreen({
                   type="password"
                   value={form.apiKeyInput}
                   onChange={(event) => setForm((prev) => ({ ...prev, apiKeyInput: event.target.value }))}
-                  placeholder={hasStoredKey ? `Clave guardada terminada en ${settings?.keyLast4 ?? '****'}` : 'Pega tu API key para validarla'}
+                  placeholder={hasStoredKey ? `Clave guardada terminada en ${effectiveSettings.keyLast4 ?? '****'}` : 'Pega tu API key para validarla'}
                   className="placeholder:text-slate-400"
                 />
                 <p className="text-sm text-slate-500">
@@ -384,28 +415,28 @@ export function AISettingsScreen({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Tokens este mes</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{usage?.currentMonthTokens ?? 0}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{effectiveUsage.currentMonthTokens}</p>
                 </div>
                 <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Promedio por request</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{usage?.avgTokensPerRequest ?? 0}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{effectiveUsage.avgTokensPerRequest}</p>
                 </div>
               </div>
 
               <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Restante / estado</p>
                 <p className="mt-2 text-xl font-semibold text-primary">{remainingSummary}</p>
-                <p className="mt-2 text-sm text-slate-400">{usage?.budgetStatusText ?? 'Sin datos disponibles.'}</p>
+                <p className="mt-2 text-sm text-slate-400">{effectiveUsage.budgetStatusText}</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Último request</p>
-                  <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{formatDate(usage?.lastRequestAt ?? null)}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{formatDate(effectiveUsage.lastRequestAt)}</p>
                 </div>
                 <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Últimos tokens</p>
-                  <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{usage?.lastRequestTokens ?? 0}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{effectiveUsage.lastRequestTokens}</p>
                 </div>
               </div>
 
@@ -415,15 +446,15 @@ export function AISettingsScreen({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Historial reciente</h3>
                   <Badge variant="outline" className="border-primary/10 text-slate-600 dark:text-slate-300">
-                    {usage?.currentMonthRequests ?? 0} requests exitosos
+                    {effectiveUsage.currentMonthRequests} requests exitosos
                   </Badge>
                 </div>
 
                 <div className="space-y-2">
-                  {(usage?.recentRequests ?? []).length === 0 && (
+                  {effectiveUsage.recentRequests.length === 0 && (
                     <p className="text-sm text-slate-500">Aún no hay consumo registrado.</p>
                   )}
-                  {(usage?.recentRequests ?? []).map((item) => (
+                  {effectiveUsage.recentRequests.map((item) => (
                     <div key={item.id} className="rounded-2xl border border-primary/10 bg-background/80 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <div>

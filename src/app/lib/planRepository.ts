@@ -130,6 +130,31 @@ export interface ShoppingTripItemInput {
   notes?: string | null;
 }
 
+function buildPlanSnapshotEquivalenceKey(input: {
+  dayOfWeek: number | null | undefined;
+  slot: WeeklyPlanSlot | null | undefined;
+  recipeId: string | null | undefined;
+  notes?: string | null;
+  configSnapshot: WeeklyPlanItemConfigSnapshot;
+}): string {
+  const selectedOptionalIngredients = [...(input.configSnapshot.selectedOptionalIngredients ?? [])].sort().join('|');
+  const summary = input.configSnapshot.sourceContextSummary ?? null;
+  return JSON.stringify({
+    dayOfWeek: input.dayOfWeek ?? null,
+    slot: input.slot ?? null,
+    recipeId: input.recipeId ?? null,
+    notes: input.notes?.trim() || null,
+    quantityMode: input.configSnapshot.quantityMode,
+    peopleCount: input.configSnapshot.peopleCount ?? null,
+    amountUnit: input.configSnapshot.amountUnit ?? null,
+    availableCount: input.configSnapshot.availableCount ?? null,
+    selectedOptionalIngredients,
+    resolvedPortion: input.configSnapshot.resolvedPortion,
+    scaleFactor: Number(input.configSnapshot.scaleFactor.toFixed(4)),
+    sourceSummary: summary ? JSON.stringify(summary) : null,
+  });
+}
+
 function parseMoney(value: number | string | null): number | null {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
@@ -316,8 +341,46 @@ export async function getWeeklyPlanItems(weeklyPlanId: string): Promise<WeeklyPl
 
 export async function saveWeeklyPlanItem(weeklyPlanId: string, input: WeeklyPlanItemInput): Promise<WeeklyPlanItem> {
   const client = ensureReady();
+  let resolvedId = input.id;
+
+  if (!resolvedId) {
+    const { data: existingRows, error: existingError } = await client
+      .from('weekly_plan_items')
+      .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+      .eq('weekly_plan_id', weeklyPlanId)
+      .eq('day_of_week', input.dayOfWeek ?? null)
+      .eq('slot', input.slot ?? null)
+      .eq('recipe_id', input.recipeId ?? null);
+
+    if (existingError) {
+      throw new Error(existingError.message || 'No se pudo verificar duplicados del plan semanal.');
+    }
+
+    const targetKey = buildPlanSnapshotEquivalenceKey({
+      dayOfWeek: input.dayOfWeek,
+      slot: input.slot,
+      recipeId: input.recipeId,
+      notes: input.notes,
+      configSnapshot: input.configSnapshot,
+    });
+
+    const matchedRow = ((existingRows ?? []) as DbWeeklyPlanItem[]).find((row) => {
+      const existingItem = mapPlanItem(row);
+      const existingKey = buildPlanSnapshotEquivalenceKey({
+        dayOfWeek: existingItem.dayOfWeek,
+        slot: existingItem.slot,
+        recipeId: existingItem.recipeId,
+        notes: existingItem.notes,
+        configSnapshot: existingItem.configSnapshot,
+      });
+      return existingKey === targetKey;
+    });
+
+    resolvedId = matchedRow?.id;
+  }
+
   const payload = {
-    id: input.id,
+    id: resolvedId,
     weekly_plan_id: weeklyPlanId,
     day_of_week: input.dayOfWeek ?? null,
     slot: input.slot ?? null,

@@ -9,6 +9,8 @@ fi
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 PWCLI_DEFAULT="$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh"
 PWCLI="${PWCLI:-$PWCLI_DEFAULT}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+EDGE_CONFIG_DEFAULT="$SCRIPT_DIR/playwright-cli.edge-mobile.json"
 
 if [[ ! -x "$PWCLI" ]]; then
   echo "Error: Playwright wrapper not found or not executable at: $PWCLI" >&2
@@ -22,6 +24,8 @@ TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-90}"
 POLL_SECONDS="${POLL_SECONDS:-3}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-output/playwright/ai-recipe-workflow}"
 HEADED=false
+USE_EDGE=false
+STATE_FILE="${PLAYWRIGHT_STATE_FILE:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -53,6 +57,14 @@ while [[ $# -gt 0 ]]; do
       HEADED=true
       shift
       ;;
+    --edge)
+      USE_EDGE=true
+      shift
+      ;;
+    --state-file)
+      STATE_FILE="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 1
@@ -63,7 +75,11 @@ done
 mkdir -p "$ARTIFACTS_DIR"
 
 run_pwcli() {
-  "$PWCLI" --session "$SESSION" "$@"
+  local args=(--session "$SESSION")
+  if [[ "$USE_EDGE" == true ]]; then
+    args+=(--config "$EDGE_CONFIG_DEFAULT")
+  fi
+  "$PWCLI" "${args[@]}" "$@"
 }
 
 latest_snapshot() {
@@ -98,6 +114,11 @@ if [[ "$HEADED" == true ]]; then
   open_args+=(--headed)
 fi
 run_pwcli "${open_args[@]}" | tee "$ARTIFACTS_DIR/01-open.log" >/dev/null
+
+if [[ -n "$STATE_FILE" && -f "$STATE_FILE" ]]; then
+  run_pwcli state-load "$STATE_FILE" | tee "$ARTIFACTS_DIR/01b-state-load.log" >/dev/null
+  run_pwcli goto "$URL" | tee "$ARTIFACTS_DIR/01c-goto-after-state.log" >/dev/null
+fi
 
 SNAPSHOT_1="$(snapshot_and_get_file "$ARTIFACTS_DIR/02-snapshot-initial.log")"
 cp "$SNAPSHOT_1" "$ARTIFACTS_DIR/02-initial.yml"

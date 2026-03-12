@@ -1,4 +1,4 @@
-import type { AIRecipeContextDraft, AIUsageMetadata, CookingEquipment } from '../../types';
+import type { AIRecipeContextDraft, AIUsageMetadata, ClarificationNumberIntent, CookingEquipment } from '../../types';
 import { authenticatedJsonFetch } from './authenticatedApi';
 
 export type FireLevel = 'low' | 'medium' | 'high';
@@ -63,6 +63,7 @@ export interface AIClarificationQuestion {
   presentationVariant?: 'cards' | 'stepper' | 'textarea';
   emoji?: string;
   section?: string;
+  numberIntent?: ClarificationNumberIntent;
 }
 
 export interface AIClarificationResult {

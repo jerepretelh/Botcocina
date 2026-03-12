@@ -1,5 +1,6 @@
 import type { SavedRecipeContextSummary, UserRecipeCookingConfig } from '../../types';
 import { isSupabaseEnabled, supabaseClient } from './supabaseClient';
+import { canUseUserRecipeConfigs, disableUserRecipeConfigsForSession } from './supabaseOptionalFeatures';
 
 type DbUserRecipeCookingConfig = {
   user_id: string;
@@ -14,6 +15,12 @@ type DbUserRecipeCookingConfig = {
   created_at: string;
   updated_at: string;
 };
+
+function isMissingTableError(error: { message?: string | null; code?: string | null; details?: string | null } | null | undefined): boolean {
+  if (!error) return false;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return error.code === 'PGRST205' || message.includes('could not find the table') || message.includes('relation') && message.includes('does not exist');
+}
 
 function ensureReady() {
   if (!isSupabaseEnabled || !supabaseClient) {
@@ -44,6 +51,9 @@ function mapRow(row: DbUserRecipeCookingConfig): UserRecipeCookingConfig {
 }
 
 export async function getUserRecipeCookingConfigs(userId: string): Promise<UserRecipeCookingConfig[]> {
+  if (!canUseUserRecipeConfigs()) {
+    return [];
+  }
   const client = ensureReady();
   const { data, error } = await client
     .from('user_recipe_cooking_configs')
@@ -52,6 +62,10 @@ export async function getUserRecipeCookingConfigs(userId: string): Promise<UserR
     .order('last_used_at', { ascending: false });
 
   if (error) {
+    if (isMissingTableError(error)) {
+      disableUserRecipeConfigsForSession();
+      return [];
+    }
     throw new Error(error.message || 'No se pudieron cargar las configuraciones de recetas.');
   }
 
@@ -59,7 +73,16 @@ export async function getUserRecipeCookingConfigs(userId: string): Promise<UserR
 }
 
 export async function upsertUserRecipeCookingConfig(config: Omit<UserRecipeCookingConfig, 'createdAt' | 'updatedAt'>): Promise<UserRecipeCookingConfig> {
+  if (!canUseUserRecipeConfigs()) {
+    const now = new Date().toISOString();
+    return {
+      ...config,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   const client = ensureReady();
+  const now = new Date().toISOString();
   const payload = {
     user_id: config.userId,
     recipe_id: config.recipeId,
@@ -70,7 +93,7 @@ export async function upsertUserRecipeCookingConfig(config: Omit<UserRecipeCooki
     selected_optional_ingredients: config.selectedOptionalIngredients,
     source_context_summary: config.sourceContextSummary,
     last_used_at: config.lastUsedAt,
-    updated_at: new Date().toISOString(),
+    updated_at: now,
   };
 
   const { data, error } = await client
@@ -80,6 +103,14 @@ export async function upsertUserRecipeCookingConfig(config: Omit<UserRecipeCooki
     .single();
 
   if (error || !data) {
+    if (isMissingTableError(error)) {
+      disableUserRecipeConfigsForSession();
+      return {
+        ...config,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }
     throw new Error(error?.message || 'No se pudo guardar la configuración de la receta.');
   }
 

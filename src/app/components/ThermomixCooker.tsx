@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Recipe, RecipeCategoryId, Screen, WeeklyPlanItem, WeeklyPlanItemConfigSnapshot } from '../../types';
 import { recipeCategories } from '../data/recipeCategories';
@@ -7,6 +7,7 @@ import {
   getIngredientKey,
   buildInitialIngredientSelection,
   clampNumber,
+  normalizeText,
   splitIngredientQuantity,
 } from '../utils/recipeHelpers';
 
@@ -23,6 +24,7 @@ import { useRecipeSeeds } from '../hooks/useRecipeSeeds';
 import { trackProductEvent } from '../lib/productEvents';
 import { buildSavedRecipeSummary, deriveRecipeSetupBehavior } from '../lib/recipeSetupBehavior';
 import { buildCookingSessionState } from '../lib/cookingSession';
+import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
 import { useThermomixTimer } from '../hooks/useThermomixTimer';
@@ -58,6 +60,49 @@ function ScreenFallback() {
 
 interface ThermomixCookerProps {
   auth: ReturnType<typeof useAuthSession>;
+}
+
+function dedupeRecipesById(recipes: Recipe[]): Recipe[] {
+  const byId = new Map<string, Recipe>();
+  for (const recipe of recipes) {
+    byId.set(recipe.id, recipe);
+  }
+  return [...byId.values()];
+}
+
+function buildRecipeSignature(recipe: Recipe, content?: { ingredients: Array<{ name: string }>; steps: Array<{ stepName: string; subSteps: Array<{ subStepName: string }> }> } | null): string {
+  const ingredientSignature = (content?.ingredients ?? [])
+    .map((ingredient) => getIngredientKey(ingredient.name))
+    .filter(Boolean)
+    .sort()
+    .join('|');
+  const stepSignature = (content?.steps ?? [])
+    .map((step) => normalizeText(`${step.stepName} ${step.subSteps.map((subStep) => subStep.subStepName).join(' ')}`))
+    .filter(Boolean)
+    .join('|');
+
+  return [recipe.ownerUserId ?? '', recipe.visibility ?? 'public', normalizeText(recipe.name), normalizeText(recipe.ingredient), ingredientSignature, stepSignature].join('::');
+}
+
+function dedupeRecipesBySignature(
+  recipes: Recipe[],
+  recipeContentById: Record<string, { ingredients: Array<{ name: string }>; steps: Array<{ stepName: string; subSteps: Array<{ subStepName: string }> }> }>,
+): Recipe[] {
+  const bySignature = new Map<string, Recipe>();
+  for (const recipe of recipes) {
+    const signature = buildRecipeSignature(recipe, recipeContentById[recipe.id]);
+    const existing = bySignature.get(signature);
+    if (!existing) {
+      bySignature.set(signature, recipe);
+      continue;
+    }
+    const existingUpdatedAt = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+    const nextUpdatedAt = recipe.updatedAt ? new Date(recipe.updatedAt).getTime() : 0;
+    if (nextUpdatedAt >= existingUpdatedAt) {
+      bySignature.set(signature, recipe);
+    }
+  }
+  return [...bySignature.values()];
 }
 
 export function ThermomixCooker({ auth }: ThermomixCookerProps) {
@@ -105,9 +150,14 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     limit: 48,
   });
   const appVersion = formatVersionLabel();
+  const uniqueAvailableRecipes = useMemo(
+    () => dedupeRecipesById(recipeSelection.availableRecipes),
+    [recipeSelection.availableRecipes],
+  );
 
   const aiRecipeGen = useAIRecipeGeneration({
     availableRecipes: recipeSelection.availableRecipes,
+    recipeContentById: recipeSelection.recipeContentById,
     setAvailableRecipes: recipeSelection.setAvailableRecipes,
     setRecipeContentById: recipeSelection.setRecipeContentById,
     setIngredientSelectionByRecipe: recipeSelection.setIngredientSelectionByRecipe,
@@ -154,7 +204,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     isRecipeFinished,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
 
-  const recipesForCurrentView = recipeSelection.availableRecipes.filter((recipe) => {
+  const recipesForCurrentView = uniqueAvailableRecipes.filter((recipe) => {
     if (userLists.catalogViewMode === 'platform') {
       return (recipe.visibility ?? 'public') === 'public';
     }
@@ -165,17 +215,23 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   });
 
   const visibleRecipesForCurrentView = recipeSelection.selectedCategory
-    ? recipesForCurrentView.filter((recipe) => recipe.categoryId === recipeSelection.selectedCategory)
+    ? recipesForCurrentView.filter((recipe) => matchesRecipeCategory(recipeSelection.selectedCategory, recipe.categoryId))
     : [];
-  const privateUserRecipes = recipeSelection.availableRecipes
+  const privateUserRecipes = dedupeRecipesBySignature(
+    uniqueAvailableRecipes
     .filter((recipe) => recipe.ownerUserId === auth.userId && (recipe.visibility ?? 'public') === 'private')
     .sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
       const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       return bTime - aTime;
-    });
+    }),
+    recipeSelection.recipeContentById,
+  );
   const recentPrivateRecipes = privateUserRecipes.slice(0, 4);
-  const favoriteRecipes = recipeSelection.availableRecipes.filter((recipe) => userFavorites.favoriteRecipeIds.has(recipe.id));
+  const favoriteRecipes = dedupeRecipesBySignature(
+    uniqueAvailableRecipes.filter((recipe) => userFavorites.favoriteRecipeIds.has(recipe.id)),
+    recipeSelection.recipeContentById,
+  );
   const selectedRecipeSavedConfig = recipeSelection.selectedRecipe
     ? userRecipeConfigs.configsByRecipeId[recipeSelection.selectedRecipe.id] ?? null
     : null;
@@ -185,6 +241,46 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     selectedRecipeSavedConfig,
   );
   const selectedRecipeSavedSummary = buildSavedRecipeSummary(selectedRecipeSavedConfig);
+
+  const hydrateRecipeSelection = (recipe: Recipe) => {
+    const content = recipeSelection.recipeContentById[recipe.id] ?? null;
+    const savedConfig = userRecipeConfigs.configsByRecipeId[recipe.id] ?? null;
+    const setupBehavior = deriveRecipeSetupBehavior(recipe, content, savedConfig);
+
+    if (content && !recipeSelection.ingredientSelectionByRecipe[recipe.id]) {
+      const baseSelection = buildInitialIngredientSelection(content.ingredients);
+      const optionalKeys = savedConfig?.selectedOptionalIngredients ?? null;
+      const hydratedSelection = optionalKeys
+        ? Object.fromEntries(
+          Object.entries(baseSelection).map(([key]) => {
+            const ingredient = content.ingredients.find((item) => getIngredientKey(item.name) === key);
+            if (ingredient?.indispensable) return [key, true];
+            return [key, optionalKeys.includes(key)];
+          }),
+        )
+        : baseSelection;
+      recipeSelection.setIngredientSelectionByRecipe((prev) => ({
+        ...prev,
+        [recipe.id]: hydratedSelection,
+      }));
+    }
+
+    recipeSelection.setSelectedRecipe(recipe);
+    recipeSelection.setSelectedCategory(recipe.categoryId);
+
+    if (savedConfig && (setupBehavior === 'saved_config_first' || setupBehavior === 'servings_or_quantity')) {
+      const shouldUseHave = setupBehavior !== 'servings_only' && savedConfig.quantityMode === 'have';
+      recipeSelection.setQuantityMode(shouldUseHave ? 'have' : 'people');
+      recipeSelection.setPeopleCount(savedConfig.peopleCount ?? 2);
+      recipeSelection.setAvailableCount(savedConfig.availableCount ?? 2);
+      recipeSelection.setAmountUnit(savedConfig.amountUnit ?? 'units');
+    } else {
+      recipeSelection.setQuantityMode('people');
+      recipeSelection.setPeopleCount(2);
+      recipeSelection.setAvailableCount(2);
+      recipeSelection.setAmountUnit('units');
+    }
+  };
 
   const handleCreateList = async () => {
     const name = window.prompt('Nombre de la nueva lista');
@@ -209,6 +305,14 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     if (!ok) return;
     await userLists.deleteUserList(userLists.activeListId);
   };
+
+  const closePlanSheet = () => {
+    setIsPlanSheetOpen(false);
+    setPlanningRecipe(null);
+    setEditingPlanItem(null);
+    setPlanningInitialSnapshot(null);
+  };
+
   const hasTrackedHomeRef = useRef(false);
   const previousCookingPositionRef = useRef<{ step: number; subStep: number } | null>(null);
   const previousScreenRef = useRef<Screen>(screen);
@@ -288,8 +392,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         return;
       }
 
-      recipeSelection.setSelectedRecipe(recipe);
-      recipeSelection.setSelectedCategory(recipe.categoryId);
+      hydrateRecipeSelection(recipe);
       const targetScreen: Screen =
         stage === 'configurar'
           ? 'recipe-setup'
@@ -302,7 +405,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
     routeSyncRef.current = false;
     navigate('/', { replace: true });
-  }, [location.pathname, recipeSelection.availableRecipes, recipeSelection.isSyncingCatalog]);
+  }, [location.pathname, recipeSelection.availableRecipes, recipeSelection.isSyncingCatalog, userRecipeConfigs.configsByRecipeId, recipeSelection.recipeContentById, recipeSelection.ingredientSelectionByRecipe]);
 
   useEffect(() => {
     if (routeSyncRef.current) {
@@ -394,6 +497,32 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeId: recipeSelection.selectedRecipe.id,
     });
   }, [auth.userId, isRecipeFinished, recipeSelection.selectedRecipe]);
+
+  useEffect(() => {
+    if (!isPlanSheetOpen) return;
+
+    const isFlowScreenCompatible =
+      screen === 'category-select' ||
+      screen === 'recipe-select' ||
+      screen === 'recipe-setup' ||
+      screen === 'my-recipes' ||
+      screen === 'favorites' ||
+      screen === 'weekly-plan';
+
+    if (!isFlowScreenCompatible) {
+      closePlanSheet();
+      return;
+    }
+
+    if (
+      planningRecipe &&
+      recipeSelection.selectedRecipe &&
+      recipeSelection.selectedRecipe.id !== planningRecipe.id &&
+      screen !== 'weekly-plan'
+    ) {
+      closePlanSheet();
+    }
+  }, [isPlanSheetOpen, planningRecipe, recipeSelection.selectedRecipe, screen]);
 
   // Computed state for UI
   const currentSubStepText = `${currentSubStep?.subStepName ?? ''} ${currentSubStep?.notes ?? ''}`.toLowerCase();
@@ -584,7 +713,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   const handleRecipeOpen = (recipe: Recipe) => {
     setActivePlannedRecipeItemId(null);
-    handlers.handleRecipeSelect(recipe);
+    hydrateRecipeSelection(recipe);
+    recipeSelection.setScreen('recipe-setup');
   };
 
   useThermomixTimer({
@@ -612,15 +742,15 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         initialSnapshot={planningInitialSnapshot ?? (planningRecipe ? weeklyPlan.getDefaultPlanSnapshot(planningRecipe) : null)}
         editingItem={editingPlanItem}
         onOpenChange={(open) => {
-          setIsPlanSheetOpen(open);
           if (!open) {
-            setPlanningRecipe(null);
-            setEditingPlanItem(null);
-            setPlanningInitialSnapshot(null);
+            closePlanSheet();
+            return;
           }
+          setIsPlanSheetOpen(true);
         }}
         onSave={async (input) => {
           await weeklyPlan.saveItem(input);
+          closePlanSheet();
         }}
       />
     </Suspense>
