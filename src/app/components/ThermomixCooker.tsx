@@ -141,6 +141,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const [editingPlanItem, setEditingPlanItem] = useState<WeeklyPlanItem | null>(null);
   const [planningInitialSnapshot, setPlanningInitialSnapshot] = useState<WeeklyPlanItemConfigSnapshot | null>(null);
   const [isPlanSheetOpen, setIsPlanSheetOpen] = useState(false);
+  const [planSheetSourceScreen, setPlanSheetSourceScreen] = useState<Screen | null>(null);
   const [activePlannedRecipeItemId, setActivePlannedRecipeItemId] = useState<string | null>(null);
   const [recipeSeedSearchTerm, setRecipeSeedSearchTerm] = useState('');
   const [recipeSeedCategoryFilter, setRecipeSeedCategoryFilter] = useState<RecipeCategoryId | null>(null);
@@ -311,6 +312,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setPlanningRecipe(null);
     setEditingPlanItem(null);
     setPlanningInitialSnapshot(null);
+    setPlanSheetSourceScreen(null);
   };
 
   const hasTrackedHomeRef = useRef(false);
@@ -340,7 +342,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('design-system');
       return;
     }
-    if (normalizedPath === '/ajustes/ia') {
+    if (normalizedPath === '/ajustes' || normalizedPath === '/ajustes/ia') {
       recipeSelection.setScreenDirect('ai-settings');
       return;
     }
@@ -424,7 +426,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         : screen === 'recipe-seed-search'
           ? '/buscar-recetas'
         : screen === 'ai-settings'
-          ? '/ajustes/ia'
+          ? '/ajustes'
         : screen === 'releases'
           ? '/releases'
         : screen === 'my-recipes'
@@ -439,11 +441,19 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           ? categoryId ? `/categorias/${categoryId}` : '/'
           : screen === 'ai-clarify'
             ? '/ia/aclarar'
-            : screen === 'recipe-setup'
-              ? recipeId ? `/recetas/${recipeId}/configurar` : '/'
-              : screen === 'ingredients'
-                ? recipeId ? `/recetas/${recipeId}/ingredientes` : '/'
-                : recipeId ? `/recetas/${recipeId}/cocinar` : '/';
+            : screen === 'recipe-setup' || screen === 'ingredients' || screen === 'cooking'
+              ? recipeId
+                ? screen === 'recipe-setup'
+                  ? `/recetas/${recipeId}/configurar`
+                  : screen === 'ingredients'
+                    ? `/recetas/${recipeId}/ingredientes`
+                    : `/recetas/${recipeId}/cocinar`
+                : null
+              : '/';
+
+    if (!targetPath) {
+      return;
+    }
 
     if (location.pathname !== targetPath) {
       navigate(targetPath);
@@ -501,15 +511,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   useEffect(() => {
     if (!isPlanSheetOpen) return;
 
-    const isFlowScreenCompatible =
-      screen === 'category-select' ||
-      screen === 'recipe-select' ||
-      screen === 'recipe-setup' ||
-      screen === 'my-recipes' ||
-      screen === 'favorites' ||
-      screen === 'weekly-plan';
-
-    if (!isFlowScreenCompatible) {
+    if (planSheetSourceScreen && screen !== planSheetSourceScreen) {
       closePlanSheet();
       return;
     }
@@ -522,7 +524,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     ) {
       closePlanSheet();
     }
-  }, [isPlanSheetOpen, planningRecipe, recipeSelection.selectedRecipe, screen]);
+  }, [isPlanSheetOpen, planSheetSourceScreen, planningRecipe, recipeSelection.selectedRecipe, screen]);
 
   // Computed state for UI
   const currentSubStepText = `${currentSubStep?.subStepName ?? ''} ${currentSubStep?.notes ?? ''}`.toLowerCase();
@@ -642,6 +644,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setPlanningRecipe(recipe);
     setEditingPlanItem(planItem);
     setPlanningInitialSnapshot(snapshotOverride);
+    setPlanSheetSourceScreen(screen);
     setIsPlanSheetOpen(true);
   };
 
