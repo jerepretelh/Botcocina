@@ -7,6 +7,7 @@ Frontend (Vite):
 - `VITE_SUPABASE_ENABLED=true`
 - `VITE_SUPABASE_URL=https://<project-ref>.supabase.co`
 - `VITE_SUPABASE_ANON_KEY=<anon-key>`
+- `VITE_FORCE_LOCAL_CATALOG=true` (opcional, para probar recetas locales sin leer catálogo remoto)
 
 Server/API (opcional para compat layer `/api/recipes`):
 

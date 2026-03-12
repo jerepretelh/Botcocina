@@ -1,4 +1,5 @@
 import type { Recipe, RecipeCategory, Ingredient as BaseIngredient, RecipeStep, RecipeContent } from '../../types/index.js';
+import { arrozLentejasFlow, pastaSalsaRapidaFlow } from './recipeFlows.js';
 
 export const recipes: Recipe[] = [
   {
@@ -18,6 +19,8 @@ export const recipes: Recipe[] = [
     emoji: '🥑',
     ingredient: 'Porciones',
     description: '4 subpasos · 10-15 min',
+    modelVersion: 2,
+    supportsAdaptiveCooking: true,
   },
   {
     id: 'lomo-saltado-casero',
@@ -92,6 +95,21 @@ export const recipes: Recipe[] = [
     icon: '🍛',
     ingredient: 'Porciones',
     description: 'Fases guiadas · 45-55 min',
+    modelVersion: 2,
+    flowId: arrozLentejasFlow.id,
+    supportsAdaptiveCooking: true,
+  },
+  {
+    id: 'pasta-salsa-rapida',
+    categoryId: 'almuerzos',
+    name: 'Pasta con salsa rápida',
+    icon: '🍝',
+    emoji: '🍝',
+    ingredient: 'Porciones',
+    description: 'Subreceta guiada · 20-30 min',
+    modelVersion: 2,
+    flowId: pastaSalsaRapidaFlow.id,
+    supportsAdaptiveCooking: true,
   },
   {
     id: 'huevo-frito',
@@ -1164,6 +1182,44 @@ export const airfryerCamoteRecipeData: RecipeStep[] = [
   },
 ];
 
+export const pastaSalsaRapidaIngredients: Ingredient[] = [
+  { name: 'Pasta seca', emoji: '🍝', indispensable: true, portions: { 1: '100 g', 2: '200 g', 4: '400 g' } },
+  { name: 'Tomate triturado', emoji: '🍅', indispensable: true, portions: { 1: '1 taza', 2: '2 tazas', 4: '4 tazas' } },
+  { name: 'Ajo', emoji: '🧄', indispensable: true, portions: { 1: '1 diente', 2: '2 dientes', 4: '4 dientes' } },
+  { name: 'Cebolla', emoji: '🧅', indispensable: false, portions: { 1: '1/4 unidad', 2: '1/2 unidad', 4: '1 unidad' } },
+  { name: 'Queso rallado o albahaca', emoji: '🧀', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+export const pastaSalsaRapidaRecipeData: RecipeStep[] = [
+  {
+    stepNumber: 1,
+    stepName: 'Base paralela',
+    fireLevel: 'high',
+    subSteps: [
+      { subStepName: 'Hervir agua para la pasta', notes: 'Agua abundante con sal.', portions: { 1: 360, 2: 420, 4: 540 }, isTimer: true },
+      { subStepName: 'Sofreír ajo y cebolla', notes: 'Calienta aceite y dora suave.', portions: { 1: 180, 2: 180, 4: 240 }, isTimer: true },
+    ],
+  },
+  {
+    stepNumber: 2,
+    stepName: 'Cocción',
+    fireLevel: 'medium',
+    subSteps: [
+      { subStepName: 'Cocer la pasta', notes: 'Hasta al dente.', portions: { 1: 480, 2: 540, 4: 660 }, isTimer: true },
+      { subStepName: 'Cocinar tomate triturado', notes: 'Reduce hasta que tome cuerpo.', portions: { 1: 420, 2: 480, 4: 600 }, isTimer: true },
+    ],
+  },
+  {
+    stepNumber: 3,
+    stepName: 'Final',
+    fireLevel: 'low',
+    subSteps: [
+      { subStepName: 'Mezclar pasta con salsa', notes: 'Escurre y mezcla caliente.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+      { subStepName: 'Agregar queso o albahaca', notes: 'Opcional antes de servir.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+    ],
+  },
+];
+
 export const initialRecipeContent: Record<string, RecipeContent> = {
   arroz: {
     ingredients: arrozIngredients,
@@ -1206,6 +1262,7 @@ export const initialRecipeContent: Record<string, RecipeContent> = {
     steps: arrozLentejasCompuestoRecipeData,
     tip: 'Empieza por lentejas y avanza el arroz en paralelo; al unir, controla siempre el nivel de líquido.',
     portionLabels: { singular: 'porción', plural: 'porciones' },
+    flowDefinition: arrozLentejasFlow,
   },
   'quinua-desayuno': {
     ingredients: quinuaDesayunoIngredients,
@@ -1218,6 +1275,13 @@ export const initialRecipeContent: Record<string, RecipeContent> = {
     steps: panPaltaHuevoRecipeData,
     tip: 'Para mejor textura, tuesta ligeramente el pan justo antes de montar.',
     portionLabels: { singular: 'porción', plural: 'porciones' },
+  },
+  'pasta-salsa-rapida': {
+    ingredients: pastaSalsaRapidaIngredients,
+    steps: pastaSalsaRapidaRecipeData,
+    tip: 'Hierve el agua y cocina la salsa en paralelo para llegar con todo caliente al final.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+    flowDefinition: pastaSalsaRapidaFlow,
   },
   'lomo-saltado-casero': {
     ingredients: lomoSaltadoIngredients,

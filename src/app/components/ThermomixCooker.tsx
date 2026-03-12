@@ -14,6 +14,7 @@ import {
 import { useRecipeSelection } from '../hooks/useRecipeSelection';
 import { usePortions } from '../hooks/usePortions';
 import { useCookingProgress } from '../hooks/useCookingProgress';
+import { useCookingProgressV2 } from '../hooks/useCookingProgressV2';
 import { useAIRecipeGeneration } from '../hooks/useAIRecipeGeneration';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useUserFavorites } from '../hooks/useUserFavorites';
@@ -39,6 +40,7 @@ import { formatVersionLabel } from '../lib/appMetadata';
 const APPROX_GRAMS_PER_UNIT = 250;
 const RecipeSetupScreen = lazy(() => import('./screens/RecipeSetupScreen').then((module) => ({ default: module.RecipeSetupScreen })));
 const CookingScreen = lazy(() => import('./screens/CookingScreen').then((module) => ({ default: module.CookingScreen })));
+const CookingScreenV2 = lazy(() => import('./screens/CookingScreenV2').then((module) => ({ default: module.CookingScreenV2 })));
 const AIClarifyScreen = lazy(() => import('./screens/AIClarifyScreen').then((module) => ({ default: module.AIClarifyScreen })));
 const DesignSystemScreen = lazy(() => import('./screens/DesignSystemScreen').then((module) => ({ default: module.DesignSystemScreen })));
 const AISettingsScreen = lazy(() => import('./screens/AISettingsScreen').then((module) => ({ default: module.AISettingsScreen })));
@@ -47,6 +49,7 @@ const WeeklyPlanScreen = lazy(() => import('./screens/WeeklyPlanScreen').then((m
 const ShoppingListScreen = lazy(() => import('./screens/ShoppingListScreen').then((module) => ({ default: module.ShoppingListScreen })));
 const ReleasesScreen = lazy(() => import('./screens/ReleasesScreen').then((module) => ({ default: module.ReleasesScreen })));
 const PlanRecipeSheet = lazy(() => import('./screens/PlanRecipeSheet').then((module) => ({ default: module.PlanRecipeSheet })));
+const TestRecipesScreen = lazy(() => import('./screens/TestRecipesScreen').then((module) => ({ default: module.TestRecipesScreen })));
 
 function ScreenFallback() {
   return (
@@ -125,6 +128,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const cookingProgress = useCookingProgress({
     selectedRecipe: recipeSelection.selectedRecipe,
     activeRecipeContentSteps: recipeSelection.activeRecipeContent.steps,
+    portion: recipeSelection.portion,
+    cloudUserId: auth.userId,
+  });
+  const cookingProgressV2 = useCookingProgressV2({
+    recipe: recipeSelection.selectedRecipe,
+    content: recipeSelection.selectedRecipe ? recipeSelection.activeRecipeContent : null,
     portion: recipeSelection.portion,
     cloudUserId: auth.userId,
   });
@@ -232,9 +241,11 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     uniqueAvailableRecipes.filter((recipe) => userFavorites.favoriteRecipeIds.has(recipe.id)),
     recipeSelection.recipeContentById,
   );
+  const testRecipes = uniqueAvailableRecipes.filter((recipe) => recipe.supportsAdaptiveCooking || recipe.modelVersion === 2);
   const selectedRecipeSavedConfig = recipeSelection.selectedRecipe
     ? userRecipeConfigs.configsByRecipeId[recipeSelection.selectedRecipe.id] ?? null
     : null;
+  const isAdaptiveRecipe = (recipeSelection.selectedRecipe?.modelVersion ?? 1) === 2;
   const selectedRecipeSetupBehavior = deriveRecipeSetupBehavior(
     recipeSelection.selectedRecipe,
     recipeSelection.activeRecipeContent,
@@ -352,6 +363,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('my-recipes');
       return;
     }
+    if (normalizedPath === '/recetas-prueba') {
+      recipeSelection.setScreenDirect('test-recipes');
+      return;
+    }
     if (normalizedPath === '/favoritos') {
       recipeSelection.setScreenDirect('favorites');
       return;
@@ -429,6 +444,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           ? '/releases'
         : screen === 'my-recipes'
           ? '/mis-recetas'
+        : screen === 'test-recipes'
+          ? '/recetas-prueba'
         : screen === 'favorites'
           ? '/favoritos'
         : screen === 'weekly-plan'
@@ -467,14 +484,15 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     if (screen === 'cooking' && prev !== 'cooking' && recipeSelection.selectedRecipe) {
       void trackProductEvent(auth.userId, 'recipe_start', {
         recipeId: recipeSelection.selectedRecipe.id,
+        cookingMode: isAdaptiveRecipe ? 'adaptive' : 'linear',
       });
       previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
     }
     previousScreenRef.current = screen;
-  }, [screen, auth.userId, recipeSelection.selectedRecipe, currentStepIndex, currentSubStepIndex]);
+  }, [screen, auth.userId, recipeSelection.selectedRecipe, currentStepIndex, currentSubStepIndex, isAdaptiveRecipe]);
 
   useEffect(() => {
-    if (!auth.userId || screen !== 'cooking' || !recipeSelection.selectedRecipe) return;
+    if (!auth.userId || screen !== 'cooking' || !recipeSelection.selectedRecipe || isAdaptiveRecipe) return;
     const previous = previousCookingPositionRef.current;
     if (!previous) {
       previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
@@ -489,14 +507,15 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       });
       previousCookingPositionRef.current = { step: currentStepIndex, subStep: currentSubStepIndex };
     }
-  }, [screen, currentStepIndex, currentSubStepIndex, auth.userId, recipeSelection.selectedRecipe]);
+  }, [screen, currentStepIndex, currentSubStepIndex, auth.userId, recipeSelection.selectedRecipe, isAdaptiveRecipe]);
 
   useEffect(() => {
-    if (!auth.userId || !isRecipeFinished || !recipeSelection.selectedRecipe) return;
+    const completed = isAdaptiveRecipe ? cookingProgressV2.isFinished : isRecipeFinished;
+    if (!auth.userId || !completed || !recipeSelection.selectedRecipe) return;
     void trackProductEvent(auth.userId, 'recipe_complete', {
       recipeId: recipeSelection.selectedRecipe.id,
     });
-  }, [auth.userId, isRecipeFinished, recipeSelection.selectedRecipe]);
+  }, [auth.userId, isRecipeFinished, cookingProgressV2.isFinished, recipeSelection.selectedRecipe, isAdaptiveRecipe]);
 
   useEffect(() => {
     if (!isPlanSheetOpen) return;
@@ -507,7 +526,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       screen === 'recipe-setup' ||
       screen === 'my-recipes' ||
       screen === 'favorites' ||
-      screen === 'weekly-plan';
+      screen === 'weekly-plan' ||
+      screen === 'test-recipes';
 
     if (!isFlowScreenCompatible) {
       closePlanSheet();
@@ -518,7 +538,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       planningRecipe &&
       recipeSelection.selectedRecipe &&
       recipeSelection.selectedRecipe.id !== planningRecipe.id &&
-      screen !== 'weekly-plan'
+      screen !== 'weekly-plan' &&
+      screen !== 'test-recipes'
     ) {
       closePlanSheet();
     }
@@ -779,6 +800,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onRecipeOpen={handleRecipeOpen}
           onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
           onOpenMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onOpenTestRecipes={() => recipeSelection.setScreen('test-recipes')}
           onOpenFavorites={() => recipeSelection.setScreen('favorites')}
           onOpenWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
           onOpenShoppingList={() => recipeSelection.setScreen('shopping-list')}
@@ -888,6 +910,25 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         />
         {planRecipeSheet}
       </>
+    );
+  }
+
+  if (screen === 'test-recipes') {
+    return (
+      <Suspense fallback={<ScreenFallback />}>
+        <TestRecipesScreen
+          currentUserEmail={auth.user?.email ?? null}
+          recipes={testRecipes}
+          onRecipeOpen={handleRecipeOpen}
+          onGoHome={() => recipeSelection.setScreen('category-select')}
+          onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+          onGoFavorites={() => recipeSelection.setScreen('favorites')}
+          onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+          onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+          onSignOut={() => void auth.signOut()}
+        />
+      </Suspense>
     );
   }
 
@@ -1138,9 +1179,50 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         batchUsageTips={portions.batchUsageTips}
         currentTip={recipeSelection.activeRecipeContent.tip}
         onBack={() => recipeSelection.goBackScreen(recipeSelection.ingredientsBackScreen)}
-        onStartCooking={handlers.handleStartCooking}
+        onStartCooking={() => {
+          if (isAdaptiveRecipe) {
+            recipeSelection.setScreen('cooking');
+            return;
+          }
+          handlers.handleStartCooking();
+        }}
         currentRecipeData={recipeSelection.activeRecipeContent.steps}
       />
+    );
+  }
+
+  if (isAdaptiveRecipe) {
+    return (
+      <>
+        <Suspense fallback={<ScreenFallback />}>
+          <CookingScreenV2
+            recipe={recipeSelection.selectedRecipe}
+            session={cookingProgressV2.session}
+            primaryAction={cookingProgressV2.primaryAction}
+            secondarySummary={cookingProgressV2.secondarySummary}
+            recommendedTask={cookingProgressV2.recommendedTask}
+            recommendationReason={cookingProgressV2.recommendationReason}
+            readyTasks={cookingProgressV2.readyTasks}
+            blockedTasks={cookingProgressV2.blockedTasks}
+            activeTasks={cookingProgressV2.activeTasks}
+            completedTasks={cookingProgressV2.completedTasks}
+            busyResources={cookingProgressV2.busyResources}
+            availableResources={cookingProgressV2.availableResources}
+            activeTimers={cookingProgressV2.activeTimers}
+            nextMilestone={cookingProgressV2.nextMilestone}
+            warning={cookingProgressV2.warning}
+            onChangeMission={handlers.handleChangeMission}
+            onOpenIngredients={handlers.handleOpenIngredientsFromCooking}
+            onOpenSetup={handlers.handleOpenSetupFromCooking}
+            onStartTask={cookingProgressV2.startTask}
+            onCompleteTask={cookingProgressV2.completeTask}
+            onSkipTask={cookingProgressV2.skipTask}
+            onToggleTimerPause={cookingProgressV2.toggleTimerPause}
+            onReset={cookingProgressV2.resetSession}
+          />
+        </Suspense>
+        {planRecipeSheet}
+      </>
     );
   }
 

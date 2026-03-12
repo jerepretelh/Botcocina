@@ -1,4 +1,4 @@
-export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
+export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'test-recipes';
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
@@ -27,6 +27,7 @@ export type ClarificationNumberMode = 'people' | 'quantity';
 export type ClarificationQuantityUnit = 'units' | 'grams';
 export type ClarificationNumberIntent = 'servings' | 'ingredient_base';
 export type CookingEquipment = 'stove' | 'airfryer' | 'oven';
+export type RecipeModelVersion = 1 | 2;
 export type CatalogSource = 'supabase' | 'local-dev';
 export type CatalogViewMode = 'platform' | 'my-lists' | 'all';
 export type AIProvider = 'google_gemini' | 'openai';
@@ -271,6 +272,9 @@ export interface Recipe {
     visibility?: 'public' | 'private';
     createdAt?: string;
     updatedAt?: string;
+    modelVersion?: RecipeModelVersion;
+    flowId?: string;
+    supportsAdaptiveCooking?: boolean;
 }
 
 export interface UserRecipeList {
@@ -335,6 +339,170 @@ export interface RecipeContent {
         singular: string;
         plural: string;
     };
+    flowDefinition?: RecipeFlowDefinition | null;
+}
+
+export type FlowNodeKind = 'sequence' | 'parallel' | 'task' | 'subrecipe' | 'sync';
+export type FlowTaskKind = 'prep' | 'cook' | 'wait' | 'assemble' | 'finish';
+export type FlowDependencyType = 'finish_to_start';
+export type FlowSyncPolicy = 'wait_all' | 'wait_any';
+export type FlowResourceMode = 'exclusive' | 'shared';
+export type TaskRuntimeStatus = 'pending' | 'ready' | 'active' | 'completed' | 'skipped';
+
+export interface FlowResource {
+    id: string;
+    label: string;
+    kind: string;
+    capacity: number;
+}
+
+export interface FlowResourceClaim {
+    resourceId: string;
+    mode: FlowResourceMode;
+    units?: number;
+    retainDuringTimer?: boolean;
+}
+
+export interface FlowOptionalPolicy {
+    defaultEnabled: boolean;
+    skipLabel?: string;
+}
+
+export interface FlowTaskNode {
+    type: 'task';
+    id: string;
+    title: string;
+    instructions: string;
+    taskKind?: FlowTaskKind;
+    estimatedDurationSec?: number | null;
+    activeDurationSec?: number | null;
+    timerSeconds?: Partial<Record<Portion, number>>;
+    usesTimer?: boolean;
+    handsOn?: boolean;
+    produces?: string[];
+    resourceClaims?: FlowResourceClaim[];
+    optional?: FlowOptionalPolicy;
+}
+
+export interface FlowSequenceNode {
+    type: 'sequence';
+    id: string;
+    title: string;
+    children: FlowStageNode[];
+}
+
+export interface FlowParallelNode {
+    type: 'parallel';
+    id: string;
+    title: string;
+    children: FlowStageNode[];
+}
+
+export interface FlowSubrecipeNode {
+    type: 'subrecipe';
+    id: string;
+    title: string;
+    recipeName: string;
+    outputLabel?: string;
+    root: FlowStageNode;
+}
+
+export interface FlowSyncNode {
+    type: 'sync';
+    id: string;
+    title: string;
+    policy?: FlowSyncPolicy;
+}
+
+export type FlowStageNode =
+    | FlowTaskNode
+    | FlowSequenceNode
+    | FlowParallelNode
+    | FlowSubrecipeNode
+    | FlowSyncNode;
+
+export interface FlowDependency {
+    fromTaskId: string;
+    toTaskId: string;
+    type: FlowDependencyType;
+}
+
+export interface RecipeFlowDefinition {
+    id: string;
+    version: number;
+    root: FlowStageNode;
+    resources?: FlowResource[];
+}
+
+export interface ExecutionTask {
+    id: string;
+    title: string;
+    instructions: string;
+    order: number;
+    taskKind: FlowTaskKind | 'sync';
+    estimatedDurationSec: number | null;
+    timerSecondsByPortion?: Partial<Record<Portion, number>>;
+    usesTimer: boolean;
+    handsOn: boolean;
+    optional?: FlowOptionalPolicy;
+    resourceClaims: FlowResourceClaim[];
+    joinDependencyCount?: number;
+    metadata?: {
+        sourceNodeId?: string;
+        stageTitle?: string;
+        outputLabel?: string;
+    };
+}
+
+export interface ExecutionEdge {
+    fromTaskId: string;
+    toTaskId: string;
+    type: FlowDependencyType;
+}
+
+export interface ExecutionPlan {
+    id: string;
+    recipeId: string;
+    modelVersion: RecipeModelVersion;
+    tasks: ExecutionTask[];
+    edges: ExecutionEdge[];
+    resources: FlowResource[];
+}
+
+export interface TimerRuntimeState {
+    taskId: string;
+    startedAt: string;
+    endsAt: string;
+    remainingSec: number;
+    paused: boolean;
+}
+
+export interface ResourceLockState {
+    resourceId: string;
+    taskId: string;
+    mode: FlowResourceMode;
+    units: number;
+    lockedAt: string;
+}
+
+export interface TaskRuntimeState {
+    taskId: string;
+    status: TaskRuntimeStatus;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    skippedAt?: string | null;
+}
+
+export interface CookingSessionV2 {
+    sessionId: string;
+    recipeId: string;
+    sessionVersion: 2;
+    plan: ExecutionPlan;
+    tasks: Record<string, TaskRuntimeState>;
+    activeTimers: Record<string, TimerRuntimeState>;
+    resourceLocks: Record<string, ResourceLockState>;
+    recommendedTaskId: string | null;
+    updatedAt: string;
 }
 
 export interface StepLoopState {

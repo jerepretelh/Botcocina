@@ -20,6 +20,7 @@ interface CategorySelectScreenProps {
   onRecipeOpen: (recipe: Recipe) => void;
   onToggleFavorite: (recipeId: string) => void;
   onOpenMyRecipes: () => void;
+  onOpenTestRecipes: () => void;
   onOpenFavorites: () => void;
   onOpenWeeklyPlan: () => void;
   onOpenShoppingList: () => void;
@@ -47,6 +48,7 @@ export function CategorySelectScreen({
   onRecipeOpen,
   onToggleFavorite,
   onOpenMyRecipes,
+  onOpenTestRecipes,
   onOpenFavorites,
   onOpenWeeklyPlan,
   onOpenShoppingList,
@@ -125,6 +127,24 @@ export function CategorySelectScreen({
                   className="shrink-0 rounded-full border border-primary/20 bg-white px-5 py-3 text-sm font-bold text-primary transition-colors active:scale-[0.98] dark:bg-background"
                 >
                   Buscar recetas
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 w-full rounded-[1.5rem] border border-primary/10 bg-card/80 p-4 text-left shadow-sm md:max-w-2xl md:rounded-[1.75rem]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Pruebas V2</p>
+                  <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-slate-100 md:text-lg">Abre el módulo de recetas compuestas</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Entra directo a las recetas pensadas para validar el cooking adaptativo sin buscarlas por categoría.
+                  </p>
+                </div>
+                <button
+                  onClick={onOpenTestRecipes}
+                  className="shrink-0 rounded-full border border-primary/20 bg-white px-5 py-3 text-sm font-bold text-primary transition-colors active:scale-[0.98] dark:bg-background"
+                >
+                  Ver recetas de prueba
                 </button>
               </div>
             </div>

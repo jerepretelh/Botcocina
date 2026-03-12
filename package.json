@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "test:recipe-orchestration": "tsx --test src/app/lib/recipeOrchestration.test.ts",
     "typecheck:vercel-api": "tsc -p tsconfig.api.json --noEmit",
     "catalog:validate": "tsx scripts/validate_catalog.ts",
     "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",

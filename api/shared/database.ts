@@ -187,6 +187,45 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      user_recipe_progress_v2: {
+        Row: {
+          user_id: string
+          recipe_id: string
+          session_version: number
+          plan_snapshot: Json
+          runtime_state: Json
+          active_timers: Json
+          resource_locks: Json
+          recommended_task_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          recipe_id: string
+          session_version?: number
+          plan_snapshot: Json
+          runtime_state: Json
+          active_timers?: Json
+          resource_locks?: Json
+          recommended_task_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          recipe_id?: string
+          session_version?: number
+          plan_snapshot?: Json
+          runtime_state?: Json
+          active_timers?: Json
+          resource_locks?: Json
+          recommended_task_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       weekly_plan_items: {
         Row: {
           id: string
