@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, LoaderCircle, Minus, Plus, Sparkles, WandSparkles, X } from 'lucide-react';
 import { AIRecipeContextDraft, AIWizardStep, ClarificationNumberMode, ClarificationQuantityUnit, RecipeSeed } from '../../../types';
 import { AIClarificationQuestion } from '../../lib/recipeAI';
+import { inferClarificationNumberIntent } from '../../utils/recipeHelpers';
 
 interface AIClarifyScreenProps {
     contextDraft: AIRecipeContextDraft;
@@ -164,7 +165,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
     return (
         <div className="min-h-screen bg-background text-foreground">
             <header className="sticky top-0 z-20 border-b border-primary/10 bg-background/85 backdrop-blur-md">
-                <div className="mx-auto flex max-w-md items-center justify-between px-4 py-4">
+                <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
                     <button
                         onClick={onBack}
                         className="flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-primary/10"
@@ -175,7 +176,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                         <span className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
                             Paso {displayStep} de 3
                         </span>
-                        <h2 className="text-sm font-bold">
+                        <h2 className="text-xs font-bold sm:text-sm">
                             {displayStep === 1 ? 'Contexto' : displayStep === 2 ? 'Refinamiento' : 'Generando'}
                         </h2>
                     </div>
@@ -186,18 +187,18 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                 </div>
             </header>
 
-            <main className="mx-auto max-w-md px-4 pb-32 pt-5">
+            <main className="mx-auto max-w-md px-4 pb-32 pt-4">
                 {wizardStep === 'context' && (
                     <div className="space-y-6">
                         <section>
-                            <h1 className="text-3xl font-extrabold leading-tight">🥣 ¡Vamos a cocinar!</h1>
+                            <h1 className="text-[2rem] font-extrabold leading-tight sm:text-3xl">🥣 ¡Vamos a cocinar!</h1>
                             <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                                 Cuéntanos qué quieres resolver con la IA. Puedes añadir comensales o ingredientes si te ayuda a orientar mejor la receta.
                             </p>
                         </section>
 
                         {selectedSeed && (
-                            <section className="rounded-[1.5rem] border border-primary/20 bg-primary/10 p-4">
+                            <section className="rounded-[1.35rem] border border-primary/20 bg-primary/10 p-4">
                                 <div className="flex items-center gap-3">
                                     <span className="text-2xl">🍽️</span>
                                     <div>
@@ -212,15 +213,15 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                         )}
 
                         <section>
-                            <div className="mb-3 flex items-center gap-2">
-                                <span className="text-xl">💡</span>
-                                <label className="text-lg font-bold">¿Qué vamos a cocinar hoy?</label>
-                            </div>
+                                <div className="mb-3 flex items-center gap-2">
+                                    <span className="text-xl">💡</span>
+                                <label className="text-base font-bold sm:text-lg">¿Qué vamos a cocinar hoy?</label>
+                                </div>
                             <textarea
                                 value={contextDraft.prompt}
                                 onChange={(event) => onContextPromptChange(event.target.value)}
                                 placeholder="Describe tu idea... Ej: una cena rápida con pollo, pasta cremosa para 3 personas o un almuerzo con lo que tengo en la refri."
-                                className="min-h-[160px] w-full rounded-[1.5rem] border-2 border-primary/20 bg-white p-4 text-base text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-primary/5 dark:text-slate-100 dark:placeholder:text-slate-500"
+                                className="min-h-[150px] w-full rounded-[1.35rem] border-2 border-primary/20 bg-white p-4 text-base text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-primary/5 dark:text-slate-100 dark:placeholder:text-slate-500"
                             />
                         </section>
 
@@ -252,11 +253,11 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                             </section>
                         )}
 
-                        <section className="rounded-3xl border border-primary/20 bg-primary/5 p-5">
+                        <section className="rounded-[1.5rem] border border-primary/20 bg-primary/5 p-4">
                             <div className="mb-4 flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xl">👥</span>
-                                    <h3 className="text-lg font-bold">¿Para cuántas personas?</h3>
+                                    <h3 className="text-base font-bold sm:text-lg">¿Para cuántas personas?</h3>
                                 </div>
                                 <button
                                     type="button"
@@ -275,24 +276,24 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                 </button>
                             </div>
 
-                            <div className={`flex items-center justify-between rounded-[1.5rem] border border-primary/20 bg-white px-4 py-4 shadow-sm transition-opacity dark:bg-background ${isServingsEnabled ? 'opacity-100' : 'opacity-55'}`}>
+                            <div className={`flex items-center justify-between rounded-[1.35rem] border border-primary/20 bg-white px-3 py-4 shadow-sm transition-opacity dark:bg-background ${isServingsEnabled ? 'opacity-100' : 'opacity-55'}`}>
                                 <button
                                     type="button"
                                     disabled={!isServingsEnabled}
                                     onClick={() => onContextServingsChange(Math.max(1, servingsValue - 1))}
-                                    className="flex size-14 items-center justify-center rounded-full border-2 border-primary/30 bg-white text-primary transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-background"
+                                    className="flex size-12 items-center justify-center rounded-full border-2 border-primary/30 bg-white text-primary transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-background sm:size-14"
                                 >
                                     <Minus className="size-6" />
                                 </button>
                                 <div className="flex flex-col items-center">
-                                    <span className="text-4xl font-black text-primary">{servingsValue}</span>
+                                    <span className="text-3xl font-black text-primary sm:text-4xl">{servingsValue}</span>
                                     <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Comensales</span>
                                 </div>
                                 <button
                                     type="button"
                                     disabled={!isServingsEnabled}
                                     onClick={() => onContextServingsChange(Math.min(20, servingsValue + 1))}
-                                    className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                                    className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:size-14"
                                 >
                                     <Plus className="size-6" />
                                 </button>
@@ -354,7 +355,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                 ) : null}
 
                                 <section>
-                                    <h1 className="text-3xl font-extrabold leading-tight">✨ Afinemos la receta</h1>
+                                    <h1 className="text-[2rem] font-extrabold leading-tight sm:text-3xl">✨ Afinemos la receta</h1>
                                     <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
                                         La IA necesita confirmar algunos detalles para generar una receta más precisa y útil para tu cocina. Si algo falla, tus respuestas quedarán listas para reintentar.
                                     </p>
@@ -367,7 +368,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                                 <span className="rounded-md bg-primary/20 px-2 py-1 text-sm font-bold text-primary">
                                                     {String(index + 1).padStart(2, '0')}
                                                 </span>
-                                                <h4 className="text-lg font-bold">{question.question}</h4>
+                                                <h4 className="text-base font-bold sm:text-lg">{question.question}</h4>
                                             </div>
 
                                             {question.type === 'single_choice' && (
@@ -379,7 +380,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                                                 key={option}
                                                                 type="button"
                                                                 onClick={() => onAnswerChange(question.id, option)}
-                                                                className={`flex items-center gap-4 rounded-[1.25rem] border-2 p-4 text-left transition-all ${selected ? 'border-primary bg-primary/8' : 'border-primary/10 bg-white/70 hover:border-primary/35 dark:bg-white/5'}`}
+                                                                className={`flex items-center gap-3 rounded-[1.15rem] border-2 p-3.5 text-left transition-all ${selected ? 'border-primary bg-primary/8' : 'border-primary/10 bg-white/70 hover:border-primary/35 dark:bg-white/5'}`}
                                                             >
                                                                 <div className={`flex size-6 items-center justify-center rounded-full border-2 ${selected ? 'border-primary bg-primary' : 'border-primary/30'}`}>
                                                                     <div className="size-2 rounded-full bg-white" />
@@ -394,46 +395,48 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                             )}
 
                                             {question.type === 'number' && (
-                                                <div className="space-y-4 rounded-[1.5rem] border border-primary/20 bg-primary/5 p-4">
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => onNumberModeChange(question.id, 'people')}
-                                                            className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'people' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
-                                                        >
-                                                            Por personas
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => onNumberModeChange(question.id, 'quantity')}
-                                                            className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'quantity' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
-                                                        >
-                                                            Por cantidad
-                                                        </button>
-                                                    </div>
+                                                <div className="space-y-4 rounded-[1.35rem] border border-primary/20 bg-primary/5 p-4">
+                                                    {inferClarificationNumberIntent(question) === 'ingredient_base' && (
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => onNumberModeChange(question.id, 'people')}
+                                                                className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'people' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
+                                                            >
+                                                                Por personas
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => onNumberModeChange(question.id, 'quantity')}
+                                                                className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'quantity' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
+                                                            >
+                                                                Por cantidad
+                                                            </button>
+                                                        </div>
+                                                    )}
 
-                                                    <div className="flex items-center justify-between rounded-[1.25rem] bg-white px-4 py-4 dark:bg-background">
+                                                    <div className="flex items-center justify-between rounded-[1.15rem] bg-white px-3 py-4 dark:bg-background">
                                                         <button
                                                             type="button"
                                                             onClick={() => onAnswerChange(question.id, Math.max(question.min ?? 1, Number(answers[question.id] ?? question.min ?? 1) - (question.step ?? 1)))}
-                                                            className="flex size-12 items-center justify-center rounded-full border border-primary/30 text-primary"
+                                                            className="flex size-11 items-center justify-center rounded-full border border-primary/30 text-primary sm:size-12"
                                                         >
                                                             <Minus className="size-5" />
                                                         </button>
                                                         <div className="text-center">
-                                                            <div className="text-4xl font-black text-primary">{answers[question.id]}</div>
+                                                            <div className="text-3xl font-black text-primary sm:text-4xl">{answers[question.id]}</div>
                                                             <div className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{resolveUnit(question)}</div>
                                                         </div>
                                                         <button
                                                             type="button"
                                                             onClick={() => onAnswerChange(question.id, Math.min(question.max ?? 20, Number(answers[question.id] ?? question.min ?? 1) + (question.step ?? 1)))}
-                                                            className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                                                            className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground sm:size-12"
                                                         >
                                                             <Plus className="size-5" />
                                                         </button>
                                                     </div>
 
-                                                    {numberModes[question.id] === 'quantity' && (
+                                                    {inferClarificationNumberIntent(question) === 'ingredient_base' && numberModes[question.id] === 'quantity' && (
                                                         <div className="flex justify-center">
                                                             <div className="inline-flex rounded-full bg-white p-1 dark:bg-background">
                                                                 <button
@@ -514,7 +517,7 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                 )}
             </main>
 
-            <div className="fixed inset-x-0 bottom-0 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent p-4 backdrop-blur-xl">
+            <div className="fixed inset-x-0 bottom-0 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-4 pt-3 backdrop-blur-xl">
                 <div className="mx-auto max-w-md">
                     {wizardStep === 'context' ? (
                         <button

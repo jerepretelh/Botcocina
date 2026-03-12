@@ -71,35 +71,35 @@ export function RecipeSetupScreen({
 
     return (
         <ProductPage>
-            <ProductContainer className="max-w-3xl">
+            <ProductContainer className="max-w-md sm:max-w-lg md:max-w-3xl">
                 <ProductHeader
                     eyebrow="Configuración"
                     title={selectedRecipe?.name || 'Tu receta'}
-                    description="Ajusta la base de cocción antes de pasar al checklist de ingredientes."
+                    description="Ajusta solo lo necesario antes de pasar al checklist de ingredientes."
                     onBack={onBackToRecipeSelect}
                     actions={onPlanRecipe ? (
                         <button
                             type="button"
                             onClick={onPlanRecipe}
-                            className="rounded-full border border-primary/20 bg-card/80 px-4 py-3 text-sm font-bold text-primary transition-colors hover:bg-primary/8"
+                    className="rounded-full border border-primary/20 bg-card/80 px-4 py-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/8"
                         >
                             Planificar
                         </button>
                     ) : undefined}
                 />
 
-                <ProductSurface className="p-6 md:p-8">
-                    <div className="flex flex-col items-center border-b border-primary/10 pb-8 text-center">
-                        <div className="mb-4 flex size-20 items-center justify-center rounded-[1.5rem] bg-primary/10 text-4xl shadow-sm">
+                <ProductSurface className="p-4 sm:p-6 md:p-8">
+                    <div className="flex flex-col items-center border-b border-primary/10 pb-6 text-center sm:pb-8">
+                        <div className="mb-4 flex size-16 items-center justify-center rounded-[1.35rem] bg-primary/10 text-3xl shadow-sm sm:size-20 sm:text-4xl">
                             {selectedRecipe?.emoji || selectedRecipe?.icon || '🍳'}
                         </div>
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">Base de cocción</p>
-                        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                        <h2 className="mt-2 text-[1.85rem] font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
                             Ajusta la cantidad inicial
                         </h2>
                     </div>
 
-                    <div className="mt-8 grid gap-6">
+                    <div className="mt-6 grid gap-5 sm:mt-8 sm:gap-6">
                         {savedConfig && (
                             <div className="rounded-[1.5rem] border border-primary/15 bg-primary/6 p-5">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -129,10 +129,10 @@ export function RecipeSetupScreen({
                         )}
 
                         {supportsIngredientMode ? (
-                            <div className="grid grid-cols-2 gap-2 rounded-[1.5rem] bg-primary/6 p-2">
+                            <div className="grid grid-cols-2 gap-2 rounded-[1.35rem] bg-primary/6 p-2">
                                 <button
                                     onClick={() => setQuantityMode('people')}
-                                    className={`rounded-[1.25rem] px-4 py-3 text-sm font-bold transition-all ${quantityMode === 'people'
+                                    className={`rounded-[1.15rem] px-4 py-2.5 text-sm font-bold transition-all ${quantityMode === 'people'
                                         ? 'bg-primary text-primary-foreground shadow-sm'
                                         : 'text-slate-600 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-white/5'
                                         }`}
@@ -141,7 +141,7 @@ export function RecipeSetupScreen({
                                 </button>
                                 <button
                                     onClick={() => setQuantityMode('have')}
-                                    className={`rounded-[1.25rem] px-4 py-3 text-sm font-bold transition-all ${quantityMode === 'have'
+                                    className={`rounded-[1.15rem] px-4 py-2.5 text-sm font-bold transition-all ${quantityMode === 'have'
                                         ? 'bg-primary text-primary-foreground shadow-sm'
                                         : 'text-slate-600 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-white/5'
                                         }`}
@@ -174,21 +174,21 @@ export function RecipeSetupScreen({
                             </div>
                         )}
 
-                        <div className="rounded-[1.75rem] border border-primary/12 bg-background/70 p-6">
-                            <div className="flex items-center justify-between gap-6">
+                        <div className="rounded-[1.5rem] border border-primary/12 bg-background/70 p-4 sm:p-6">
+                            <div className="flex items-center justify-between gap-4 sm:gap-6">
                                 <button
                                     onClick={() =>
                                         quantityMode === 'people'
                                             ? setPeopleCount((prev: number) => Math.max(1, prev - 1))
                                             : setAvailableCount((prev: number) => Math.max(1, prev - (amountUnit === 'grams' ? 50 : 1)))
                                     }
-                                    className="flex size-14 items-center justify-center rounded-full border border-primary/20 bg-card text-3xl text-primary transition-transform active:scale-95"
+                                    className="flex size-12 items-center justify-center rounded-full border border-primary/20 bg-card text-2xl text-primary transition-transform active:scale-95 sm:size-14 sm:text-3xl"
                                 >
                                     −
                                 </button>
 
                                 <div className="text-center">
-                                    <span className="text-6xl font-black tracking-tight text-primary">
+                                    <span className="text-5xl font-black tracking-tight text-primary sm:text-6xl">
                                         {quantityMode === 'people' ? peopleCount : availableCount}
                                     </span>
                                     <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
@@ -202,13 +202,13 @@ export function RecipeSetupScreen({
                                             ? setPeopleCount((prev: number) => Math.min(8, prev + 1))
                                             : setAvailableCount((prev: number) => Math.min(amountUnit === 'grams' ? 5000 : 20, prev + (amountUnit === 'grams' ? 50 : 1)))
                                     }
-                                    className="flex size-14 items-center justify-center rounded-full bg-primary text-3xl text-primary-foreground shadow-lg shadow-primary/25 transition-transform active:scale-95"
+                                    className="flex size-12 items-center justify-center rounded-full bg-primary text-2xl text-primary-foreground shadow-lg shadow-primary/25 transition-transform active:scale-95 sm:size-14 sm:text-3xl"
                                 >
                                     +
                                 </button>
                             </div>
 
-                            <div className="mt-6 rounded-[1.25rem] bg-primary/8 px-5 py-4 text-center text-sm font-medium text-primary">
+                            <div className="mt-5 rounded-[1.15rem] bg-primary/8 px-4 py-3 text-center text-sm font-medium text-primary">
                                 {quantityMode === 'people'
                                     ? `Cocinando para ${peopleCount} raciones`
                                     : `Usando ${availableCount}${amountUnit === 'grams' ? ' g' : ' unidades'} de ${selectedRecipe?.ingredient || 'base'}`}

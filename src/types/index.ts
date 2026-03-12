@@ -2,11 +2,30 @@ export type Screen = 'category-select' | 'recipe-select' | 'recipe-seed-search' 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
-export type RecipeCategoryId = 'desayunos' | 'almuerzos' | 'cenas' | 'airfryer' | 'frituras' | 'arroces' | 'hervidos' | 'sopas' | 'personalizadas';
+export type RecipeCategoryId =
+    | 'breakfast'
+    | 'lunch'
+    | 'dinner'
+    | 'pescados-mariscos'
+    | 'carnes-pollo'
+    | 'arroces-pastas'
+    | 'sopas-guisos'
+    | 'postres'
+    | 'saludables-veggies'
+    | 'desayunos'
+    | 'almuerzos'
+    | 'cenas'
+    | 'airfryer'
+    | 'frituras'
+    | 'arroces'
+    | 'hervidos'
+    | 'sopas'
+    | 'personalizadas';
 export type QuantityMode = 'people' | 'have';
 export type AmountUnit = 'units' | 'grams';
 export type ClarificationNumberMode = 'people' | 'quantity';
 export type ClarificationQuantityUnit = 'units' | 'grams';
+export type ClarificationNumberIntent = 'servings' | 'ingredient_base';
 export type CookingEquipment = 'stove' | 'airfryer' | 'oven';
 export type CatalogSource = 'supabase' | 'local-dev';
 export type CatalogViewMode = 'platform' | 'my-lists' | 'all';
@@ -235,7 +254,7 @@ export interface RecipeCategory {
     id: RecipeCategoryId;
     name: string;
     icon: string;
-    description: string;
+    description?: string;
 }
 
 export interface Recipe {

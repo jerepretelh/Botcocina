@@ -187,6 +187,23 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         savePlannedRecipeConfig,
     } = props;
 
+    const persistRecipeConfigSafely = (config: Omit<UserRecipeCookingConfig, 'createdAt' | 'updatedAt'>) => {
+        void Promise.resolve(saveUserRecipeConfig(config)).catch(() => null);
+    };
+
+    const persistPlannedRecipeConfigSafely = (configSnapshot: {
+        quantityMode: QuantityMode;
+        peopleCount: number | null;
+        amountUnit: AmountUnit | null;
+        availableCount: number | null;
+        selectedOptionalIngredients: string[];
+        sourceContextSummary: UserRecipeCookingConfig['sourceContextSummary'];
+        resolvedPortion: Portion;
+        scaleFactor: number;
+    }) => {
+        void Promise.resolve(savePlannedRecipeConfig(configSnapshot)).catch(() => null);
+    };
+
     const handleRecipeSelect = (recipe: Recipe) => {
         const content = recipeContentById[recipe.id];
         const savedConfig = getSavedRecipeConfig(recipe.id);
@@ -268,7 +285,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setIngredientsBackScreen('recipe-setup');
         setScreen('ingredients');
         if (selectedRecipe && recipeUserId) {
-            void saveUserRecipeConfig({
+            persistRecipeConfigSafely({
                 userId: recipeUserId,
                 recipeId: selectedRecipe.id,
                 quantityMode,
@@ -284,7 +301,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
             });
         }
         if (selectedRecipe && activePlannedRecipeItemId) {
-            void savePlannedRecipeConfig({
+            persistPlannedRecipeConfigSafely({
                 quantityMode,
                 peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,
@@ -337,7 +354,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setCurrentStepIndex(0);
         setCurrentSubStepIndex(0);
         if (selectedRecipe && recipeUserId) {
-            void saveUserRecipeConfig({
+            persistRecipeConfigSafely({
                 userId: recipeUserId,
                 recipeId: selectedRecipe.id,
                 quantityMode,
@@ -353,7 +370,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
             });
         }
         if (selectedRecipe && activePlannedRecipeItemId) {
-            void savePlannedRecipeConfig({
+            persistPlannedRecipeConfigSafely({
                 quantityMode,
                 peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,

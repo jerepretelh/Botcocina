@@ -340,6 +340,7 @@ export function ShoppingListScreen({
   onCheckoutTrip,
 }: ShoppingListScreenProps) {
   const [mode, setMode] = useState<ShoppingScreenMode>('planned');
+  const [isManualComposerOpen, setIsManualComposerOpen] = useState(false);
   const [manualDraft, setManualDraft] = useState({ name: '', quantity: '' });
   const [extraDraft, setExtraDraft] = useState({ name: '', quantity: '', total: '' });
   const [checkoutDraft, setCheckoutDraft] = useState({
@@ -355,6 +356,7 @@ export function ShoppingListScreen({
   const extraTripItems = useMemo(() => shoppingTripItems.filter((item) => item.isExtra), [shoppingTripItems]);
   const pendingTripItems = plannedTripItems.filter((item) => item.status !== 'in_cart');
   const inCartTripItems = plannedTripItems.filter((item) => item.status === 'in_cart');
+  const hasManualItems = manualItems.length > 0;
 
   useEffect(() => {
     if (shoppingTrip) {
@@ -373,6 +375,7 @@ export function ShoppingListScreen({
 
     onAddManualItem(name, manualDraft.quantity.trim() || null);
     setManualDraft({ name: '', quantity: '' });
+    setIsManualComposerOpen(false);
   };
 
   const handleStartOrContinueTrip = () => {
@@ -395,7 +398,7 @@ export function ShoppingListScreen({
       onSignOut={onSignOut}
     >
       <ProductPage>
-        <ProductContainer className="max-w-3xl pb-32 md:px-8">
+        <ProductContainer className="max-w-md pb-32 sm:max-w-lg md:max-w-xl lg:max-w-3xl">
           {mode === 'planned' ? (
             <>
               <ProductHeader
@@ -417,12 +420,12 @@ export function ShoppingListScreen({
                 </div>
 
                 {shoppingTrip ? (
-                  <ProductSurface className="p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <ProductSurface className="p-4 sm:p-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary/80">Compra en curso</p>
-                        <h2 className="mt-2 text-xl font-bold text-slate-900 dark:text-slate-100">Ya puedes retomar tu compra real</h2>
-                        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        <h2 className="mt-2 text-lg font-bold text-slate-900 dark:text-slate-100 sm:text-xl">Ya puedes retomar tu compra real</h2>
+                        <p className="mt-1.5 text-sm leading-6 text-slate-500 dark:text-slate-400">
                           {shoppingTrip.status === 'checked_out'
                             ? `Compra cerrada por ${formatCurrency(shoppingTrip.finalTotal)}`
                             : `Llevas ${variance.inCartCount} productos en el coche y ${variance.pendingCount} pendientes.`}
@@ -438,11 +441,12 @@ export function ShoppingListScreen({
 
                 {error ? <ProductSurface className="p-4 text-sm text-red-500">{error}</ProductSurface> : null}
 
-                <ProductSurface className="overflow-hidden p-5 sm:p-6">
+                <ProductSurface className="overflow-hidden p-4 sm:p-5">
                   <div className="mb-5 flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Ingredientes automáticos</p>
-                      <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Lo que se calculó desde tu plan</h2>
+                      <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Qué comprar</h2>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Lista totalizada desde tu plan semanal.</p>
                     </div>
                     <Badge label={`${autoItems.length} items`} tone="primary" />
                   </div>
@@ -478,39 +482,57 @@ export function ShoppingListScreen({
                   )}
                 </ProductSurface>
 
-                <ProductSurface className="overflow-hidden p-5 sm:p-6">
+                <ProductSurface className="overflow-hidden p-4 sm:p-5">
                   <div className="mb-5 flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Otros ítems</p>
-                      <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Lo que agregaste manualmente</h2>
+                      <h2 className="mt-2 text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-xl">Lo que agregaste manualmente</h2>
                     </div>
                     <Badge label={`${manualItems.length} manuales`} />
                   </div>
 
-                  <div className="rounded-[1.35rem] border-2 border-dashed border-primary/20 bg-background/70 p-4">
-                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-                      <input
-                        value={manualDraft.name}
-                        onChange={(event) => setManualDraft((prev) => ({ ...prev, name: event.target.value }))}
-                        placeholder="Añadir ítem manual"
-                        className="rounded-xl border border-primary/10 bg-white/80 px-4 py-3 text-sm outline-none focus:border-primary dark:bg-white/5"
-                      />
-                      <input
-                        value={manualDraft.quantity}
-                        onChange={(event) => setManualDraft((prev) => ({ ...prev, quantity: event.target.value }))}
-                        placeholder="Cantidad opcional"
-                        className="rounded-xl border border-primary/10 bg-white/80 px-4 py-3 text-sm outline-none focus:border-primary dark:bg-white/5"
-                      />
+                  {isManualComposerOpen || hasManualItems ? (
+                    <div className="rounded-[1.35rem] border-2 border-dashed border-primary/20 bg-background/70 p-4">
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+                        <input
+                          value={manualDraft.name}
+                          onChange={(event) => setManualDraft((prev) => ({ ...prev, name: event.target.value }))}
+                          placeholder="Añadir ítem manual"
+                          className="rounded-xl border border-primary/10 bg-white/80 px-4 py-3 text-sm outline-none focus:border-primary dark:bg-white/5"
+                        />
+                        <input
+                          value={manualDraft.quantity}
+                          onChange={(event) => setManualDraft((prev) => ({ ...prev, quantity: event.target.value }))}
+                          placeholder="Cantidad opcional"
+                          className="rounded-xl border border-primary/10 bg-white/80 px-4 py-3 text-sm outline-none focus:border-primary dark:bg-white/5"
+                        />
+                      </div>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Button onClick={handleAddManualItem} variant="outline" className="w-full sm:w-auto">
+                          <PackagePlus className="size-4" />
+                          Añadir ítem manual
+                        </Button>
+                        {!hasManualItems ? (
+                          <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setIsManualComposerOpen(false)}>
+                            Cancelar
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                    <Button onClick={handleAddManualItem} variant="outline" className="mt-3 w-full sm:w-auto">
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsManualComposerOpen(true)}
+                      className="flex w-full items-center justify-center gap-2 rounded-[1.35rem] border-2 border-dashed border-primary/20 bg-background/70 px-4 py-4 text-sm font-semibold text-primary transition-colors active:scale-[0.99]"
+                    >
                       <PackagePlus className="size-4" />
                       Añadir ítem manual
-                    </Button>
-                  </div>
+                    </button>
+                  )}
 
                   {manualItems.length === 0 ? (
-                    <div className="mt-5">
-                      <ProductEmptyState message="No has agregado ítems manuales todavía." />
+                    <div className="mt-4 rounded-[1.15rem] bg-primary/5 px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
+                      Los ítems manuales quedan aparte de la lista generada desde tu plan.
                     </div>
                   ) : (
                     <div className="mt-5 space-y-3">
@@ -532,15 +554,15 @@ export function ShoppingListScreen({
                 </ProductSurface>
 
                 <div className="flex justify-center">
-                  <Button variant="ghost" onClick={onRegenerateShopping} className="text-primary">
+                  <Button variant="ghost" onClick={onRegenerateShopping} className="h-auto px-2 py-1 text-xs text-primary sm:text-sm">
                     <RefreshCcw className="size-4" />
                     Regenerar desde plan
                   </Button>
                 </div>
               </div>
 
-              <div className="fixed inset-x-0 bottom-0 z-20 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-6 pt-4 backdrop-blur-xl">
-                <div className="mx-auto flex max-w-3xl flex-col gap-3">
+                <div className="fixed inset-x-0 bottom-[4.85rem] z-20 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-4 pt-3 backdrop-blur-xl lg:bottom-0 lg:pb-6 lg:pt-4">
+                  <div className="mx-auto flex max-w-md flex-col gap-3 sm:max-w-lg lg:max-w-3xl">
                   <div className="flex items-center justify-between rounded-[1.25rem] border border-primary/10 bg-card/90 px-4 py-3 text-sm text-slate-500 shadow-sm dark:text-slate-300">
                     <span>{shoppingList?.title ?? 'Lista activa'}</span>
                     <span>{pendingCount} pendientes</span>
@@ -580,11 +602,11 @@ export function ShoppingListScreen({
                   <>
                     <ShoppingTripSummary variance={variance} />
 
-                    <ProductSurface className="p-5">
+                  <ProductSurface className="p-4 sm:p-5">
                       <div className="mb-4 flex items-start justify-between gap-4">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Acción rápida</p>
-                          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Añadir extra no planeado</h2>
+                          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Añadir extra no planeado</h2>
                           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Registra algo que no venía en la lista sin salir de la compra.</p>
                         </div>
                         <Badge label={`${extraTripItems.length} extras`} tone="primary" />
@@ -628,11 +650,11 @@ export function ShoppingListScreen({
                       </Button>
                     </ProductSurface>
 
-                    <ProductSurface className="p-5">
+                    <ProductSurface className="p-4 sm:p-5">
                       <div className="mb-4 flex items-start justify-between gap-4">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Pendientes</p>
-                          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Lo que falta revisar</h2>
+                          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Lo que falta revisar</h2>
                           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Confirma cantidad real y precio cuando el producto ya esté contigo.</p>
                         </div>
                         <Badge label={`${pendingTripItems.length} items`} />
@@ -655,11 +677,11 @@ export function ShoppingListScreen({
                       )}
                     </ProductSurface>
 
-                    <ProductSurface className="p-5">
+                    <ProductSurface className="p-4 sm:p-5">
                       <div className="mb-4 flex items-start justify-between gap-4">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">En el coche</p>
-                          <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Lo que ya confirmaste</h2>
+                          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Lo que ya confirmaste</h2>
                           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Aquí quedan los productos ya comprados y los extras que vas sumando.</p>
                         </div>
                         <Badge label={`${inCartTripItems.length} comprados`} tone="success" />
@@ -691,10 +713,10 @@ export function ShoppingListScreen({
                       )}
                     </ProductSurface>
 
-                    <ProductSurface className="p-5">
+                    <ProductSurface className="p-4 sm:p-5">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Cierre</p>
-                        <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Finalizar compra</h2>
+                        <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Finalizar compra</h2>
                         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">Guarda el nombre del súper y confirma el monto final en caja.</p>
                       </div>
 
@@ -717,8 +739,8 @@ export function ShoppingListScreen({
                       </div>
                     </ProductSurface>
 
-                    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-6 pt-4 backdrop-blur-xl">
-                      <div className="mx-auto flex max-w-3xl flex-col gap-3">
+                    <div className="fixed inset-x-0 bottom-[4.85rem] z-20 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-4 pt-3 backdrop-blur-xl lg:bottom-0 lg:pb-6 lg:pt-4">
+                      <div className="mx-auto flex max-w-md flex-col gap-3 sm:max-w-lg lg:max-w-3xl">
                         <div className="flex items-center justify-between rounded-[1.25rem] border border-primary/10 bg-card/90 px-4 py-3 text-sm text-slate-500 shadow-sm dark:text-slate-300">
                           <span>{checkoutDraft.storeName?.trim() || 'Compra en curso'}</span>
                           <span>{formatCurrency(checkoutDraft.finalTotal ? Number(checkoutDraft.finalTotal) : variance.runningTotal)}</span>

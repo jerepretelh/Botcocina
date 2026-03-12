@@ -29,14 +29,17 @@ import {
     inferPortionFromPrompt,
     inferPeopleCountFromClarifications,
     inferSizingFromClarifications,
+    inferClarificationNumberIntent,
     buildInitialIngredientSelection,
     buildRecipeId,
     ensureRecipeShape,
+    getIngredientKey,
     mapCountToPortion,
     clampNumber,
 } from '../utils/recipeHelpers';
 import { useAIClarifications } from './useAIClarifications';
 import { isSupabaseEnabled, supabaseClient } from '../lib/supabaseClient';
+import { canUseUserRecipeConfigs, disableUserRecipeConfigsForSession } from '../lib/supabaseOptionalFeatures';
 import { trackProductEvent } from '../lib/productEvents';
 import { buildCookingSessionState } from '../lib/cookingSession';
 import {
@@ -46,10 +49,12 @@ import {
     isAIMockModeEnabled,
     type AIMockScenarioId,
 } from '../lib/aiMockScenarios';
+import { supportsIngredientBaseFromText } from '../lib/recipeSetupBehavior';
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface UseAIRecipeGenerationDeps {
     availableRecipes: Recipe[];
+    recipeContentById: Record<string, RecipeContent>;
     setAvailableRecipes: (action: any) => void;
     setRecipeContentById: (action: any) => void;
     setIngredientSelectionByRecipe: (action: any) => void;
@@ -87,6 +92,23 @@ const INITIAL_AI_CONTEXT_DRAFT: AIRecipeContextDraft = {
     avoidIngredients: [],
 };
 
+function buildRecipeEquivalenceSignature(
+    recipe: Pick<Recipe, 'name' | 'ingredient'>,
+    content: Pick<RecipeContent, 'ingredients' | 'steps'>,
+): string {
+    const ingredientSignature = content.ingredients
+        .map((ingredient) => getIngredientKey(ingredient.name))
+        .filter(Boolean)
+        .sort()
+        .join('|');
+    const stepSignature = content.steps
+        .map((step) => normalizeText(`${step.stepName} ${step.subSteps.map((subStep) => subStep.subStepName).join(' ')}`))
+        .filter(Boolean)
+        .join('|');
+
+    return [normalizeText(recipe.name || ''), normalizeText(recipe.ingredient || ''), ingredientSignature, stepSignature].join('::');
+}
+
 // ─── Clarification Helpers (pure functions) ──────────────────────────
 
 function resolveClarificationUnit(
@@ -95,6 +117,7 @@ function resolveClarificationUnit(
     quantityUnits: Record<string, ClarificationQuantityUnit>,
 ): string {
     if (question.type !== 'number') return '';
+    if (inferClarificationNumberIntent(question) === 'servings') return 'personas';
     const mode = numberModes[question.id];
     if (mode === 'people') return 'personas';
     const selectedQuantityUnit = quantityUnits[question.id];
@@ -133,13 +156,20 @@ function normalizeQuestionShape(
             text.includes('kilos') ||
             text.includes('cuantos')
         ) {
+            const isServingsQuestion =
+                text.includes('persona') ||
+                text.includes('personas') ||
+                text.includes('comensal') ||
+                text.includes('porcion') ||
+                text.includes('porción');
             return {
                 ...question,
                 type: 'number',
                 min: 1,
-                max: text.includes('gramos') || text.includes('kilos') ? 5000 : 20,
+                max: isServingsQuestion ? 12 : (text.includes('gramos') || text.includes('kilos') ? 5000 : 20),
                 step: text.includes('gramos') || text.includes('kilos') ? 50 : 1,
-                unit: text.includes('gramos') || text.includes('kilos') ? 'g' : 'unidades',
+                unit: isServingsQuestion ? 'personas' : (text.includes('gramos') || text.includes('kilos') ? 'g' : 'unidades'),
+                numberIntent: isServingsQuestion ? 'servings' : 'ingredient_base',
             };
         }
     }
@@ -162,9 +192,16 @@ function normalizeQuestionShape(
 function enrichClarificationQuestions(
     userPrompt: string,
     questions: AIClarificationQuestion[],
+    contextDraft: AIRecipeContextDraft,
 ): AIClarificationQuestion[] {
     const normalizedPrompt = normalizeText(userPrompt);
-    const result = questions.map((question) => normalizeQuestionShape(question, normalizedPrompt));
+    const supportsIngredientBase = supportsIngredientBaseFromText(userPrompt);
+    const result = questions
+        .map((question) => normalizeQuestionShape(question, normalizedPrompt))
+        .filter((question) => {
+            if (question.type !== 'number') return true;
+            return supportsIngredientBase || inferClarificationNumberIntent(question) === 'servings';
+        });
 
     const hasCutQuestion = result.some((question) => {
         const text = normalizeText(`${question.id} ${question.question}`);
@@ -184,7 +221,10 @@ function enrichClarificationQuestions(
     }
 
     const hasNumericQuestion = result.some((question) => question.type === 'number');
-    if (!hasNumericQuestion) {
+    const hasIngredientBaseQuestion = result.some(
+        (question) => question.type === 'number' && inferClarificationNumberIntent(question) === 'ingredient_base',
+    );
+    if (supportsIngredientBase && !contextDraft.servings && !hasNumericQuestion && !hasIngredientBaseQuestion) {
         result.push({
             id: 'cantidad_base',
             question: '¿Con qué base quieres cocinar esta receta?',
@@ -194,6 +234,7 @@ function enrichClarificationQuestions(
             max: 20,
             step: 1,
             unit: 'unidades',
+            numberIntent: 'ingredient_base',
         });
     }
 
@@ -255,6 +296,10 @@ function buildContextSummary(context: AIRecipeContextDraft, options: {
 
 function isQuestionSatisfiedByContext(question: AIClarificationQuestion, context: AIRecipeContextDraft): boolean {
     const text = normalizeText(`${question.id} ${question.question}`);
+
+    if (question.type === 'number' && inferClarificationNumberIntent(question) === 'servings') {
+        return typeof context.servings === 'number' && context.servings > 0;
+    }
 
     if (
         (text.includes('persona') || text.includes('comensal') || text.includes('porcion') || text.includes('porción')) &&
@@ -331,6 +376,7 @@ function assertGeneratedRecipePayload(
 export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
     const {
         availableRecipes,
+        recipeContentById,
         setAvailableRecipes,
         setRecipeContentById,
         setIngredientSelectionByRecipe,
@@ -473,8 +519,8 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     await supabaseClient.from('recipe_substeps').insert(substepsPayload);
                 }
 
-                if (options?.initialConfig) {
-                    await supabaseClient.from('user_recipe_cooking_configs').upsert(
+                if (options?.initialConfig && canUseUserRecipeConfigs()) {
+                    const { error: configError } = await supabaseClient.from('user_recipe_cooking_configs').upsert(
                         {
                             user_id: aiUserId,
                             recipe_id: recipe.id,
@@ -489,6 +535,14 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                         },
                         { onConflict: 'user_id,recipe_id' },
                     );
+                    if (configError) {
+                        const configMessage = `${configError.message ?? ''} ${configError.details ?? ''}`.toLowerCase();
+                        if (configError.code === 'PGRST205' || configMessage.includes('could not find the table') || (configMessage.includes('relation') && configMessage.includes('does not exist'))) {
+                            disableUserRecipeConfigsForSession();
+                        } else {
+                            throw configError;
+                        }
+                    }
                 }
 
                 await updateGeneration('approved', {
@@ -539,6 +593,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     const numberMode = ai.aiClarificationNumberModes[question.id];
                     const label =
                         question.type === 'number' &&
+                            inferClarificationNumberIntent(question) === 'ingredient_base' &&
                             numberMode === 'quantity' &&
                             normalizeText(question.question).includes('persona')
                             ? 'Cantidad disponible'
@@ -564,7 +619,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 .filter((question) => question && question.id && question.question && question.type)
                 .slice(0, 5)
             : [];
-        const enrichedQuestions = enrichClarificationQuestions(prompt, normalizedQuestions)
+        const enrichedQuestions = enrichClarificationQuestions(prompt, normalizedQuestions, ai.aiContextDraft)
             .filter((question) => !isQuestionSatisfiedByContext(question, ai.aiContextDraft));
         ai.setAiClarificationSuggestedTitle(clarification.suggestedTitle ?? null);
         ai.setAiClarificationTip(clarification.tip ?? null);
@@ -580,13 +635,8 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 }
                 if (question.type === 'number') {
                     initialAnswers[question.id] = typeof question.min === 'number' ? question.min : 1;
-                    const normalizedQuestionText = normalizeText(`${question.id} ${question.question}`);
-                    initialNumberModes[question.id] =
-                        normalizedQuestionText.includes('persona') ||
-                            normalizedQuestionText.includes('porcion') ||
-                            normalizedQuestionText.includes('comensal')
-                            ? 'people'
-                            : 'quantity';
+                    const questionIntent = inferClarificationNumberIntent(question);
+                    initialNumberModes[question.id] = questionIntent === 'ingredient_base' ? 'quantity' : 'people';
                     initialQuantityUnits[question.id] =
                         normalizeText(question.unit ?? '').includes('g') || normalizeText(question.unit ?? '').includes('gram')
                             ? 'grams'
@@ -775,25 +825,10 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     : await generateRecipeWithAI(finalPrompt);
             const validatedResult = assertGeneratedRecipePayload(generatedResult);
             const generated = ensureRecipeShape(validatedResult.recipe);
-            const baseId = buildRecipeId(generated.id || generated.name);
-            const uniqueId = `${baseId}-${aiUserId?.slice(0, 8) ?? 'anon'}-${Date.now()}`;
 
             if (generated.ingredients.length === 0 || generated.steps.length === 0) {
                 throw new Error('La IA devolvió una receta incompleta. Intenta nuevamente.');
             }
-
-            const newRecipe: Recipe = {
-                id: uniqueId,
-                categoryId: 'personalizadas',
-                name: generated.name || ai.aiClarificationSuggestedTitle || 'Nueva receta',
-                icon: generated.icon,
-                ingredient: generated.ingredient,
-                description: generated.description,
-                ownerUserId: aiUserId ?? null,
-                visibility: 'private',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
 
             const newContent: RecipeContent = {
                 ingredients: generated.ingredients,
@@ -805,7 +840,45 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 },
             };
 
-            setAvailableRecipes((prev: Recipe[]) => [...prev, newRecipe]);
+            const recipeName = generated.name || ai.aiClarificationSuggestedTitle || 'Nueva receta';
+            const recipeSignature = buildRecipeEquivalenceSignature(
+                {
+                    name: recipeName,
+                    ingredient: generated.ingredient,
+                },
+                newContent,
+            );
+            const existingEquivalentRecipe = availableRecipes.find((recipe) => {
+                if (recipe.ownerUserId !== (aiUserId ?? null) || (recipe.visibility ?? 'public') !== 'private') {
+                    return false;
+                }
+                const existingContent = recipeContentById[recipe.id];
+                if (!existingContent) return false;
+                return buildRecipeEquivalenceSignature(recipe, existingContent) === recipeSignature;
+            });
+            const recipeId =
+                existingEquivalentRecipe?.id ??
+                `${buildRecipeId(generated.id || recipeName)}-${aiUserId?.slice(0, 8) ?? 'anon'}-${Date.now()}`;
+
+            const newRecipe: Recipe = {
+                id: recipeId,
+                categoryId: 'personalizadas',
+                name: recipeName,
+                icon: generated.icon,
+                ingredient: generated.ingredient,
+                description: generated.description,
+                ownerUserId: aiUserId ?? null,
+                visibility: 'private',
+                createdAt: existingEquivalentRecipe?.createdAt ?? new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+
+            setAvailableRecipes((prev: Recipe[]) => {
+                if (!existingEquivalentRecipe) {
+                    return [...prev, newRecipe];
+                }
+                return prev.map((recipe) => (recipe.id === existingEquivalentRecipe.id ? newRecipe : recipe));
+            });
             setRecipeContentById((prev: Record<string, RecipeContent>) => ({ ...prev, [newRecipe.id]: newContent }));
             const nextIngredientSelection = buildInitialIngredientSelection(newContent.ingredients);
             setIngredientSelectionByRecipe((prev: Record<string, Record<string, boolean>>) => ({
@@ -922,8 +995,10 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
     }, [
         ai,
         aiUserId,
+        availableRecipes,
         buildFinalPrompt,
         persistAiRecipeToSupabase,
+        recipeContentById,
         resetAiWizardState,
         setActiveStepLoop,
         setAmountUnit,

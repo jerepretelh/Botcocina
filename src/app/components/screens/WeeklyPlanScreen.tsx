@@ -58,7 +58,7 @@ export function WeeklyPlanScreen({
   onCookFromPlan,
   onCreateNextWeek,
 }: WeeklyPlanScreenProps) {
-  const [view, setView] = useState<WeeklyPlanView>('calendar');
+  const [view, setView] = useState<WeeklyPlanView>('list');
 
   const totalServings = useMemo(
     () =>

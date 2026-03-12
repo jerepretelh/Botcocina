@@ -56,6 +56,60 @@ type SavePlanItemInput = {
   configSnapshot: WeeklyPlanItemConfigSnapshot;
 };
 
+function dedupePlanItemsById(items: WeeklyPlanItem[]): WeeklyPlanItem[] {
+  const byId = new Map<string, WeeklyPlanItem>();
+  for (const item of items) {
+    byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+function buildPlanItemEquivalenceKey(item: WeeklyPlanItem): string {
+  return JSON.stringify({
+    dayOfWeek: item.dayOfWeek ?? null,
+    slot: item.slot ?? null,
+    recipeId: item.recipeId ?? null,
+    recipeNameSnapshot: item.recipeNameSnapshot,
+    notes: item.notes?.trim() || null,
+    quantityMode: item.configSnapshot.quantityMode,
+    peopleCount: item.configSnapshot.peopleCount ?? null,
+    amountUnit: item.configSnapshot.amountUnit ?? null,
+    availableCount: item.configSnapshot.availableCount ?? null,
+    selectedOptionalIngredients: [...item.configSnapshot.selectedOptionalIngredients].sort(),
+    resolvedPortion: item.configSnapshot.resolvedPortion,
+    scaleFactor: Number(item.configSnapshot.scaleFactor.toFixed(4)),
+    sourceContextSummary: item.configSnapshot.sourceContextSummary ?? null,
+  });
+}
+
+function dedupePlanItemsByEquivalence(items: WeeklyPlanItem[]): { uniqueItems: WeeklyPlanItem[]; duplicateIds: string[] } {
+  const byKey = new Map<string, WeeklyPlanItem>();
+  const duplicateIds: string[] = [];
+
+  for (const item of items) {
+    const key = buildPlanItemEquivalenceKey(item);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, item);
+      continue;
+    }
+
+    const existingCreatedAt = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+    const nextCreatedAt = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+    if (nextCreatedAt < existingCreatedAt) {
+      duplicateIds.push(existing.id);
+      byKey.set(key, item);
+    } else {
+      duplicateIds.push(item.id);
+    }
+  }
+
+  return {
+    uniqueItems: [...byKey.values()],
+    duplicateIds,
+  };
+}
+
 function buildDefaultSnapshot(
   recipe: Recipe,
   savedConfig?: UserRecipeCookingConfig | null,
@@ -108,10 +162,11 @@ export function useWeeklyPlan({
     () => Object.fromEntries(recipes.map((recipe) => [recipe.id, recipe])),
     [recipes],
   );
+  const uniqueItems = useMemo(() => dedupePlanItemsById(items), [items]);
 
   const aggregation = useMemo<ShoppingAggregationResult>(
-    () => buildWeeklyShoppingAggregation(items, recipeContentById, recipesById),
-    [items, recipeContentById, recipesById],
+    () => buildWeeklyShoppingAggregation(uniqueItems, recipeContentById, recipesById),
+    [uniqueItems, recipeContentById, recipesById],
   );
   const autoShoppingItems = useMemo(
     () => shoppingItems.filter((item) => item.sourceType === 'plan_auto'),
@@ -188,7 +243,11 @@ export function useWeeklyPlan({
     setError(null);
     try {
       const nextPlan = await ensureWeeklyPlan(userId, getWeekStartDate());
-      const nextItems = await getWeeklyPlanItems(nextPlan.id);
+      const rawItems = dedupePlanItemsById(await getWeeklyPlanItems(nextPlan.id));
+      const { uniqueItems: nextItems, duplicateIds } = dedupePlanItemsByEquivalence(rawItems);
+      if (duplicateIds.length > 0) {
+        await Promise.all(duplicateIds.map((itemId) => deleteWeeklyPlanItem(itemId)));
+      }
       const ensuredShopping = await getOrCreateShoppingList(userId, nextPlan.id);
       const nextShoppingItems = await getShoppingListItems(ensuredShopping.id);
       setPlan(nextPlan);
@@ -223,7 +282,10 @@ export function useWeeklyPlan({
       configSnapshot: input.configSnapshot,
     };
     const saved = await saveWeeklyPlanItem(plan.id, payload);
-    const nextItems = await getWeeklyPlanItems(plan.id);
+    const { uniqueItems: nextItems, duplicateIds } = dedupePlanItemsByEquivalence(dedupePlanItemsById(await getWeeklyPlanItems(plan.id)));
+    if (duplicateIds.length > 0) {
+      await Promise.all(duplicateIds.map((itemId) => deleteWeeklyPlanItem(itemId)));
+    }
     setItems(nextItems);
     await syncShopping(plan, nextItems);
     return saved;
@@ -232,18 +294,18 @@ export function useWeeklyPlan({
   const removeItem = useCallback(async (itemId: string) => {
     if (!plan) return;
     await deleteWeeklyPlanItem(itemId);
-    const nextItems = await getWeeklyPlanItems(plan.id);
+    const { uniqueItems: nextItems } = dedupePlanItemsByEquivalence(dedupePlanItemsById(await getWeeklyPlanItems(plan.id)));
     setItems(nextItems);
     await syncShopping(plan, nextItems);
   }, [plan, syncShopping]);
 
   const regenerateShopping = useCallback(async () => {
     if (!plan) return;
-    await syncShopping(plan, items);
+    await syncShopping(plan, uniqueItems);
     if (shoppingList) {
       setShoppingItems(await getShoppingListItems(shoppingList.id));
     }
-  }, [items, plan, syncShopping]);
+  }, [plan, syncShopping, uniqueItems]);
 
   const createNextWeek = useCallback(async () => {
     if (!userId) return;
@@ -367,7 +429,7 @@ export function useWeeklyPlan({
 
   return {
     plan,
-    items,
+    items: uniqueItems,
     shoppingList,
     shoppingItems,
     shoppingTrip,
