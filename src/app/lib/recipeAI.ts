@@ -74,14 +74,31 @@ export interface AIClarificationResult {
   usage?: AIUsageMetadata;
 }
 
+async function fetchRecipeAI<T>(payload: Record<string, unknown>): Promise<T> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+
+  try {
+    return await authenticatedJsonFetch<T>('/api/ai/recipe', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('La generación tardó demasiado. Revisa tu conexión e inténtalo nuevamente.');
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
 export async function generateRecipeWithAI(prompt: string, context?: AIRecipeContextDraft): Promise<{
   recipe: GeneratedRecipe;
   usage?: AIUsageMetadata;
 }> {
-  const payload = await authenticatedJsonFetch<{ recipe: GeneratedRecipe; usage?: AIUsageMetadata }>('/api/ai/recipe', {
-    method: 'POST',
-    body: JSON.stringify({ prompt, context }),
-  });
+  const payload = await fetchRecipeAI<{ recipe: GeneratedRecipe; usage?: AIUsageMetadata }>({ prompt, context });
 
   return payload;
 }
@@ -90,8 +107,5 @@ export async function requestRecipeClarificationWithAI(
   prompt: string,
   context?: AIRecipeContextDraft,
 ): Promise<AIClarificationResult> {
-  return authenticatedJsonFetch<AIClarificationResult>('/api/ai/recipe', {
-    method: 'POST',
-    body: JSON.stringify({ prompt, context, mode: 'clarify' }),
-  });
+  return fetchRecipeAI<AIClarificationResult>({ prompt, context, mode: 'clarify' });
 }
