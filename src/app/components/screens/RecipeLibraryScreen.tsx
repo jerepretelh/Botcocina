@@ -81,7 +81,7 @@ export function RecipeLibraryScreen({
                     key={recipe.id}
                     className="rounded-[1.35rem] border border-[#d8d1cb] bg-[#f5f4f3] px-3 py-3 shadow-[0_8px_20px_rgba(78,64,53,0.08)] md:px-4 md:py-3.5"
                   >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
                       <button
                         type="button"
                         onClick={() => onRecipeOpen(recipe)}
@@ -115,7 +115,7 @@ export function RecipeLibraryScreen({
                           </div>
                         </div>
                       </button>
-                      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                      <div className="flex flex-wrap items-center gap-2 xl:justify-end">
                         <button
                           type="button"
                           onClick={() => onPlanRecipe(recipe)}

@@ -95,10 +95,10 @@ export function CategorySelectScreen({
           </div>
 
           <div className="mx-auto mt-7 max-w-4xl text-center md:mt-8">
-            <h1 className="text-[1rem] font-black leading-[1.1] tracking-tight text-[#131d36] md:text-[1rem]">
+            <h1 className="text-[2rem] font-black leading-[1.02] tracking-tight text-[#131d36] md:text-[3.2rem]">
               ¿Qué cocinamos hoy?
             </h1>
-            <p className="mx-auto mt-2 max-w-3xl text-[0.875rem] leading-5 text-[#56647c] md:text-[0.875rem] md:leading-5">
+            <p className="mx-auto mt-3 max-w-3xl text-[1rem] leading-6 text-[#56647c] md:text-[1.45rem] md:leading-[1.35]">
               Cuéntale a la IA qué quieres cocinar y empieza rápido con una receta guiada.
             </p>
           </div>

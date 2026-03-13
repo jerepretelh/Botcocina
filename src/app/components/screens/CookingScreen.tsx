@@ -1,5 +1,6 @@
 import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient, Recipe } from '../../../types';
-import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight, ListChecks, SlidersHorizontal } from 'lucide-react';
+import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight, ListChecks, SlidersHorizontal, Ellipsis, LogOut, ArrowLeft } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 
 interface CookingScreenProps {
   appVersion: string;
@@ -36,10 +37,12 @@ interface CookingScreenProps {
   onOpenIngredients: () => void;
   onOpenSetup: () => void;
   onPlanRecipe: () => void;
+  onExitRecipe: () => void;
   currentIngredients: Ingredient[];
   activeIngredientSelection: Record<string, boolean>;
   activeRecipeContent: RecipeContent;
   selectedRecipe?: Recipe | null;
+  isBackgroundMuted?: boolean;
 }
 
 function formatClock(seconds: number) {
@@ -100,6 +103,7 @@ export function CookingScreen({
   retirarTitle,
   retirarMessage,
   onChangeMission,
+  onPrevious,
   onNext,
   onTogglePause,
   onContinue,
@@ -107,10 +111,12 @@ export function CookingScreen({
   onOpenIngredients,
   onOpenSetup,
   onPlanRecipe,
+  onExitRecipe,
   currentIngredients,
   activeIngredientSelection,
   activeRecipeContent,
   selectedRecipe,
+  isBackgroundMuted = false,
 }: CookingScreenProps) {
   const flattenedSubSteps = currentRecipeData.flatMap((step, sIdx) =>
     step.subSteps.map((subStep, ssIdx) => ({ stepIndex: sIdx, subStepIndex: ssIdx, step, subStep })),
@@ -124,6 +130,7 @@ export function CookingScreen({
   const totalSubSteps = Math.max(flattenedSubSteps.length, 1);
   const progressPercent = Math.round((currentPosition / totalSubSteps) * 100);
   const isLastSubStep = currentPosition >= totalSubSteps;
+  const isFirstSubStep = currentPosition <= 1;
 
   const nextItem = currentFlatIndex >= 0 && currentFlatIndex < flattenedSubSteps.length - 1 ? flattenedSubSteps[currentFlatIndex + 1] : null;
 
@@ -201,9 +208,10 @@ export function CookingScreen({
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background text-foreground antialiased">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.16),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_58%)] dark:bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.18),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_58%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05] [background-image:radial-gradient(rgba(236,91,19,0.6)_1px,transparent_1px)] [background-size:24px_24px]" />
+    <div className={`relative min-h-screen overflow-hidden bg-background text-foreground antialiased transition-[filter,opacity] duration-300 ${isBackgroundMuted ? 'opacity-75 saturate-[0.82] blur-[1px]' : ''}`}>
+      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-300 bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.16),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_58%)] dark:bg-[radial-gradient(circle_at_top,_rgba(236,91,19,0.18),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),transparent_58%)] ${isBackgroundMuted ? 'opacity-45' : ''}`} />
+      <div className={`pointer-events-none absolute inset-0 [background-image:radial-gradient(rgba(236,91,19,0.6)_1px,transparent_1px)] [background-size:24px_24px] transition-opacity duration-300 dark:opacity-[0.05] ${isBackgroundMuted ? 'opacity-[0.015]' : 'opacity-[0.03]'}`} />
+      {isBackgroundMuted ? <div className="pointer-events-none absolute inset-0 bg-[#ede4dc]/42" /> : null}
 
       <div className="relative z-10 h-1.5 w-full bg-white/5">
         <div
@@ -213,7 +221,7 @@ export function CookingScreen({
       </div>
 
       <div className="relative z-20 flex h-[calc(100dvh-6px)] overflow-hidden">
-        <aside className="hidden w-72 shrink-0 flex-col border-r border-primary/10 bg-card/80 backdrop-blur-2xl lg:flex">
+        <aside className={`hidden w-72 shrink-0 flex-col border-r border-primary/10 bg-card/80 backdrop-blur-2xl transition-opacity duration-300 lg:flex ${isBackgroundMuted ? 'opacity-60' : ''}`}>
           <div className="border-b border-primary/10 p-7">
             <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-primary">Ingredientes</h3>
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Lista activa</p>
@@ -250,7 +258,7 @@ export function CookingScreen({
           </div>
         </aside>
 
-        <main className="relative flex flex-1 flex-col">
+        <main className={`relative flex flex-1 flex-col transition-opacity duration-300 ${isBackgroundMuted ? 'opacity-70' : ''}`}>
           <header className="flex flex-col gap-3 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-8">
             <div className="flex items-center gap-3">
               <div>
@@ -260,7 +268,7 @@ export function CookingScreen({
                 </h1>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
               <button
                 onClick={onOpenIngredients}
                 className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
@@ -268,26 +276,36 @@ export function CookingScreen({
                 <ListChecks className="h-4 w-4" />
                 Ingredientes
               </button>
-              <button
-                onClick={onOpenSetup}
-                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Configurar
-              </button>
-              <button
-                onClick={onPlanRecipe}
-                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
-              >
-                Planificar
-              </button>
-              <button
-                onClick={onChangeMission}
-                className="flex items-center justify-center gap-2 rounded-full border border-primary/15 bg-card/80 px-3 py-2.5 text-sm font-bold text-foreground transition-all hover:bg-primary/8"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reiniciar
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Más acciones"
+                    className="flex h-11 w-11 items-center justify-center rounded-full border border-primary/15 bg-card/80 text-foreground transition-all hover:bg-primary/8"
+                  >
+                    <Ellipsis className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-2xl border-primary/10 bg-card/95 p-2 backdrop-blur">
+                  <DropdownMenuItem onClick={onOpenSetup} className="rounded-xl px-3 py-2.5 text-sm font-semibold">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Configurar receta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onPlanRecipe} className="rounded-xl px-3 py-2.5 text-sm font-semibold">
+                    <ListChecks className="h-4 w-4" />
+                    Planificar receta
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-primary/10" />
+                  <DropdownMenuItem onClick={onExitRecipe} className="rounded-xl px-3 py-2.5 text-sm font-semibold">
+                    <LogOut className="h-4 w-4" />
+                    Salir de la receta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onChangeMission} className="rounded-xl px-3 py-2.5 text-sm font-semibold">
+                    <RotateCcw className="h-4 w-4" />
+                    Reiniciar experiencia
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 
@@ -322,6 +340,15 @@ export function CookingScreen({
 
             <div className="relative z-20 mx-auto flex w-full max-w-sm gap-3">
               <button
+                onClick={onPrevious}
+                disabled={isFirstSubStep}
+                title="Volver al subpaso anterior"
+                aria-label="Volver al subpaso anterior"
+                className="flex w-18 items-center justify-center rounded-[1.5rem] border border-primary/10 bg-card/80 px-4 text-slate-700 transition-all hover:bg-primary/8 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 sm:w-20 sm:rounded-[2rem]"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+              <button
                 onClick={handleQuickAction}
                 className={`flex flex-1 items-center justify-center gap-3 rounded-[1.5rem] border py-4 text-base font-extrabold transition-all active:scale-95 sm:rounded-[2rem] sm:py-5 sm:text-lg ${
                   currentIsTimer && isRunning
@@ -345,7 +372,7 @@ export function CookingScreen({
           </section>
         </main>
 
-        <aside className="hidden w-80 shrink-0 flex-col border-l border-primary/10 bg-card/80 backdrop-blur-2xl xl:flex">
+        <aside className={`hidden w-80 shrink-0 flex-col border-l border-primary/10 bg-card/80 backdrop-blur-2xl transition-opacity duration-300 xl:flex ${isBackgroundMuted ? 'opacity-60' : ''}`}>
           <div className="border-b border-primary/10 p-7">
             <h3 className="mb-1 text-xs font-extrabold uppercase tracking-[0.18em] text-primary/85">Siguiente subpaso</h3>
             <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Vista previa</p>
@@ -378,12 +405,6 @@ export function CookingScreen({
                 <p className="text-sm font-semibold uppercase tracking-widest text-slate-500">No hay más subpasos</p>
               </div>
             )}
-          </div>
-          <div className="mt-auto p-7">
-            <div className="flex items-center justify-between rounded-2xl border border-primary/10 bg-background/80 p-4 opacity-60">
-              <span className="text-xs font-bold uppercase tracking-widest">Preview bloqueado</span>
-              <span className="text-lg">🔒</span>
-            </div>
           </div>
         </aside>
       </div>
