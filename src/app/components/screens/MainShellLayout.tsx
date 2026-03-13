@@ -109,8 +109,8 @@ export function MainShellLayout({
   const pageLabel = getPageLabel(activeItem);
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-primary/10 bg-sidebar px-4 py-5 lg:flex">
+    <div className="min-h-[100dvh] bg-background text-foreground xl:flex">
+      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-primary/10 bg-sidebar px-4 py-5 xl:flex">
         <div className="flex items-center gap-3 px-2">
           <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25">
             <Sparkles className="size-6" />
@@ -169,7 +169,7 @@ export function MainShellLayout({
       </aside>
 
       <div className="flex min-h-[100dvh] flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-primary/10 bg-background/90 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-30 border-b border-primary/10 bg-background/90 backdrop-blur-xl xl:hidden">
           <div className="mx-auto flex w-full max-w-md items-center justify-between px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
@@ -249,9 +249,9 @@ export function MainShellLayout({
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 pb-24 lg:pb-0">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden pb-24 xl:pb-0">{children}</main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-primary/10 bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 backdrop-blur-xl lg:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-primary/10 bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 backdrop-blur-xl xl:hidden">
           <div className="mx-auto grid w-full max-w-md grid-cols-5 gap-1">
             {mobileItems.map((item) => {
               const Icon = item.icon;

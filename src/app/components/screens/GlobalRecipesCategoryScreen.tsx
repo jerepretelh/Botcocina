@@ -85,7 +85,7 @@ export function GlobalRecipesCategoryScreen({
               const isRecipe = item.kind === 'recipe' && recipe;
               const title = isRecipe ? recipe.name : seed?.name ?? 'Idea';
               const ingredient = isRecipe ? recipe.ingredient : (seed?.searchTerms[0] ?? 'Idea base');
-              const dateLabel = isRecipe && recipe.createdAt ? new Date(recipe.createdAt).toLocaleDateString() : 'Idea global';
+              const dateLabel = isRecipe && recipe.createdAt ? new Date(recipe.createdAt).toLocaleDateString() : 'Para generar con IA';
               const isFavorite = recipe ? favoriteRecipeIds.has(recipe.id) : false;
 
               return (
@@ -105,19 +105,23 @@ export function GlobalRecipesCategoryScreen({
                       <div className="flex size-16 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#e7ddd5] text-[1.75rem] md:size-[4.5rem] md:text-[1.9rem]">
                         {recipe?.icon ?? category?.icon ?? '✨'}
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-[1rem] font-black tracking-tight text-[#182338] md:text-[1rem]">{title}</h3>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] font-medium text-[#6d7788]">
-                          <span>{isRecipe ? 'Receta global' : 'Idea IA'}</span>
-                          <span>{ingredient}</span>
-                          <span>{dateLabel}</span>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-[1rem] font-black tracking-tight text-[#182338] md:text-[1rem]">{title}</h3>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.875rem] font-medium text-[#6d7788]">
+                            <span>{ingredient}</span>
+                            <span>{dateLabel}</span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className={`rounded-2xl px-2.5 py-0.5 text-[0.75rem] font-bold ${isRecipe ? 'bg-[#d8e5ff] text-[#2457eb]' : 'bg-[#f4ddd1] text-[#da6f3e]'}`}>
+                              {isRecipe ? 'Receta completa' : 'Idea para IA'}
+                            </span>
+                            {isRecipe ? (
+                              <span className="rounded-2xl bg-[#eef1f5] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#667085]">
+                                Pública
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className={`rounded-2xl px-2.5 py-0.5 text-[0.75rem] font-bold ${isRecipe ? 'bg-[#d8e5ff] text-[#2457eb]' : 'bg-[#f4ddd1] text-[#da6f3e]'}`}>
-                            {isRecipe ? 'Receta completa' : 'Generada con IA'}
-                          </span>
-                        </div>
-                      </div>
                     </button>
 
                     <div className="flex flex-wrap items-center gap-2 md:justify-end">

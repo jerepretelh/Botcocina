@@ -108,6 +108,9 @@ interface UseThermomixHandlersProps {
         resolvedPortion: Portion;
         scaleFactor: number;
     }) => Promise<unknown>;
+    openRecipeSetupOverlay: () => void;
+    openIngredientsOverlay: () => void;
+    closeRecipeOverlays: () => void;
 }
 
 export function useThermomixHandlers(props: UseThermomixHandlersProps) {
@@ -185,6 +188,9 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         recipeUserId,
         activePlannedRecipeItemId,
         savePlannedRecipeConfig,
+        openRecipeSetupOverlay,
+        openIngredientsOverlay,
+        closeRecipeOverlays,
     } = props;
 
     const persistRecipeConfigSafely = (config: Omit<UserRecipeCookingConfig, 'createdAt' | 'updatedAt'>) => {
@@ -244,7 +250,11 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setProduceSize('medium');
         setTimerScaleFactor(1);
         setTimingAdjustedLabel('Tiempo estándar');
-        setScreen('recipe-setup');
+        setCookingSteps(null);
+        setActiveStepLoop(null);
+        setCurrentStepIndex(0);
+        setCurrentSubStepIndex(0);
+        openRecipeSetupOverlay();
     };
 
     const handleCategorySelect = (categoryId: RecipeCategoryId) => {
@@ -283,7 +293,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
                 : `Tiempo ajustado x${setupScaleFactor.toFixed(2)}`,
         );
         setIngredientsBackScreen('recipe-setup');
-        setScreen('ingredients');
+        openIngredientsOverlay();
         if (selectedRecipe && recipeUserId) {
             persistRecipeConfigSafely({
                 userId: recipeUserId,
@@ -351,6 +361,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setCookingSteps(session.steps);
         setActiveStepLoop(session.activeStepLoop);
         setScreen('cooking');
+        closeRecipeOverlays();
         setCurrentStepIndex(0);
         setCurrentSubStepIndex(0);
         if (selectedRecipe && recipeUserId) {
@@ -388,12 +399,26 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
 
     const handleOpenIngredientsFromCooking = () => {
         setIngredientsBackScreen('cooking');
-        setScreen('ingredients');
+        openIngredientsOverlay();
     };
 
     const handleOpenSetupFromCooking = () => {
         setIngredientsBackScreen('recipe-setup');
-        setScreen('recipe-setup');
+        openRecipeSetupOverlay();
+    };
+
+    const handleExitCooking = () => {
+        closeRecipeOverlays();
+        setScreen('category-select');
+        setSelectedCategory(null);
+        setIsRunning(false);
+        setFlipPromptVisible(false);
+        setPendingFlipAdvance(false);
+        setFlipPromptCountdown(0);
+        setStirPromptVisible(false);
+        setPendingStirAdvance(false);
+        setStirPromptCountdown(0);
+        setAwaitingNextUnitConfirmation(false);
     };
 
     const handleChangeMission = () => {
@@ -409,6 +434,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setTimerScaleFactor(1);
         setTimingAdjustedLabel('Tiempo estándar');
         setIngredientsBackScreen('recipe-setup');
+        closeRecipeOverlays();
         setCookingSteps(null);
         setActiveStepLoop(null);
         setCurrentStepIndex(0);
@@ -479,6 +505,15 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
             });
             setCurrentSubStepIndex(Math.max((currentStep?.subSteps.length ?? 1) - 1, 0));
             setIsRunning(false);
+        } else if (currentStepIndex > 0) {
+            const previousStepIndex = currentStepIndex - 1;
+            const previousStep = currentRecipeData[previousStepIndex];
+            setCurrentStepIndex(previousStepIndex);
+            setCurrentSubStepIndex(Math.max((previousStep?.subSteps.length ?? 1) - 1, 0));
+            if (activeStepLoop && activeStepLoop.stepIndex > previousStepIndex) {
+                setActiveStepLoop(null);
+            }
+            setIsRunning(false);
         }
     };
 
@@ -547,5 +582,6 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         handleAnswerChange,
         handleOpenIngredientsFromCooking,
         handleOpenSetupFromCooking,
+        handleExitCooking,
     };
 }
