@@ -13,6 +13,7 @@ import { getIngredientKey, mapCountToPortion } from '../../utils/recipeHelpers';
 import { deriveTargetYieldFromLegacy, describeRecipeYield } from '../../lib/recipeV2';
 import { deriveLegacyPlanCompatFromTargetYield } from '../../lib/planSnapshotCompat';
 import { convertCanonicalVolumeToVisible, requiresExplicitContainerCapacity } from '../../lib/recipe-v2/measurements';
+import { getSetupQuestion, shouldShowCookingContextBlock, usesDiscreteContainerControl } from '../../lib/recipe-v2/setupUxContract';
 import {
   Sheet,
   SheetContent,
@@ -120,7 +121,8 @@ export function PlanRecipeSheet({
 
   const activeYield = selectedYield ?? recipeV2?.baseYield ?? initialSnapshot?.targetYield ?? null;
   const isYieldDriven = Boolean(recipeV2 && activeYield);
-  const isAirfryerRecipe = Boolean(recipeV2?.steps.some((step) => step.equipment === 'airfryer'));
+  const showCookingContextBlock = shouldShowCookingContextBlock(recipeV2, activeYield);
+  const hasDiscreteContainerYield = usesDiscreteContainerControl(activeYield);
   const yieldStep = activeYield?.type === 'weight'
     ? 50
     : activeYield?.type === 'volume'
@@ -370,21 +372,23 @@ export function PlanRecipeSheet({
 
               <div className="rounded-[1.5rem] border border-primary/10 bg-background/80 p-5">
                 <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isYieldDriven) {
-                        adjustYield(-1);
-                      } else if (quantityMode === 'people') {
-                        setPeopleCount((prev) => Math.max(1, prev - 1));
-                      } else {
-                        setAvailableCount((prev) => Math.max(amountUnit === 'grams' ? 50 : 1, prev - (amountUnit === 'grams' ? 50 : 1)));
-                      }
-                    }}
-                    className="flex size-12 items-center justify-center rounded-full border border-primary/20 text-primary"
-                  >
-                    <Minus className="size-5" />
-                  </button>
+                  {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isYieldDriven) {
+                          adjustYield(-1);
+                        } else if (quantityMode === 'people') {
+                          setPeopleCount((prev) => Math.max(1, prev - 1));
+                        } else {
+                          setAvailableCount((prev) => Math.max(amountUnit === 'grams' ? 50 : 1, prev - (amountUnit === 'grams' ? 50 : 1)));
+                        }
+                      }}
+                      className="flex size-12 items-center justify-center rounded-full border border-primary/20 text-primary"
+                    >
+                      <Minus className="size-5" />
+                    </button>
+                  )}
                   <div className="text-center">
                     <div className="text-5xl font-black text-primary">
                       {isYieldDriven ? (yieldValue ?? 'Base') : quantityMode === 'people' ? peopleCount : availableCount}
@@ -398,22 +402,29 @@ export function PlanRecipeSheet({
                             ? 'Gramos'
                             : 'Unidades'}
                     </div>
+                    {isYieldDriven ? (
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                        {getSetupQuestion(recipeV2, activeYield?.type)}
+                      </p>
+                    ) : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isYieldDriven) {
-                        adjustYield(1);
-                      } else if (quantityMode === 'people') {
-                        setPeopleCount((prev) => Math.min(20, prev + 1));
-                      } else {
-                        setAvailableCount((prev) => prev + (amountUnit === 'grams' ? 50 : 1));
-                      }
-                    }}
-                    className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                  >
-                    <Plus className="size-5" />
-                  </button>
+                  {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isYieldDriven) {
+                          adjustYield(1);
+                        } else if (quantityMode === 'people') {
+                          setPeopleCount((prev) => Math.min(20, prev + 1));
+                        } else {
+                          setAvailableCount((prev) => prev + (amountUnit === 'grams' ? 50 : 1));
+                        }
+                      }}
+                      className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                    >
+                      <Plus className="size-5" />
+                    </button>
+                  )}
                 </div>
                 {isYieldDriven && activeYield?.type === 'volume' ? (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -501,7 +512,7 @@ export function PlanRecipeSheet({
                     </div>
                   </div>
                 ) : null}
-                {isYieldDriven && isAirfryerRecipe && activeYield?.type !== 'tray_size' ? (
+                {isYieldDriven && showCookingContextBlock ? (
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Canasta airfryer</p>
                     <div className="flex flex-wrap gap-2">

@@ -1,22 +1,25 @@
 import { ArrowLeft, Heart, HeartOff, Sparkles } from 'lucide-react';
-import type { Recipe, RecipeCategory, RecipeSeed } from '../../../types';
+import type { Recipe, RecipeCategory } from '../../../types';
 import { MainShellLayout } from './MainShellLayout';
 
 interface GlobalCategoryItem {
   id: string;
-  kind: 'recipe' | 'seed';
+  kind: 'recipe';
   recipe?: Recipe;
-  seed?: RecipeSeed;
 }
 
 interface GlobalRecipesCategoryScreenProps {
   currentUserEmail: string | null;
-  category: RecipeCategory | null;
+  category: (RecipeCategory | {
+    id: 'all';
+    name: string;
+    icon: string;
+    description?: string;
+  }) | null;
   items: GlobalCategoryItem[];
   favoriteRecipeIds: Set<string>;
   onBack: () => void;
   onOpenRecipe: (recipe: Recipe) => void;
-  onOpenSeed: (seed: RecipeSeed) => void;
   onToggleFavorite: (recipeId: string) => void;
   onGoHome: () => void;
   onGoGlobalRecipes: () => void;
@@ -36,7 +39,6 @@ export function GlobalRecipesCategoryScreen({
   favoriteRecipeIds,
   onBack,
   onOpenRecipe,
-  onOpenSeed,
   onToggleFavorite,
   onGoHome,
   onGoGlobalRecipes,
@@ -75,20 +77,19 @@ export function GlobalRecipesCategoryScreen({
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#da6f3e]">Recetas globales</p>
               <h1 className="mt-2 text-[1rem] font-black tracking-tight text-[#131d36]">
-                {category ? `${category.icon} ${category.name}` : 'Categoría'}
+                {category ? `${category.icon} ${category.name}` : 'Recetas'}
               </h1>
-              <p className="mt-1 text-[0.875rem] text-[#6d6a67]">Aquí se mezclan recetas completas públicas e ideas base para IA dentro de esta categoría.</p>
+              <p className="mt-1 text-[0.875rem] text-[#6d6a67]">Aquí solo se muestran recetas públicas ya creadas dentro de esta agrupación.</p>
             </div>
           </div>
 
           <div className="space-y-4">
             {items.map((item) => {
               const recipe = item.recipe;
-              const seed = item.seed;
-              const isRecipe = item.kind === 'recipe' && recipe;
-              const title = isRecipe ? recipe.name : seed?.name ?? 'Idea';
-              const ingredient = isRecipe ? recipe.ingredient : (seed?.searchTerms[0] ?? 'Idea base');
-              const dateLabel = isRecipe && recipe.createdAt ? new Date(recipe.createdAt).toLocaleDateString() : 'Para generar con IA';
+              const isRecipe = Boolean(recipe);
+              const title = recipe?.name ?? 'Receta';
+              const ingredient = recipe?.ingredient ?? 'Receta';
+              const dateLabel = recipe?.createdAt ? new Date(recipe.createdAt).toLocaleDateString() : 'Receta disponible';
               const isFavorite = recipe ? favoriteRecipeIds.has(recipe.id) : false;
 
               return (
@@ -101,7 +102,6 @@ export function GlobalRecipesCategoryScreen({
                       type="button"
                       onClick={() => {
                         if (recipe) onOpenRecipe(recipe);
-                        if (seed) onOpenSeed(seed);
                       }}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
@@ -115,10 +115,10 @@ export function GlobalRecipesCategoryScreen({
                             <span>{dateLabel}</span>
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className={`rounded-2xl px-2.5 py-0.5 text-[0.75rem] font-bold ${isRecipe ? 'bg-[#d8e5ff] text-[#2457eb]' : 'bg-[#f4ddd1] text-[#da6f3e]'}`}>
-                              {isRecipe ? 'Receta completa' : 'Idea para IA'}
+                            <span className="rounded-2xl bg-[#d8e5ff] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#2457eb]">
+                              Receta completa
                             </span>
-                            {isRecipe ? (
+                            {recipe ? (
                               <span className="rounded-2xl bg-[#eef1f5] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#667085]">
                                 Pública
                               </span>
@@ -132,11 +132,10 @@ export function GlobalRecipesCategoryScreen({
                         type="button"
                         onClick={() => {
                           if (recipe) onOpenRecipe(recipe);
-                          if (seed) onOpenSeed(seed);
                         }}
                         className="inline-flex h-9 items-center gap-1.5 rounded-[0.8rem] bg-[#da6f3e] px-3.5 text-[0.875rem] font-bold text-white transition-transform hover:scale-[1.01]"
                       >
-                        {isRecipe ? 'Abrir' : 'Crear con IA'}
+                        Abrir
                       </button>
                       {recipe ? (
                         <button
@@ -163,7 +162,7 @@ export function GlobalRecipesCategoryScreen({
                 <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-[#f4ddd1] text-[#da6f3e]">
                   <Sparkles className="size-6" />
                 </div>
-                Esta categoría aún no tiene recetas o ideas globales visibles.
+                Esta agrupación aún no tiene recetas públicas visibles.
               </div>
             ) : null}
           </div>

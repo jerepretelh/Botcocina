@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { Recipe } from '../../../types';
 import type { ContainerMetaV2, CookingContextV2, RecipeV2, RecipeYieldV2 } from '../../types/recipe-v2';
 import { convertCanonicalVolumeToVisible, formatDisplayNumber, requiresExplicitContainerCapacity } from '../../lib/recipe-v2/measurements';
+import { getSetupQuestion, shouldShowCookingContextBlock, usesDiscreteContainerControl } from '../../lib/recipe-v2/setupUxContract';
 import { ProductSurface } from '../ui/product-system';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 
@@ -25,49 +26,6 @@ function getBaseIngredientLabel(recipe: RecipeV2 | null | undefined) {
   const baseIngredient = recipe.ingredients?.find((item) => item.id === recipe.baseIngredientId);
   if (baseIngredient?.name) return baseIngredient.name.toLowerCase();
   return recipe.baseIngredientId;
-}
-
-function getQuestion(yieldType: RecipeYieldV2['type'] | undefined, recipe: RecipeV2 | null | undefined) {
-  if (recipe?.scalingModel === 'base_ingredient') {
-    const baseIngredient = getBaseIngredientLabel(recipe);
-    switch (yieldType) {
-      case 'units':
-        return `¿Cuántas ${baseIngredient} quieres usar?`;
-      case 'weight':
-        return `¿Cuánto pesa la base de ${baseIngredient}?`;
-      case 'volume':
-        return `¿Cuánto ${baseIngredient} quieres usar?`;
-      case 'pan_size':
-      case 'tray_size':
-        return `¿Qué recipiente usarás para ${baseIngredient}?`;
-      default:
-        return `¿Cuánto ${baseIngredient} quieres usar?`;
-    }
-  }
-
-  if (recipe?.scalingModel === 'container_bound') {
-    switch (yieldType) {
-      case 'pan_size':
-      case 'tray_size':
-        return '¿Qué recipiente quieres usar como referencia?';
-      default:
-        return '¿Qué recipiente quieres usar para esta receta?';
-    }
-  }
-
-  switch (yieldType) {
-    case 'units':
-      return '¿Cuántas unidades quieres preparar?';
-    case 'weight':
-      return '¿Cuánto peso quieres preparar?';
-    case 'volume':
-      return '¿Cuánto volumen quieres preparar?';
-    case 'pan_size':
-    case 'tray_size':
-      return '¿Qué tamano de recipiente usarás?';
-    default:
-      return '¿Para cuánto quieres cocinar?';
-  }
 }
 
 function getYieldCardLabel(recipe: RecipeV2 | null | undefined, baseIngredientLabel: string) {
@@ -132,10 +90,10 @@ export function RecipeSetupScreenV2({
   onBack,
   onContinue,
 }: RecipeSetupScreenV2Props) {
-  const isAirfryerRecipe = Boolean(recipe?.steps.some((step) => step.equipment === 'airfryer'));
   const baseIngredientLabel = getBaseIngredientLabel(recipe);
   const effectiveYield = selectedYield ?? recipe?.baseYield ?? null;
-  const hasDiscreteContainerYield = effectiveYield?.type === 'pan_size' || effectiveYield?.type === 'tray_size';
+  const hasDiscreteContainerYield = usesDiscreteContainerControl(effectiveYield);
+  const showCookingContextBlock = shouldShowCookingContextBlock(recipe, effectiveYield);
 
   const applyVolumeUnit = (unit: 'ml' | 'l' | 'taza' | 'vaso') => {
     if (!selectedYield) return;
@@ -237,7 +195,7 @@ export function RecipeSetupScreenV2({
                   {selectedRecipe?.name ?? recipe?.name ?? 'Configurar receta'}
                 </h1>
                 <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600">
-                  {getQuestion(effectiveYield?.type, recipe)}
+                  {getSetupQuestion(recipe, effectiveYield?.type)}
                 </p>
               </div>
             </div>
@@ -373,7 +331,7 @@ export function RecipeSetupScreenV2({
                   </div>
                 ) : null}
 
-                {isAirfryerRecipe ? (
+                {showCookingContextBlock ? (
                   <div className="mt-4 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Canasta de airfryer</p>
                     <div className="mt-3 flex flex-wrap gap-2">

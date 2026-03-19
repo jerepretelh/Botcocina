@@ -330,33 +330,39 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     [uniqueAvailableRecipes],
   );
   const globalCategories = useMemo(
-    () =>
-      recipeCategories
+    () => [
+      {
+        category: {
+          id: 'all' as const,
+          name: 'Todas',
+          icon: '📚',
+          description: 'Todas las recetas públicas disponibles en la fuente actual.',
+        },
+        recipeCount: publicRecipes.length,
+      },
+      ...recipeCategories
         .filter((category) => category.id !== 'personalizadas')
         .map((category) => ({
           category,
           recipeCount: publicRecipes.filter((recipe) => matchesRecipeCategory(category.id, recipe.categoryId)).length,
-          ideaCount: recipeSeeds.seeds.filter((seed) => matchesRecipeCategory(category.id, seed.categoryId)).length,
         }))
-        .filter((entry) => entry.recipeCount > 0 || entry.ideaCount > 0),
-    [publicRecipes, recipeSeeds.seeds],
+        .filter((entry) => entry.recipeCount > 0),
+    ],
+    [publicRecipes],
   );
   const globalCategoryItems = useMemo(() => {
-    if (!recipeSelection.selectedCategory) return [];
+    if (!recipeSelection.selectedCategory) {
+      return publicRecipes
+        .map((recipe) => ({ id: `recipe:${recipe.id}`, kind: 'recipe' as const, recipe }))
+        .sort((a, b) => (a.recipe?.name ?? '').localeCompare(b.recipe?.name ?? ''));
+    }
 
     const recipeItems = publicRecipes
       .filter((recipe) => matchesRecipeCategory(recipeSelection.selectedCategory, recipe.categoryId))
       .map((recipe) => ({ id: `recipe:${recipe.id}`, kind: 'recipe' as const, recipe }));
-    const seedItems = recipeSeeds.seeds
-      .filter((seed) => matchesRecipeCategory(recipeSelection.selectedCategory, seed.categoryId))
-      .map((seed) => ({ id: `seed:${seed.id}`, kind: 'seed' as const, seed }));
 
-    return [...recipeItems, ...seedItems].sort((a, b) => {
-      const aLabel = a.kind === 'recipe' ? a.recipe?.name ?? '' : a.seed?.name ?? '';
-      const bLabel = b.kind === 'recipe' ? b.recipe?.name ?? '' : b.seed?.name ?? '';
-      return aLabel.localeCompare(bLabel);
-    });
-  }, [publicRecipes, recipeSeeds.seeds, recipeSelection.selectedCategory]);
+    return recipeItems.sort((a, b) => (a.recipe?.name ?? '').localeCompare(b.recipe?.name ?? ''));
+  }, [publicRecipes, recipeSelection.selectedCategory]);
   const privateUserRecipes = dedupeRecipesBySignature(
     uniqueAvailableRecipes
     .filter((recipe) => recipe.ownerUserId === auth.userId && (recipe.visibility ?? 'public') === 'private')
@@ -1530,7 +1536,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           currentUserEmail={auth.user?.email ?? null}
           categories={globalCategories}
           onSelectCategory={(category) => {
-            recipeSelection.setSelectedCategory(category.id);
+            recipeSelection.setSelectedCategory(category.id === 'all' ? null : category.id);
             recipeSelection.setScreen('recipe-select');
           }}
           onGoHome={() => recipeSelection.setScreen('category-select')}
@@ -1772,12 +1778,16 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       <>
         <GlobalRecipesCategoryScreen
           currentUserEmail={auth.user?.email ?? null}
-          category={recipeSelection.selectedCategoryMeta}
+          category={recipeSelection.selectedCategoryMeta ?? {
+            id: 'all' as const,
+            name: 'Todas',
+            icon: '📚',
+            description: 'Todas las recetas públicas disponibles en la fuente actual.',
+          }}
           items={globalCategoryItems}
           favoriteRecipeIds={userFavorites.favoriteRecipeIds}
           onBack={() => recipeSelection.goBackScreen('global-recipes')}
           onOpenRecipe={handleRecipeOpen}
-          onOpenSeed={(seed) => aiRecipeGen.startWizardFromSeed(seed)}
           onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
           onGoHome={() => recipeSelection.setScreen('category-select')}
           onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}

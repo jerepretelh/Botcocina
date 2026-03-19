@@ -3,15 +3,19 @@ import type { RecipeCategory } from '../../../types';
 import { MainShellLayout } from './MainShellLayout';
 
 interface GlobalCategoryEntry {
-  category: RecipeCategory;
+  category: RecipeCategory | {
+    id: 'all';
+    name: string;
+    icon: string;
+    description?: string;
+  };
   recipeCount: number;
-  ideaCount: number;
 }
 
 interface GlobalRecipesScreenProps {
   currentUserEmail: string | null;
   categories: GlobalCategoryEntry[];
-  onSelectCategory: (category: RecipeCategory) => void;
+  onSelectCategory: (category: GlobalCategoryEntry['category']) => void;
   onGoHome: () => void;
   onGoGlobalRecipes: () => void;
   onGoMyRecipes: () => void;
@@ -56,11 +60,11 @@ export function GlobalRecipesScreen({
           <div className="mb-5">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#da6f3e]">Recetas globales</p>
             <h1 className="mt-2 text-[1rem] font-black tracking-tight text-[#131d36]">Explora por categoría</h1>
-            <p className="mt-1 text-[0.875rem] text-[#6d6a67]">Entra primero a una categoría y luego elige una receta completa o una idea para IA.</p>
+            <p className="mt-1 text-[0.875rem] text-[#6d6a67]">Entra a una agrupación y elige una receta pública ya disponible.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {categories.map(({ category, recipeCount, ideaCount }) => (
+            {categories.map(({ category, recipeCount }) => (
               <button
                 key={category.id}
                 type="button"
@@ -83,9 +87,6 @@ export function GlobalRecipesScreen({
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <span className="rounded-2xl bg-[#d8e5ff] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#2457eb]">
                     {recipeCount} receta{recipeCount === 1 ? '' : 's'}
-                  </span>
-                  <span className="rounded-2xl bg-[#f4ddd1] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#da6f3e]">
-                    {ideaCount} idea{ideaCount === 1 ? '' : 's'} IA
                   </span>
                 </div>
               </button>
