@@ -27,6 +27,7 @@ import { buildSavedRecipeSummary, deriveRecipeSetupBehavior } from '../lib/recip
 import { buildCookingSessionState } from '../lib/cookingSession';
 import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
 import { buildMixedRecipeSearchResults } from '../lib/mixedRecipeSearch';
+import { resolveRoutableCategoryId } from '../lib/routableRecipeCategory';
 import { resolveSubStepDisplayValue } from '../lib/recipeScaling';
 import { resolvePersistedTargetYield } from '../lib/recipe-v2/resolvePersistedTargetYield';
 import { buildCookingPresentationV2 } from '../lib/presentation/buildCookingPresentationV2';
@@ -475,6 +476,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     const recipeV2 = recipeSelection.recipeV2ById[recipe.id] ?? null;
     const savedConfig = userRecipeConfigs.configsByRecipeId[recipe.id] ?? null;
     const setupBehavior = deriveRecipeSetupBehavior(recipe, content, savedConfig);
+    const resolvedCategoryId = resolveRoutableCategoryId(recipe.categoryId);
 
     if (content && !recipeSelection.ingredientSelectionByRecipe[recipe.id]) {
       const baseSelection = buildInitialIngredientSelection(content.ingredients);
@@ -495,7 +497,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     }
 
     recipeSelection.setSelectedRecipe(recipe);
-    recipeSelection.setSelectedCategory(recipe.categoryId);
+    recipeSelection.setSelectedCategory(resolvedCategoryId);
     if (recipeV2) {
       recipeSelection.setTargetYield(
         resolvePersistedTargetYield(
