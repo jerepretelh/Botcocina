@@ -23,8 +23,33 @@ interface InlineCompoundMessage {
   body: string;
 }
 
-function getStorageKey(recipeId: string) {
-  return `compound_cooking_progress_${recipeId}`;
+export function getCompoundConfigSignature(recipe: ScaledRecipeV2 | null) {
+  if (!recipe) return 'no-recipe';
+
+  return JSON.stringify({
+    recipeId: recipe.id,
+    selectedYield: {
+      type: recipe.selectedYield.type,
+      value: recipe.selectedYield.value,
+      canonicalUnit: recipe.selectedYield.canonicalUnit ?? null,
+      visibleUnit: recipe.selectedYield.visibleUnit ?? null,
+      label: recipe.selectedYield.label ?? null,
+      containerKey: recipe.selectedYield.containerKey ?? null,
+      containerSizeLabel: recipe.selectedYield.containerMeta?.sizeLabel ?? null,
+      containerDiameterCm: recipe.selectedYield.containerMeta?.diameterCm ?? null,
+      containerCapacityMl: recipe.selectedYield.containerMeta?.capacityMl ?? null,
+    },
+    selectedCookingContext: {
+      selectedContainerKey: recipe.selectedCookingContext?.selectedContainerKey ?? null,
+      selectedContainerSizeLabel: recipe.selectedCookingContext?.selectedContainerMeta?.sizeLabel ?? null,
+      selectedContainerCapacityMl: recipe.selectedCookingContext?.selectedContainerMeta?.capacityMl ?? null,
+    },
+    batchCount: recipe.batchResolution?.batchCount ?? 1,
+  });
+}
+
+function getStorageKey(recipeId: string, configSignature: string) {
+  return `compound_cooking_progress_${recipeId}_${configSignature}`;
 }
 
 const AUTO_DISMISS_EXPIRED_TIMER_MS = 12000;
@@ -41,7 +66,9 @@ export function useCompoundCookingSessionV2({
   const [isRecipeComplete, setIsRecipeComplete] = useState(false);
   const [inlineMessage, setInlineMessage] = useState<InlineCompoundMessage | null>(null);
   const hydratedRecipeIdRef = useRef<string | null>(null);
+  const hydratedConfigSignatureRef = useRef<string | null>(null);
   const previousTimersRef = useRef<ActiveCompoundTimer[]>([]);
+  const configSignature = useMemo(() => getCompoundConfigSignature(scaledRecipe), [scaledRecipe]);
 
   useEffect(() => {
     const recipeId = selectedRecipe?.id ?? null;
@@ -49,6 +76,7 @@ export function useCompoundCookingSessionV2({
 
     if (!recipeId || !isCompound) {
       hydratedRecipeIdRef.current = null;
+      hydratedConfigSignatureRef.current = null;
       setCurrentTimelineIndex(0);
       setActiveTimers([]);
       setFocusedComponentId(null);
@@ -57,10 +85,11 @@ export function useCompoundCookingSessionV2({
       return;
     }
 
-    if (hydratedRecipeIdRef.current === recipeId) return;
+    if (hydratedRecipeIdRef.current === recipeId && hydratedConfigSignatureRef.current === configSignature) return;
     hydratedRecipeIdRef.current = recipeId;
+    hydratedConfigSignatureRef.current = configSignature;
 
-    const saved = localStorage.getItem(getStorageKey(recipeId));
+    const saved = localStorage.getItem(getStorageKey(recipeId, configSignature));
     if (!saved) {
       setCurrentTimelineIndex(0);
       setActiveTimers([]);
@@ -83,7 +112,7 @@ export function useCompoundCookingSessionV2({
       setIsRecipeComplete(false);
       setInlineMessage(null);
     }
-  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe]);
+  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe, configSignature]);
 
   useEffect(() => {
     const recipeId = selectedRecipe?.id;
@@ -97,8 +126,8 @@ export function useCompoundCookingSessionV2({
       isRecipeComplete,
     };
 
-    localStorage.setItem(getStorageKey(recipeId), JSON.stringify(snapshot));
-  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe?.compoundMeta, currentTimelineIndex, focusedComponentId, activeTimers, isRecipeComplete]);
+    localStorage.setItem(getStorageKey(recipeId, configSignature), JSON.stringify(snapshot));
+  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe?.compoundMeta, currentTimelineIndex, focusedComponentId, activeTimers, isRecipeComplete, configSignature]);
 
   useEffect(() => {
     if (screen !== 'cooking') return;
@@ -286,7 +315,7 @@ export function useCompoundCookingSessionV2({
     setIsRecipeComplete(false);
     setInlineMessage(null);
     if (selectedRecipe?.id) {
-      localStorage.removeItem(getStorageKey(selectedRecipe.id));
+      localStorage.removeItem(getStorageKey(selectedRecipe.id, configSignature));
     }
   };
 

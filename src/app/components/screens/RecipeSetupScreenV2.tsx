@@ -135,6 +135,7 @@ export function RecipeSetupScreenV2({
   const isAirfryerRecipe = Boolean(recipe?.steps.some((step) => step.equipment === 'airfryer'));
   const baseIngredientLabel = getBaseIngredientLabel(recipe);
   const effectiveYield = selectedYield ?? recipe?.baseYield ?? null;
+  const hasDiscreteContainerYield = effectiveYield?.type === 'pan_size' || effectiveYield?.type === 'tray_size';
 
   const applyVolumeUnit = (unit: 'ml' | 'l' | 'taza' | 'vaso') => {
     if (!selectedYield) return;
@@ -259,13 +260,15 @@ export function RecipeSetupScreenV2({
 
                 <div className="mt-4 rounded-[1.25rem] border border-[#edd9cc] bg-[#f3ece4] p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={onDecrement}
-                      className="flex size-12 items-center justify-center rounded-full border border-[#efc7b4] bg-[#fbf6f2] text-xl text-primary transition-transform active:scale-95"
-                    >
-                      -
-                    </button>
+                    {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                      <button
+                        type="button"
+                        onClick={onDecrement}
+                        className="flex size-12 items-center justify-center rounded-full border border-[#efc7b4] bg-[#fbf6f2] text-xl text-primary transition-transform active:scale-95"
+                      >
+                        -
+                      </button>
+                    )}
 
                     <div className="text-center">
                       <span className="text-4xl font-black tracking-tight text-primary sm:text-5xl">
@@ -276,13 +279,15 @@ export function RecipeSetupScreenV2({
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={onIncrement}
-                      className="flex size-12 items-center justify-center rounded-full bg-primary text-xl text-primary-foreground shadow-lg shadow-primary/25 transition-transform active:scale-95"
-                    >
-                      +
-                    </button>
+                    {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                      <button
+                        type="button"
+                        onClick={onIncrement}
+                        className="flex size-12 items-center justify-center rounded-full bg-primary text-xl text-primary-foreground shadow-lg shadow-primary/25 transition-transform active:scale-95"
+                      >
+                        +
+                      </button>
+                    )}
                   </div>
 
                   <div className="mt-4 rounded-[1rem] bg-[#f4ddd1] px-4 py-3 text-center text-sm font-medium text-primary">

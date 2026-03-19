@@ -21,6 +21,8 @@ export function buildScaledRecipe(
     cookingContext: resolvedCookingContext,
   });
   const scaledSteps = scaleStepTimers(recipe.steps, recipe.baseYield, targetYield, {
+    recipe,
+    cookingContext: resolvedCookingContext,
     timerScaleFactor,
   });
   const timeSummary = scaleTimeSummary(recipe, targetYield, timerScaleFactor);
