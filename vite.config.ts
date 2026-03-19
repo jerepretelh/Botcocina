@@ -73,6 +73,113 @@ function buildStructuredUserPrompt(rawPrompt: string, rawContext: RecipeContextD
   return lines.join('\n')
 }
 
+function classifyRecipePromptComplexity(prompt: string): 'simple' | 'complex' {
+  const normalized = prompt
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const complexHints = [
+    'mientras',
+    'al mismo tiempo',
+    'por separado',
+    'en otra olla',
+    'en otra sarten',
+    'reserva',
+    'vuelve',
+    'integra al final',
+    'salsa',
+    'guarnicion',
+    'acompanamiento',
+    'acompaña',
+    'compuesta',
+    'paralelo',
+  ]
+
+  const hitCount = complexHints.filter((hint) => normalized.includes(hint)).length
+  return hitCount >= 2 ? 'complex' : 'simple'
+}
+
+function buildRecipeSystemPrompt(complexity: 'simple' | 'complex'): string {
+  const baseLines = [
+    'Eres un chef experto. Responde SOLO JSON valido sin markdown.',
+    'Genera una receta en espanol para una app de cocina guiada.',
+    'Usa terminos culinarios de Peru cuando aplique.',
+    'Genera la receta SOLO para la cantidad exacta solicitada. No generes variantes 1/2/4.',
+    'La salida debe seguir un contrato V2 estructurado para rendimiento, ingredientes, pasos y tiempos.',
+    'Formato exacto:',
+    '{',
+    '  "id": "slug-corto-opcional",',
+    '  "name": "Nombre receta",',
+    '  "icon": "emoji",',
+    '  "ingredient": "Ingrediente principal",',
+    '  "description": "Resumen corto",',
+    '  "tip": "Consejo breve",',
+    '  "baseYield": {',
+    '    "type": "servings|units|weight|volume|pan_size|tray_size|custom",',
+    '    "value": 2,',
+    '    "unit": "personas|huevos|g|ml|molde mediano",',
+    '    "label": "texto corto opcional"',
+    '  },',
+    '  "ingredients": [',
+    '    {',
+    '      "name": "Ingrediente",',
+    '      "emoji": "emoji",',
+    '      "indispensable": true,',
+    '      "amount": {',
+    '        "value": 200,',
+    '        "unit": "g",',
+    '        "text": "200 g",',
+    '        "scalable": true,',
+    '        "scalingPolicy": "linear|fixed|gentle|batch|container_dependent|non_scalable"',
+    '      }',
+    '    }',
+    '  ],',
+    '  "steps": [',
+    '    {',
+    '      "title": "Nombre paso",',
+    '      "fireLevel": "low|medium|high",',
+    '      "subSteps": [',
+    '        {',
+    '          "text": "Accion",',
+    '          "notes": "Detalle breve",',
+    '          "amount": { "value": 1, "unit": "taza", "text": "1 taza", "scalable": true, "scalingPolicy": "linear" },',
+    '          "timer": { "durationSeconds": 480, "scalingPolicy": "gentle" },',
+    '          "isTimer": true',
+    '        }',
+    '      ]',
+    '    }',
+    '  ],',
+    '  "timeSummary": { "prepMinutes": 10, "cookMinutes": 18, "totalMinutes": 28 },',
+    '  "experience": "standard|compound",',
+    '  "compoundMeta": null',
+    '}',
+    'Si un subStep no necesita amount o timer, puedes omitir el campo o enviarlo como null.',
+    'Si isTimer=true, timer.durationSeconds debe ser entero en segundos.',
+    'No uses fields legacy como portions, baseServings o baseValue salvo que sean necesarios como compatibilidad secundaria.',
+    'Mantén notes cortas y solo cuando aporten.',
+    'No generes mensajes de UX, banners, recordatorios ni texto extra.',
+    'No inventes campos adicionales.',
+  ]
+
+  if (complexity === 'complex') {
+    return [
+      ...baseLines,
+      'Organiza la receta para que sea clara cuando existan procesos paralelos o componentes que luego se integran.',
+      'Usa timers solo cuando realmente ayuden a coordinar hervor, coccion, reposo o reduccion.',
+      'Evita duplicar acciones triviales o explicaciones largas.',
+      'Usa entre 4 y 8 pasos y entre 1 y 4 subpasos por paso.',
+    ].join('\n')
+  }
+
+  return [
+    ...baseLines,
+    'Prefiere una receta lineal, compacta y directa.',
+    'Usa entre 3 y 6 pasos y entre 1 y 3 subpasos por paso.',
+    'No añadas timers si no cambian la ejecucion real de la receta.',
+  ].join('\n')
+}
+
 async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'Method not allowed' })
@@ -105,54 +212,8 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
     return
   }
 
-  const recipeSystemPrompt = [
-    'Eres un chef experto. Responde SOLO JSON valido sin markdown.',
-    'Genera una receta en espanol para una app de cocina guiada.',
-    'Usa nombres de ingredientes y acciones en espanol de Peru (ej: papa, choclo, culantro, cebolla china, aji amarillo) cuando aplique.',
-    'Incluye tiempos realistas en segundos para sub-pasos con timer.',
-    'Formato exacto:',
-    '{',
-    '  "id": "slug-corto-opcional",',
-    '  "name": "Nombre receta",',
-    '  "icon": "emoji",',
-    '  "ingredient": "Ingrediente principal en plural",',
-    '  "description": "N pasos · duracion aproximada",',
-    '  "tip": "Consejo breve",',
-    '  "portionLabels": { "singular": "unidad", "plural": "unidades" },',
-    '  "ingredients": [',
-    '    { "name": "Ingrediente", "emoji": "emoji", "indispensable": true, "portions": { "1": "texto", "2": "texto", "4": "texto" } }',
-    '  ],',
-    '  "steps": [',
-    '    {',
-    '      "stepNumber": 1,',
-    '      "stepName": "Nombre paso",',
-    '      "fireLevel": "low|medium|high",',
-    '      "subSteps": [',
-    '        {',
-    '          "subStepName": "Accion",',
-    '          "notes": "Detalle breve",',
-    '          "portions": { "1": "Continuar o numero", "2": "Continuar o numero", "4": "Continuar o numero" },',
-    '          "isTimer": true',
-    '        }',
-    '      ]',
-    '    }',
-    '  ]',
-    '}',
-    'Reglas: 4 a 8 pasos, cada paso con 1 a 5 subpasos, JSON valido siempre.',
-    'Cada step DEBE incluir fireLevel (low|medium|high).',
-    'Orden obligatorio: primero mise en place (lavar/pelar/cortar), luego precalentado/calentar aceite, luego coccion.',
-    'Nunca pongas un subpaso de pelar/cortar despues de calentar aceite o iniciar coccion.',
-    'Cuando corresponda cambiar intensidad, agrega subpaso explicito: "Bajar fuego" o "Subir fuego" y especifica el nivel final en notes.',
-    'Regla obligatoria para recetas en sarten:',
-    '1) El paso 1 DEBE llamarse "Precalentado" e incluir un subpaso con isTimer=true para precalentar la sarten.',
-    '2) El paso 2 DEBE llamarse "Calentar aceite" e incluir un subpaso con isTimer=true para calentar aceite.',
-    '3) En ambos pasos debe existir accion manual + timer, y los timers deben ser numeros en segundos en portions.1/2/4.',
-    '4) No omitir estos pasos aunque el usuario no los pida explicitamente.',
-    '5) Marca "indispensable": true para ingredientes obligatorios del plato y false para opcionales (sal, pimienta, hierbas, condimentos extra).',
-    '6) Si una coccion tiene "primera cara", "primer lado" o "primer tramo", agrega un subpaso no-timer con prefijo "Recordatorio:" antes del segundo tramo.',
-    '7) El subpaso de recordatorio debe ser no-timer (isTimer=false) con portions en "Continuar". Ejemplo: "Recordatorio: mover papas" o "Recordatorio: voltear".',
-    '8) Para frituras por tandas (papas, nuggets, etc.) usa secuencia repetible por tanda: timer tramo 1 -> recordatorio -> timer tramo 2 -> subpaso de tanda completada.',
-  ].join('\n')
+  const recipeComplexity = classifyRecipePromptComplexity(userPrompt)
+  const recipeSystemPrompt = buildRecipeSystemPrompt(recipeComplexity)
   const clarifySystemPrompt = [
     'Eres un asistente culinario. Responde SOLO JSON valido sin markdown.',
     'Tu tarea NO es generar receta aun.',
@@ -286,7 +347,10 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
                 usage,
               }
             : {
-                recipe: parsed,
+                recipe: {
+                  ...(parsed as Record<string, unknown>),
+                  complexity: recipeComplexity,
+                },
                 usage,
               },
         )
@@ -366,7 +430,10 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
             usage,
           }
         : {
-            recipe: parsed,
+            recipe: {
+              ...(parsed as Record<string, unknown>),
+              complexity: recipeComplexity,
+            },
             usage,
           },
     )

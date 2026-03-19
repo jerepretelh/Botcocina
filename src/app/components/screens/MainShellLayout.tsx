@@ -1,4 +1,5 @@
 import {
+  Beaker,
   BookHeart,
   CalendarDays,
   Heart,
@@ -20,7 +21,7 @@ import {
   SheetTrigger,
 } from '../ui/sheet';
 
-type NavItem = 'home' | 'global-recipes' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'settings';
+type NavItem = 'home' | 'global-recipes' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'compound-lab' | 'settings';
 
 interface MainShellLayoutProps {
   activeItem: NavItem;
@@ -31,6 +32,7 @@ interface MainShellLayoutProps {
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
   children: React.ReactNode;
@@ -69,6 +71,8 @@ function getPageLabel(activeItem: NavItem): string {
       return 'Planificación';
     case 'shopping-list':
       return 'Compras';
+    case 'compound-lab':
+      return 'Recetas compuestas';
     case 'settings':
       return 'Ajustes';
     default:
@@ -85,6 +89,7 @@ export function MainShellLayout({
   onGoFavorites,
   onGoWeeklyPlan,
   onGoShoppingList,
+  onGoCompoundLab,
   onGoSettings,
   onSignOut,
   children,
@@ -96,6 +101,7 @@ export function MainShellLayout({
     { id: 'favorites', label: 'Favoritos', icon: Heart, onClick: onGoFavorites },
     { id: 'weekly-plan', label: 'Planificación', icon: CalendarDays, onClick: onGoWeeklyPlan },
     { id: 'shopping-list', label: 'Compras', icon: ShoppingBasket, onClick: onGoShoppingList },
+    { id: 'compound-lab', label: 'Recetas compuestas', icon: Beaker, onClick: onGoCompoundLab },
   ];
 
   const mobileItems = [
@@ -103,6 +109,7 @@ export function MainShellLayout({
     { id: 'global-recipes', label: 'Recetas', icon: LibraryBig, onClick: onGoGlobalRecipes },
     { id: 'weekly-plan', label: 'Plan', icon: CalendarDays, onClick: onGoWeeklyPlan },
     { id: 'shopping-list', label: 'Compras', icon: ShoppingBasket, onClick: onGoShoppingList },
+    { id: 'compound-lab', label: 'Lab', icon: Beaker, onClick: onGoCompoundLab },
   ] as const;
 
   const moreActive = activeItem === 'my-recipes' || activeItem === 'favorites' || activeItem === 'settings';
@@ -236,6 +243,14 @@ export function MainShellLayout({
                     <Settings className="size-5" />
                     Ajustes
                   </button>
+                  <button
+                    type="button"
+                    onClick={onGoCompoundLab}
+                    className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'compound-lab')}`}
+                  >
+                    <Beaker className="size-5" />
+                    Recetas compuestas
+                  </button>
                   <Button
                     variant="outline"
                     className="w-full rounded-[1.25rem] border-primary/20 bg-transparent"
@@ -252,7 +267,7 @@ export function MainShellLayout({
         <main className="min-w-0 flex-1 overflow-x-hidden pb-24 xl:pb-0">{children}</main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-primary/10 bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 backdrop-blur-xl xl:hidden">
-          <div className="mx-auto grid w-full max-w-md grid-cols-5 gap-1">
+          <div className="mx-auto grid w-full max-w-md grid-cols-6 gap-1">
             {mobileItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeItem === item.id;
@@ -307,6 +322,14 @@ export function MainShellLayout({
                   >
                     <Settings className="size-5" />
                     Ajustes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onGoCompoundLab}
+                    className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'compound-lab')}`}
+                  >
+                    <Beaker className="size-5" />
+                    Recetas compuestas
                   </button>
                   <Button
                     variant="outline"

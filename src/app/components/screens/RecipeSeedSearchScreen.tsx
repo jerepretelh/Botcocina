@@ -18,6 +18,7 @@ interface RecipeSeedSearchScreenProps {
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
 }
@@ -37,6 +38,7 @@ export function RecipeSeedSearchScreen({
   onGoFavorites,
   onGoWeeklyPlan,
   onGoShoppingList,
+  onGoCompoundLab,
   onGoSettings,
   onSignOut,
 }: RecipeSeedSearchScreenProps) {
@@ -50,6 +52,7 @@ export function RecipeSeedSearchScreen({
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
       onGoShoppingList={onGoShoppingList}
+      onGoCompoundLab={onGoCompoundLab}
       onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >

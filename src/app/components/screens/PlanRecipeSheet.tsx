@@ -7,8 +7,12 @@ import type {
   WeeklyPlanItemConfigSnapshot,
   WeeklyPlanSlot,
 } from '../../../types';
+import type { ContainerMetaV2, CookingContextV2, RecipeV2, RecipeYieldV2 } from '../../types/recipe-v2';
 import { deriveRecipeSetupBehavior } from '../../lib/recipeSetupBehavior';
 import { getIngredientKey, mapCountToPortion } from '../../utils/recipeHelpers';
+import { deriveTargetYieldFromLegacy, describeRecipeYield } from '../../lib/recipeV2';
+import { deriveLegacyPlanCompatFromTargetYield } from '../../lib/planSnapshotCompat';
+import { convertCanonicalVolumeToVisible, requiresExplicitContainerCapacity } from '../../lib/recipe-v2/measurements';
 import {
   Sheet,
   SheetContent,
@@ -22,10 +26,24 @@ import { Button } from '../ui/button';
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const SLOTS: WeeklyPlanSlot[] = ['desayuno', 'almuerzo', 'cena'];
 
+function getYieldDisplayValue(yieldValue: RecipeYieldV2 | null | undefined) {
+  if (!yieldValue) return 'Base';
+  if (yieldValue.type === 'pan_size' || yieldValue.type === 'tray_size') {
+    return yieldValue.containerMeta?.sizeLabel ?? yieldValue.label ?? 'Recipiente';
+  }
+  if (yieldValue.value == null) return 'Base';
+  if (yieldValue.type === 'volume' && yieldValue.canonicalUnit === 'ml') {
+    const visible = convertCanonicalVolumeToVisible(yieldValue.value, yieldValue.visibleUnit, yieldValue.containerMeta);
+    return String(Number(visible.toFixed(visible >= 10 ? 1 : 2))).replace(/\.0$/, '');
+  }
+  return `${yieldValue.value}`;
+}
+
 interface PlanRecipeSheetProps {
   open: boolean;
   recipe: Recipe | null;
   recipeContent: RecipeContent | null;
+  recipeV2: RecipeV2 | null;
   initialSnapshot: WeeklyPlanItemConfigSnapshot | null;
   editingItem: WeeklyPlanItem | null;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +61,7 @@ export function PlanRecipeSheet({
   open,
   recipe,
   recipeContent,
+  recipeV2,
   initialSnapshot,
   editingItem,
   onOpenChange,
@@ -59,6 +78,8 @@ export function PlanRecipeSheet({
   const [peopleCount, setPeopleCount] = useState(2);
   const [amountUnit, setAmountUnit] = useState<'units' | 'grams'>('units');
   const [availableCount, setAvailableCount] = useState(2);
+  const [selectedYield, setSelectedYield] = useState<RecipeYieldV2 | null>(null);
+  const [selectedCookingContext, setSelectedCookingContext] = useState<CookingContextV2 | null>(null);
   const [selectedOptionalIngredients, setSelectedOptionalIngredients] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -73,26 +94,156 @@ export function PlanRecipeSheet({
     setPeopleCount(snapshot.peopleCount ?? 2);
     setAmountUnit((snapshot.amountUnit ?? 'units') as 'units' | 'grams');
     setAvailableCount(snapshot.availableCount ?? 2);
+    setSelectedYield(snapshot.targetYield ?? recipeV2?.baseYield ?? null);
+    setSelectedCookingContext(snapshot.cookingContext ?? recipeV2?.cookingContextDefaults ?? null);
     setSelectedOptionalIngredients(snapshot.selectedOptionalIngredients);
-  }, [editingItem, initialSnapshot, open, recipe]);
+  }, [editingItem, initialSnapshot, open, recipe, recipeV2]);
 
-  const optionalIngredients = (recipeContent?.ingredients ?? []).filter((ingredient) => !ingredient.indispensable);
+  const optionalIngredients = useMemo(() => {
+    if (recipeV2) {
+      return recipeV2.ingredients
+        .filter((ingredient) => !ingredient.indispensable)
+        .map((ingredient) => ({
+          key: ingredient.id,
+          label: ingredient.name,
+          emoji: ingredient.emoji,
+        }));
+    }
+    return (recipeContent?.ingredients ?? [])
+      .filter((ingredient) => !ingredient.indispensable)
+      .map((ingredient) => ({
+        key: getIngredientKey(ingredient.name),
+        label: ingredient.name,
+        emoji: ingredient.emoji,
+      }));
+  }, [recipeContent, recipeV2]);
+
+  const activeYield = selectedYield ?? recipeV2?.baseYield ?? initialSnapshot?.targetYield ?? null;
+  const isYieldDriven = Boolean(recipeV2 && activeYield);
+  const isAirfryerRecipe = Boolean(recipeV2?.steps.some((step) => step.equipment === 'airfryer'));
+  const yieldStep = activeYield?.type === 'weight'
+    ? 50
+    : activeYield?.type === 'volume'
+      ? activeYield.visibleUnit === 'l'
+        ? 500
+        : activeYield.visibleUnit === 'taza'
+          ? 240
+          : activeYield.visibleUnit === 'vaso'
+            ? (activeYield.containerMeta?.capacityMl ?? 240)
+            : 50
+      : 1;
+  const yieldUnitLabel = activeYield?.label ?? activeYield?.visibleUnit ?? activeYield?.unit ?? 'cantidad';
+  const yieldValue = getYieldDisplayValue(activeYield);
+
+  const adjustYield = (delta: number) => {
+    if (!activeYield) return;
+    if (activeYield.type === 'pan_size' || activeYield.type === 'tray_size') return;
+    const currentValue = activeYield.value ?? 0;
+    const min = activeYield.type === 'weight'
+      ? 100
+      : activeYield.type === 'volume'
+        ? yieldStep
+        : 1;
+    const nextValue = Math.max(min, currentValue + (delta * yieldStep));
+    setSelectedYield({
+      ...activeYield,
+      value: nextValue,
+    });
+  };
+
+  const applyVolumeUnit = (unit: 'ml' | 'l' | 'taza' | 'vaso') => {
+    if (!activeYield) return;
+    const labelMap: Record<typeof unit, string> = {
+      ml: 'ml',
+      l: 'l',
+      taza: 'tazas',
+      vaso: 'vasos',
+    };
+    setSelectedYield({
+      ...activeYield,
+      visibleUnit: unit,
+      unit,
+      label: labelMap[unit],
+      containerMeta:
+        unit === 'vaso'
+          ? { kind: 'glass', sizeLabel: 'vaso estándar', capacityMl: activeYield.containerMeta?.capacityMl ?? 240 }
+          : activeYield.containerMeta,
+    });
+  };
+
+  const applyContainerPreset = (key: string, meta: ContainerMetaV2) => {
+    if (!activeYield) return;
+    setSelectedYield({
+      ...activeYield,
+      value: 1,
+      containerKey: key,
+      containerMeta: meta,
+      visibleUnit: meta.sizeLabel ?? activeYield.visibleUnit,
+      label: meta.sizeLabel ?? activeYield.label,
+      unit: meta.sizeLabel ?? activeYield.unit,
+    });
+  };
+
+  const updateContainerDimension = (field: 'diameterCm' | 'capacityMl', rawValue: string) => {
+    if (!activeYield) return;
+    const parsed = rawValue ? Number(rawValue) : null;
+    if (parsed !== null && !Number.isFinite(parsed)) return;
+    setSelectedYield({
+      ...activeYield,
+      containerMeta: {
+        kind: activeYield.containerMeta?.kind ?? (activeYield.type === 'pan_size' ? 'mold' : 'tray'),
+        sizeLabel: activeYield.containerMeta?.sizeLabel ?? activeYield.label ?? activeYield.visibleUnit ?? 'Personalizado',
+        ...activeYield.containerMeta,
+        [field]: parsed,
+      },
+    });
+  };
+
+  const applyCookingContextPreset = (key: string, meta: ContainerMetaV2) => {
+    setSelectedCookingContext({
+      selectedContainerKey: key,
+      selectedContainerMeta: meta,
+    });
+  };
+
+  const updateCookingContextDimension = (field: 'capacityMl', rawValue: string) => {
+    const parsed = rawValue ? Number(rawValue) : null;
+    if (parsed !== null && !Number.isFinite(parsed)) return;
+    setSelectedCookingContext({
+      selectedContainerKey: selectedCookingContext?.selectedContainerKey ?? null,
+      selectedContainerMeta: {
+        kind: selectedCookingContext?.selectedContainerMeta?.kind ?? 'basket',
+        sizeLabel: selectedCookingContext?.selectedContainerMeta?.sizeLabel ?? 'Canasta personalizada',
+        ...selectedCookingContext?.selectedContainerMeta,
+        [field]: parsed,
+      },
+    });
+  };
+
+  const legacyResolvedPortion = quantityMode === 'have'
+    ? mapCountToPortion(amountUnit === 'grams' ? Math.max(1, Math.round(availableCount / 250)) : availableCount)
+    : mapCountToPortion(peopleCount);
+  const legacyScaleFactor = quantityMode === 'have'
+    ? amountUnit === 'grams'
+      ? Math.max(0.25, availableCount / (legacyResolvedPortion === 1 ? 250 : legacyResolvedPortion === 2 ? 500 : 1000))
+      : Math.max(0.25, availableCount / legacyResolvedPortion)
+    : Math.max(0.25, peopleCount / legacyResolvedPortion);
 
   const handleSave = async () => {
     if (!recipe) return;
     setIsSaving(true);
-    const resolvedPortion =
-      quantityMode === 'have'
-        ? mapCountToPortion(amountUnit === 'grams' ? Math.max(1, Math.round(availableCount / 250)) : availableCount)
-        : mapCountToPortion(peopleCount);
-    const scaleFactor =
-      quantityMode === 'have'
-        ? amountUnit === 'grams'
-          ? Math.max(0.25, availableCount / (resolvedPortion === 1 ? 250 : resolvedPortion === 2 ? 500 : 1000))
-          : Math.max(0.25, availableCount / resolvedPortion)
-        : Math.max(0.25, peopleCount / resolvedPortion);
-
     try {
+      const targetYield = isYieldDriven
+        ? activeYield
+        : deriveTargetYieldFromLegacy({
+            quantityMode,
+            peopleCount,
+            amountUnit,
+            availableCount,
+            recipe,
+            content: recipeContent,
+          });
+      const compat = deriveLegacyPlanCompatFromTargetYield(targetYield, recipeV2);
       await onSave({
         id: editingItem?.id,
         recipe,
@@ -100,14 +251,23 @@ export function PlanRecipeSheet({
         slot,
         notes: notes.trim() || null,
         configSnapshot: {
-          quantityMode,
-          peopleCount: quantityMode === 'people' ? peopleCount : peopleCount,
-          amountUnit: quantityMode === 'have' ? amountUnit : null,
-          availableCount: quantityMode === 'have' ? availableCount : null,
+          quantityMode: isYieldDriven ? compat.quantityMode : quantityMode,
+          peopleCount: isYieldDriven ? compat.peopleCount : peopleCount,
+          amountUnit: isYieldDriven ? compat.amountUnit : quantityMode === 'have' ? amountUnit : null,
+          availableCount: isYieldDriven ? compat.availableCount : quantityMode === 'have' ? availableCount : null,
+          targetYield,
+          cookingContext: recipeV2?.steps.some((step) => step.equipment === 'airfryer')
+            ? selectedCookingContext ?? recipeV2?.cookingContextDefaults ?? null
+            : null,
           selectedOptionalIngredients,
-          sourceContextSummary: initialSnapshot?.sourceContextSummary ?? editingItem?.configSnapshot.sourceContextSummary ?? null,
-          resolvedPortion,
-          scaleFactor,
+          sourceContextSummary: {
+            ...(initialSnapshot?.sourceContextSummary ?? editingItem?.configSnapshot.sourceContextSummary ?? {}),
+            cookingContext: recipeV2?.steps.some((step) => step.equipment === 'airfryer')
+              ? selectedCookingContext ?? recipeV2?.cookingContextDefaults ?? null
+              : null,
+          },
+          resolvedPortion: isYieldDriven ? compat.resolvedPortion : legacyResolvedPortion,
+          scaleFactor: isYieldDriven ? compat.scaleFactor : legacyScaleFactor,
         },
       });
       onOpenChange(false);
@@ -137,6 +297,14 @@ export function PlanRecipeSheet({
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Receta</p>
                   <h3 className="text-lg font-bold">{recipe.name}</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{recipe.description}</p>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                    Base {describeRecipeYield(recipeV2?.baseYield ?? initialSnapshot?.targetYield ?? deriveTargetYieldFromLegacy({
+                      quantityMode: 'people',
+                      peopleCount: recipe.basePortions ?? recipeContent?.baseServings ?? 2,
+                      recipe,
+                      content: recipeContent,
+                    }))}
+                  </p>
                 </div>
               </div>
             </div>
@@ -181,7 +349,7 @@ export function PlanRecipeSheet({
             </div>
 
             <div className="grid gap-4 rounded-[1.5rem] border border-primary/10 bg-card/85 p-5">
-              {supportsIngredientMode && (
+              {!isYieldDriven && supportsIngredientMode && (
                 <div className="grid grid-cols-2 gap-2 rounded-[1.25rem] bg-primary/6 p-2">
                   <button
                     type="button"
@@ -205,8 +373,13 @@ export function PlanRecipeSheet({
                   <button
                     type="button"
                     onClick={() => {
-                      if (quantityMode === 'people') setPeopleCount((prev) => Math.max(1, prev - 1));
-                      else setAvailableCount((prev) => Math.max(amountUnit === 'grams' ? 50 : 1, prev - (amountUnit === 'grams' ? 50 : 1)));
+                      if (isYieldDriven) {
+                        adjustYield(-1);
+                      } else if (quantityMode === 'people') {
+                        setPeopleCount((prev) => Math.max(1, prev - 1));
+                      } else {
+                        setAvailableCount((prev) => Math.max(amountUnit === 'grams' ? 50 : 1, prev - (amountUnit === 'grams' ? 50 : 1)));
+                      }
                     }}
                     className="flex size-12 items-center justify-center rounded-full border border-primary/20 text-primary"
                   >
@@ -214,24 +387,49 @@ export function PlanRecipeSheet({
                   </button>
                   <div className="text-center">
                     <div className="text-5xl font-black text-primary">
-                      {quantityMode === 'people' ? peopleCount : availableCount}
+                      {isYieldDriven ? (yieldValue ?? 'Base') : quantityMode === 'people' ? peopleCount : availableCount}
                     </div>
                     <div className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-                      {quantityMode === 'people' ? 'Personas' : amountUnit === 'grams' ? 'Gramos' : 'Unidades'}
+                      {isYieldDriven
+                        ? yieldUnitLabel
+                        : quantityMode === 'people'
+                          ? 'Personas'
+                          : amountUnit === 'grams'
+                            ? 'Gramos'
+                            : 'Unidades'}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
-                      if (quantityMode === 'people') setPeopleCount((prev) => Math.min(20, prev + 1));
-                      else setAvailableCount((prev) => prev + (amountUnit === 'grams' ? 50 : 1));
+                      if (isYieldDriven) {
+                        adjustYield(1);
+                      } else if (quantityMode === 'people') {
+                        setPeopleCount((prev) => Math.min(20, prev + 1));
+                      } else {
+                        setAvailableCount((prev) => prev + (amountUnit === 'grams' ? 50 : 1));
+                      }
                     }}
                     className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground"
                   >
                     <Plus className="size-5" />
                   </button>
                 </div>
-                {supportsIngredientMode && quantityMode === 'have' && (
+                {isYieldDriven && activeYield?.type === 'volume' ? (
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {(['ml', 'l', 'taza', 'vaso'] as const).map((unit) => (
+                      <button
+                        key={unit}
+                        type="button"
+                        onClick={() => applyVolumeUnit(unit)}
+                        className={`rounded-full px-4 py-2 text-xs font-semibold ${activeYield.visibleUnit === unit ? 'bg-primary text-primary-foreground' : 'bg-card text-slate-600 dark:text-slate-300'}`}
+                      >
+                        {unit}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {!isYieldDriven && supportsIngredientMode && quantityMode === 'have' && (
                   <div className="mt-4 flex justify-center gap-2">
                     <button
                       type="button"
@@ -249,6 +447,92 @@ export function PlanRecipeSheet({
                     </button>
                   </div>
                 )}
+                {isYieldDriven && activeYield?.visibleUnit === 'vaso' ? (
+                  <div className="mt-4">
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Capacidad del vaso (ml)</label>
+                    <input
+                      type="number"
+                      min={100}
+                      step={10}
+                      value={activeYield.containerMeta?.capacityMl ?? 240}
+                      onChange={(event) => updateContainerDimension('capacityMl', event.target.value)}
+                      className="mt-2 w-full rounded-2xl border border-primary/10 bg-background/80 px-4 py-3 outline-none focus:border-primary"
+                    />
+                  </div>
+                ) : null}
+                {isYieldDriven && (activeYield?.type === 'pan_size' || activeYield?.type === 'tray_size') ? (
+                  <div className="mt-4 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        activeYield.type === 'pan_size'
+                          ? [
+                              ['mold-small', { kind: 'mold', sizeLabel: 'Molde pequeño', diameterCm: 18 }],
+                              ['mold-medium', { kind: 'mold', sizeLabel: 'Molde mediano', diameterCm: 22 }],
+                              ['mold-large', { kind: 'mold', sizeLabel: 'Molde grande', diameterCm: 26 }],
+                            ]
+                          : [
+                              ['basket-small', { kind: 'basket', sizeLabel: 'Canasta pequeña', capacityMl: 2500 }],
+                              ['basket-medium', { kind: 'basket', sizeLabel: 'Canasta mediana', capacityMl: 3500 }],
+                              ['basket-large', { kind: 'basket', sizeLabel: 'Canasta grande', capacityMl: 5000 }],
+                            ]
+                      ).map(([key, meta]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => applyContainerPreset(key, meta as ContainerMetaV2)}
+                          className={`rounded-full px-4 py-2 text-sm font-semibold ${activeYield.containerKey === key ? 'bg-primary text-primary-foreground' : 'bg-card text-slate-600 dark:text-slate-300'}`}
+                        >
+                          {(meta as ContainerMetaV2).sizeLabel}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        {activeYield.type === 'pan_size' ? 'Diámetro del molde (cm)' : 'Capacidad de canasta/bandeja (ml)'}
+                      </label>
+                      <input
+                        type="number"
+                        min={activeYield.type === 'pan_size' ? 12 : 1000}
+                        step={activeYield.type === 'pan_size' ? 1 : 100}
+                        value={activeYield.type === 'pan_size' ? (activeYield.containerMeta?.diameterCm ?? '') : (activeYield.containerMeta?.capacityMl ?? '')}
+                        onChange={(event) => updateContainerDimension(activeYield.type === 'pan_size' ? 'diameterCm' : 'capacityMl', event.target.value)}
+                        className="mt-2 w-full rounded-2xl border border-primary/10 bg-background/80 px-4 py-3 outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {isYieldDriven && isAirfryerRecipe && activeYield?.type !== 'tray_size' ? (
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Canasta airfryer</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        ['basket-small', { kind: 'basket', sizeLabel: 'Canasta pequeña', capacityMl: 2500 }],
+                        ['basket-medium', { kind: 'basket', sizeLabel: 'Canasta mediana', capacityMl: 3500 }],
+                        ['basket-large', { kind: 'basket', sizeLabel: 'Canasta grande', capacityMl: 5000 }],
+                      ].map(([key, meta]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => applyCookingContextPreset(key, meta as ContainerMetaV2)}
+                          className={`rounded-full px-4 py-2 text-sm font-semibold ${selectedCookingContext?.selectedContainerKey === key ? 'bg-primary text-primary-foreground' : 'bg-card text-slate-600 dark:text-slate-300'}`}
+                        >
+                          {(meta as ContainerMetaV2).sizeLabel}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-3">
+                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Capacidad de canasta (ml)</label>
+                      <input
+                        type="number"
+                        min={1000}
+                        step={100}
+                        value={selectedCookingContext?.selectedContainerMeta?.capacityMl ?? ''}
+                        onChange={(event) => updateCookingContextDimension('capacityMl', event.target.value)}
+                        className="mt-2 w-full rounded-2xl border border-primary/10 bg-background/80 px-4 py-3 outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               {optionalIngredients.length > 0 && (
@@ -256,7 +540,7 @@ export function PlanRecipeSheet({
                   <p className="mb-3 text-sm font-semibold">Ingredientes opcionales</p>
                   <div className="flex flex-wrap gap-2">
                     {optionalIngredients.map((ingredient) => {
-                      const key = getIngredientKey(ingredient.name);
+                      const key = ingredient.key;
                       const active = selectedOptionalIngredients.length === 0 || selectedOptionalIngredients.includes(key);
                       return (
                         <button
@@ -265,14 +549,14 @@ export function PlanRecipeSheet({
                           onClick={() => {
                             setSelectedOptionalIngredients((prev) => {
                               const base = prev.length === 0
-                                ? optionalIngredients.map((item) => getIngredientKey(item.name))
+                                ? optionalIngredients.map((item) => item.key)
                                 : prev;
                               return base.includes(key) ? base.filter((item) => item !== key) : [...base, key];
                             });
                           }}
                           className={`rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${active ? 'border-primary bg-primary/10 text-primary' : 'border-primary/10 bg-background/80 text-slate-500 dark:text-slate-300'}`}
                         >
-                          {ingredient.emoji} {ingredient.name}
+                          {ingredient.emoji} {ingredient.label}
                         </button>
                       );
                     })}
@@ -298,7 +582,7 @@ export function PlanRecipeSheet({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button onClick={() => void handleSave()} disabled={!recipe || isSaving}>
+          <Button onClick={() => void handleSave()} disabled={!recipe || isSaving || requiresExplicitContainerCapacity(activeYield)}>
             {isSaving ? 'Guardando...' : editingItem ? 'Actualizar plan' : 'Agregar al plan'}
           </Button>
         </SheetFooter>

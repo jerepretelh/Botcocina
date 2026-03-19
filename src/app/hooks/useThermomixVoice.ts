@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { SubStep, Screen, Portion } from '../../types';
+import { ActiveCompoundTimer, CompoundResolvedTimelineItem, SubStep, Screen, Portion } from '../../types';
 
 interface UseThermomixVoiceProps {
     voiceEnabled: boolean;
@@ -18,6 +18,12 @@ interface UseThermomixVoiceProps {
     retirarMessage: string;
     effectiveReminderTitle: string;
     effectiveReminderMessage: string;
+    compoundCurrentItem?: CompoundResolvedTimelineItem | null;
+    compoundCurrentTimer?: ActiveCompoundTimer | null;
+    compoundTimerStarted?: boolean;
+    compoundTimerExpired?: boolean;
+    compoundIsRecipeComplete?: boolean;
+    compoundRecipeName?: string | null;
 }
 
 export function useThermomixVoice({
@@ -36,6 +42,12 @@ export function useThermomixVoice({
     retirarMessage,
     effectiveReminderTitle,
     effectiveReminderMessage,
+    compoundCurrentItem = null,
+    compoundCurrentTimer = null,
+    compoundTimerStarted = false,
+    compoundTimerExpired = false,
+    compoundIsRecipeComplete = false,
+    compoundRecipeName = null,
 }: UseThermomixVoiceProps) {
     const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
     const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
@@ -160,8 +172,53 @@ export function useThermomixVoice({
         return `Cantidad: ${value}`;
     };
 
+    const buildCompoundVoiceText = () => {
+        if (compoundIsRecipeComplete) {
+            return compoundRecipeName
+                ? `Receta terminada. Terminaste ${compoundRecipeName}.`
+                : 'Receta terminada.';
+        }
+
+        if (!compoundCurrentItem) return '';
+
+        const detail = compoundTimerExpired
+            ? (compoundCurrentItem.completionMessage ?? 'Listo. Puedes revisarlo o cerrarlo cuando quieras.')
+            : compoundTimerStarted
+                ? (compoundCurrentItem.backgroundHint ?? 'Esto sigue en curso mientras avanzas en otro frente.')
+                : compoundCurrentItem.notes;
+
+        const timerText =
+            compoundCurrentItem.durationSeconds != null
+                ? compoundTimerExpired
+                    ? 'Proceso listo.'
+                    : compoundTimerStarted
+                        ? `Timer activo${compoundCurrentTimer ? `, ${compoundCurrentTimer.remainingSeconds} segundos restantes` : ''}.`
+                        : `Tiempo estimado: ${compoundCurrentItem.durationSeconds} segundos.`
+                : '';
+
+        const valueText =
+            compoundCurrentItem.displayValue != null
+                ? `Cantidad: ${String(compoundCurrentItem.displayValue)}.`
+                : '';
+
+        return [
+            compoundCurrentItem.subStepName,
+            detail,
+            timerText,
+            valueText,
+        ]
+            .filter((value) => Boolean(value && String(value).trim()))
+            .join('. ');
+    };
+
     const speakCurrentInstruction = (force = false) => {
         if (screen !== 'cooking') return;
+        if (compoundCurrentItem || compoundIsRecipeComplete) {
+            const compoundText = buildCompoundVoiceText();
+            if (!compoundText) return;
+            speakInstruction(compoundText, force);
+            return;
+        }
         if (flipPromptVisible) {
             speakInstruction('Voltea el huevo. Continúa con el lado B.', force);
             return;
@@ -185,7 +242,18 @@ export function useThermomixVoice({
     useEffect(() => {
         if (!voiceEnabled) return;
         speakCurrentInstruction();
-    }, [voiceEnabled, screen, currentStepIndex, currentSubStepIndex, flipPromptVisible, stirPromptVisible]);
+    }, [
+        voiceEnabled,
+        screen,
+        currentStepIndex,
+        currentSubStepIndex,
+        flipPromptVisible,
+        stirPromptVisible,
+        compoundCurrentItem?.id,
+        compoundTimerStarted,
+        compoundTimerExpired,
+        compoundIsRecipeComplete,
+    ]);
 
     const handleVoiceToggle = () => {
         if (!speechSupported) return;

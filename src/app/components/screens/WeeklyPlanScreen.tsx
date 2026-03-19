@@ -3,6 +3,7 @@ import { CalendarDays, CalendarPlus, ChevronRight, Pencil, Trash2, UtensilsCross
 import type { Recipe, WeeklyPlan, WeeklyPlanItem, WeeklyPlanSlot, WeeklyPlanView } from '../../../types';
 import { MainShellLayout } from './MainShellLayout';
 import { ProductContainer, ProductEmptyState, ProductHeader, ProductPage, ProductSectionTitle, ProductSurface } from '../ui/product-system';
+import { describeRecipeYield } from '../../lib/recipeV2';
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const SLOTS: WeeklyPlanSlot[] = ['desayuno', 'almuerzo', 'cena'];
@@ -20,6 +21,7 @@ interface WeeklyPlanScreenProps {
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
   onEditPlanItem: (item: WeeklyPlanItem) => void;
@@ -34,6 +36,9 @@ function slotLabel(slot: WeeklyPlanSlot): string {
 }
 
 function configLabel(item: WeeklyPlanItem): string {
+  if (item.configSnapshot.targetYield) {
+    return describeRecipeYield(item.configSnapshot.targetYield);
+  }
   return item.configSnapshot.quantityMode === 'people'
     ? `${item.configSnapshot.peopleCount ?? 2} personas`
     : `${item.configSnapshot.availableCount ?? 0} ${item.configSnapshot.amountUnit === 'grams' ? 'g' : 'unid'} de base`;
@@ -52,6 +57,7 @@ export function WeeklyPlanScreen({
   onGoFavorites,
   onGoWeeklyPlan,
   onGoShoppingList,
+  onGoCompoundLab,
   onGoSettings,
   onSignOut,
   onEditPlanItem,
@@ -65,6 +71,9 @@ export function WeeklyPlanScreen({
   const totalServings = useMemo(
     () =>
       items.reduce((sum, item) => {
+        if (item.configSnapshot.targetYield?.type === 'servings') {
+          return sum + (item.configSnapshot.targetYield.value ?? 0);
+        }
         if (item.configSnapshot.quantityMode === 'people') {
           return sum + (item.configSnapshot.peopleCount ?? 0);
         }
@@ -94,6 +103,7 @@ export function WeeklyPlanScreen({
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
       onGoShoppingList={onGoShoppingList}
+      onGoCompoundLab={onGoCompoundLab}
       onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
@@ -137,7 +147,7 @@ export function WeeklyPlanScreen({
                   {items.length} receta{items.length === 1 ? '' : 's'}
                 </div>
                 <div className="rounded-2xl bg-primary/8 px-4 py-3 text-sm font-semibold text-primary">
-                  {totalServings} porciones
+                  {totalServings > 0 ? `${totalServings} porciones` : `${items.length} rendimientos`}
                 </div>
               </div>
             </div>

@@ -2,6 +2,10 @@ import type { Recipe, RecipeContent, RecipeStep, SubStep } from '../../types';
 import { isSupabaseEnabled, supabaseClient } from './supabaseClient';
 import type { CatalogRepository, RecipesCatalogPayload } from './catalogRepository';
 import { loadLocalRecipeCatalog } from './localRecipeCatalog';
+import { canUseCompoundRecipes, disableCompoundRecipesForSession } from './supabaseOptionalFeatures';
+import { coercePersistedCompoundRecipe } from './compoundRecipeMeta';
+import { hydrateAIRecipeExactCache } from './aiRecipeExactCache';
+import { buildResolvedLegacyContentFromScaledRecipe, createRecipeYield, hydrateRecipeV2FromPersistence, scaleRecipeV2 } from './recipeV2';
 
 type DbRecipe = {
   id: string;
@@ -17,9 +21,35 @@ type DbRecipe = {
   portion_label_plural: string | null;
   owner_user_id: string | null;
   visibility: 'public' | 'private' | null;
+  experience?: 'standard' | 'compound' | null;
+  compound_meta?: unknown;
+  base_yield_type?: 'servings' | 'units' | 'weight' | 'volume' | 'pan_size' | 'tray_size' | 'custom' | null;
+  base_yield_value?: number | null;
+  base_yield_unit?: string | null;
+  base_yield_label?: string | null;
+  ingredients_json?: unknown;
+  steps_json?: unknown;
+  time_summary_json?: unknown;
   created_at: string | null;
   updated_at: string | null;
 };
+
+function isMissingCompoundColumnError(error: { message?: string | null; details?: string | null; code?: string | null } | null | undefined) {
+  if (!error) return false;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return error.code === '42703' || message.includes('column') && (message.includes('experience') || message.includes('compound_meta'));
+}
+
+function isMissingRecipeV2ColumnError(error: { message?: string | null; details?: string | null; code?: string | null } | null | undefined) {
+  if (!error) return false;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return error.code === '42703' || (message.includes('column') && (
+    message.includes('base_yield_')
+    || message.includes('ingredients_json')
+    || message.includes('steps_json')
+    || message.includes('time_summary_json')
+  ));
+}
 
 type DbIngredient = {
   recipe_id: string;
@@ -92,6 +122,33 @@ function mapSubstepsToSteps(substeps: DbSubstep[]): RecipeStep[] {
     }));
 }
 
+function mergeLocalCompoundRecipes(args: {
+  recipes: Recipe[];
+  recipeContentById: Record<string, RecipeContent>;
+  localRecipes: Recipe[];
+  localRecipeContentById: Record<string, RecipeContent>;
+}) {
+  const { recipes, recipeContentById, localRecipes, localRecipeContentById } = args;
+  const mergedRecipes = [...recipes];
+  const mergedRecipeContentById = { ...recipeContentById };
+  const knownRecipeIds = new Set(recipes.map((recipe) => recipe.id));
+
+  for (const localRecipe of localRecipes) {
+    if (localRecipe.experience !== 'compound') continue;
+    if (knownRecipeIds.has(localRecipe.id)) continue;
+
+    mergedRecipes.push(localRecipe);
+    if (localRecipeContentById[localRecipe.id]) {
+      mergedRecipeContentById[localRecipe.id] = localRecipeContentById[localRecipe.id];
+    }
+  }
+
+  return {
+    recipes: mergedRecipes,
+    recipeContentById: mergedRecipeContentById,
+  };
+}
+
 export const supabaseCatalogRepository: CatalogRepository = {
   async fetchCatalog(): Promise<RecipesCatalogPayload> {
     const localCatalog = await loadLocalRecipeCatalog();
@@ -108,18 +165,21 @@ export const supabaseCatalogRepository: CatalogRepository = {
     try {
       const userRes = await supabaseClient.auth.getUser();
       const userId = userRes.data.user?.id ?? null;
+      const recipesSelect = canUseCompoundRecipes()
+        ? 'id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, experience, compound_meta, base_yield_type, base_yield_value, base_yield_unit, base_yield_label, ingredients_json, steps_json, time_summary_json, created_at, updated_at'
+        : 'id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, base_yield_type, base_yield_value, base_yield_unit, base_yield_label, ingredients_json, steps_json, time_summary_json, created_at, updated_at';
 
       const [publicRecipesRes, privateRecipesRes] = await Promise.all([
         supabaseClient
           .from('recipes')
-          .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, created_at, updated_at')
+          .select(recipesSelect)
           .eq('is_published', true)
           .eq('visibility', 'public')
           .order('name', { ascending: true }),
         userId
           ? supabaseClient
               .from('recipes')
-              .select('id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, created_at, updated_at')
+              .select(recipesSelect)
               .eq('owner_user_id', userId)
               .eq('visibility', 'private')
               .order('created_at', { ascending: false })
@@ -127,6 +187,37 @@ export const supabaseCatalogRepository: CatalogRepository = {
       ]);
 
       if (publicRecipesRes.error || privateRecipesRes.error) {
+        if (isMissingRecipeV2ColumnError(publicRecipesRes.error) || isMissingRecipeV2ColumnError(privateRecipesRes.error)) {
+          const legacySelect = canUseCompoundRecipes()
+            ? 'id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, experience, compound_meta, created_at, updated_at'
+            : 'id, category_id, name, icon, emoji, ingredient, description, equipment, tip, portion_label_singular, portion_label_plural, owner_user_id, visibility, created_at, updated_at';
+          const [legacyPublicRecipesRes, legacyPrivateRecipesRes] = await Promise.all([
+            supabaseClient
+              .from('recipes')
+              .select(legacySelect)
+              .eq('is_published', true)
+              .eq('visibility', 'public')
+              .order('name', { ascending: true }),
+            userId
+              ? supabaseClient
+                  .from('recipes')
+                  .select(legacySelect)
+                  .eq('owner_user_id', userId)
+                  .eq('visibility', 'private')
+                  .order('created_at', { ascending: false })
+              : Promise.resolve({ data: [], error: null } as any),
+          ]);
+          if (!legacyPublicRecipesRes.error && !legacyPrivateRecipesRes.error) {
+            publicRecipesRes.data = legacyPublicRecipesRes.data;
+            privateRecipesRes.data = legacyPrivateRecipesRes.data as any;
+            publicRecipesRes.error = null as any;
+            privateRecipesRes.error = null as any;
+          }
+        }
+        if (canUseCompoundRecipes() && (isMissingCompoundColumnError(publicRecipesRes.error) || isMissingCompoundColumnError(privateRecipesRes.error))) {
+          disableCompoundRecipesForSession();
+          return this.fetchCatalog();
+        }
         const detail = publicRecipesRes.error?.message || privateRecipesRes.error?.message || 'Error de lectura';
         return {
           source: 'local-dev',
@@ -204,13 +295,14 @@ export const supabaseCatalogRepository: CatalogRepository = {
           ingredient: recipeRow.ingredient,
           description: recipeRow.description,
           equipment: (recipeRow.equipment as Recipe['equipment']) || undefined,
+          experience: recipeRow.experience === 'compound' ? 'compound' : undefined,
           ownerUserId: recipeRow.owner_user_id,
           visibility: (recipeRow.visibility as Recipe['visibility']) || 'public',
           createdAt: recipeRow.created_at ?? undefined,
           updatedAt: recipeRow.updated_at ?? undefined,
         });
 
-        recipeContentById[recipeRow.id] = {
+        const baseContent: RecipeContent = {
           ingredients: (ingredientsByRecipe.get(recipeRow.id) ?? [])
             .sort((a, b) => a.sort_order - b.sort_order)
             .map((item) => ({
@@ -230,6 +322,58 @@ export const supabaseCatalogRepository: CatalogRepository = {
             plural: recipeRow.portion_label_plural || 'porciones',
           },
         };
+
+        const recipeForHydration = recipes[recipes.length - 1];
+        const resolvedV2Content = (recipeRow.base_yield_type && Array.isArray(recipeRow.ingredients_json) && Array.isArray(recipeRow.steps_json))
+          ? buildResolvedLegacyContentFromScaledRecipe(
+              scaleRecipeV2(
+                hydrateRecipeV2FromPersistence({
+                  recipe: recipeForHydration,
+                  content: baseContent,
+                  payload: {
+                    base_yield_type: recipeRow.base_yield_type,
+                    base_yield_value: recipeRow.base_yield_value ?? null,
+                    base_yield_unit: recipeRow.base_yield_unit ?? null,
+                    base_yield_label: recipeRow.base_yield_label ?? null,
+                    ingredients_json: recipeRow.ingredients_json as any,
+                    steps_json: recipeRow.steps_json as any,
+                    time_summary_json: recipeRow.time_summary_json as any,
+                    experience: recipeRow.experience ?? null,
+                    compound_meta: recipeRow.compound_meta as any,
+                  },
+                }),
+                createRecipeYield({
+                  type: recipeRow.base_yield_type,
+                  value: recipeRow.base_yield_value ?? null,
+                  unit: recipeRow.base_yield_unit ?? null,
+                  label: recipeRow.base_yield_label ?? null,
+                }),
+              ),
+            )
+          : null;
+
+        const persistedCompound = coercePersistedCompoundRecipe({
+          experience: recipeRow.experience,
+          compoundMeta: recipeRow.compound_meta,
+          content: resolvedV2Content ?? baseContent,
+        });
+
+        const hydratedExact = hydrateAIRecipeExactCache(recipeForHydration, {
+          ...(resolvedV2Content ?? baseContent),
+          compoundMeta: persistedCompound.compoundMeta,
+        });
+
+        recipes[recipes.length - 1] = hydratedExact.recipe;
+        recipeContentById[recipeRow.id] = hydratedExact.content;
+
+        if (persistedCompound.experience === 'compound') {
+          recipes[recipes.length - 1] = {
+            ...recipes[recipes.length - 1],
+            experience: 'compound',
+          };
+        } else if (recipeRow.experience === 'compound') {
+          console.warn(`Receta ${recipeRow.id} llegó como compound sin metadata válida. Se abrirá en flujo estándar.`);
+        }
       }
 
       if (recipes.length === 0) {
@@ -241,10 +385,17 @@ export const supabaseCatalogRepository: CatalogRepository = {
         };
       }
 
-      return {
-        source: 'supabase',
+      const mergedCatalog = mergeLocalCompoundRecipes({
         recipes,
         recipeContentById,
+        localRecipes: localCatalog.defaultRecipes,
+        localRecipeContentById: localCatalog.initialRecipeContent,
+      });
+
+      return {
+        source: 'supabase',
+        recipes: mergedCatalog.recipes,
+        recipeContentById: mergedCatalog.recipeContentById,
       };
     } catch {
       return {

@@ -1,6 +1,7 @@
 import { RecipeStep, StepLoopState, RecipeContent, SubStep, Portion, Ingredient, Recipe } from '../../../types';
 import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight, ListChecks, SlidersHorizontal, Ellipsis, LogOut, ArrowLeft } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { resolveIngredientDisplayValue, resolveSubStepDisplayValue } from '../../lib/recipeScaling';
 
 interface CookingScreenProps {
   appVersion: string;
@@ -43,6 +44,8 @@ interface CookingScreenProps {
   activeRecipeContent: RecipeContent;
   selectedRecipe?: Recipe | null;
   isBackgroundMuted?: boolean;
+  peopleCount?: number;
+  quantityMode?: 'people' | 'have';
 }
 
 function formatClock(seconds: number) {
@@ -117,6 +120,8 @@ export function CookingScreen({
   activeRecipeContent,
   selectedRecipe,
   isBackgroundMuted = false,
+  peopleCount = 2,
+  quantityMode = 'people',
 }: CookingScreenProps) {
   const flattenedSubSteps = currentRecipeData.flatMap((step, sIdx) =>
     step.subSteps.map((subStep, ssIdx) => ({ stepIndex: sIdx, subStepIndex: ssIdx, step, subStep })),
@@ -184,7 +189,16 @@ export function CookingScreen({
     const key = getIngredientKey(ingredient.name);
     return activeIngredientSelection[key] ?? true;
   });
-  const nextEstimated = nextItem ? nextItem.subStep.portions[portion] : null;
+  const nextEstimated = nextItem
+    ? resolveSubStepDisplayValue({
+      subStep: nextItem.subStep,
+      recipe: selectedRecipe,
+      content: activeRecipeContent,
+      portion,
+      peopleCount,
+      quantityMode,
+    })
+    : null;
   const nextEstimatedLabel =
     typeof nextEstimated === 'number'
       ? `Tiempo estimado: ${nextEstimated}s`
@@ -249,7 +263,14 @@ export function CookingScreen({
                     {ingredient.name}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {ingredient.portions[portion]}
+                    {resolveIngredientDisplayValue({
+                      ingredient,
+                      recipe: selectedRecipe,
+                      content: activeRecipeContent,
+                      portion,
+                      peopleCount,
+                      quantityMode,
+                    })}
                     {consumedIngredientKeys.has(getIngredientKey(ingredient.name)) ? ' · usado' : ''}
                   </p>
                 </div>

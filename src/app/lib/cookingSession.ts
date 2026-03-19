@@ -56,9 +56,22 @@ export function buildCookingSessionState({
     steps = applyTimerScale(steps, timerScaleFactor);
   }
 
-  const loopItems = selectedRecipe?.id === 'papas-fritas' ? 3 : getLoopItemCount(currentIngredients, portion);
+  const resolvedLoopItems = selectedRecipe?.id === 'papas-fritas'
+    ? 3
+    : getLoopItemCount(currentIngredients, portion, {
+      recipe: selectedRecipe,
+      content: {
+        ingredients: currentIngredients,
+        steps: activeRecipeContentSteps,
+        tip: '',
+        portionLabels: { singular: 'porción', plural: 'porciones' },
+        baseServings: selectedRecipe?.basePortions,
+      },
+      peopleCount,
+      quantityMode,
+    });
   const shouldDisableLoop = selectedRecipe?.id === 'huevo-frito' || hasExplicitUnitFlow(steps);
-  const loopStepIndex = !shouldDisableLoop && loopItems > 1
+  const loopStepIndex = !shouldDisableLoop && resolvedLoopItems > 1
     ? steps.findIndex((step) => isLoopableStep(step))
     : -1;
 
@@ -67,7 +80,7 @@ export function buildCookingSessionState({
     activeStepLoop: loopStepIndex >= 0
       ? {
         stepIndex: loopStepIndex,
-        totalItems: loopItems,
+        totalItems: resolvedLoopItems,
         currentItem: 1,
       }
       : null,

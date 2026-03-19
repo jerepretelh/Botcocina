@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { AmountUnit, Portion, QuantityMode, Recipe, RecipeSetupBehavior, SavedRecipeContextSummary, UserRecipeCookingConfig } from '../../../types';
+import type { RecipeYieldV2 } from '../../types/recipe-v2';
 import { ProductSurface } from '../ui/product-system';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 
@@ -16,6 +17,7 @@ interface RecipeSetupScreenProps {
     produceSize: 'small' | 'medium' | 'large';
     setupPortionPreview: Portion;
     setupScaleFactor: number;
+    targetYield?: RecipeYieldV2 | null;
     isTubersBoilRecipe: boolean;
     setQuantityMode: (mode: QuantityMode) => void;
     setPeopleCount: (val: any) => void;
@@ -41,6 +43,7 @@ export function RecipeSetupScreen({
     produceSize,
     setupPortionPreview,
     setupScaleFactor,
+    targetYield,
     isTubersBoilRecipe,
     setQuantityMode,
     setPeopleCount,
@@ -69,6 +72,14 @@ export function RecipeSetupScreen({
             : null,
     ].filter(Boolean) as string[];
     const savedModeLabel = savedConfig?.quantityMode === 'have' ? 'Configuracion basada en ingredientes' : 'Configuracion basada en porciones';
+    const currentYieldLabel = targetYield?.label ?? targetYield?.unit ?? (quantityMode === 'people' ? 'personas' : amountUnit === 'grams' ? 'gramos' : 'unidades');
+    const currentYieldTitle = targetYield?.type === 'servings'
+        ? '¿Para cuánto quieres cocinar?'
+        : targetYield?.type === 'weight'
+            ? '¿Cuánto peso quieres preparar?'
+            : targetYield?.type === 'units'
+                ? '¿Cuántas unidades quieres preparar?'
+                : 'Ajusta el rendimiento objetivo';
 
     return (
         <Sheet
@@ -131,7 +142,7 @@ export function RecipeSetupScreen({
                                         </div>
                                         <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary/80">Base de coccion</p>
                                         <h2 className="mt-2 text-[1.15rem] font-black tracking-tight text-[#131d36] sm:text-[1.35rem]">
-                                            Ajusta la cantidad inicial
+                                            {currentYieldTitle}
                                         </h2>
                                     </div>
 
@@ -228,7 +239,7 @@ export function RecipeSetupScreen({
                                                         {quantityMode === 'people' ? peopleCount : availableCount}
                                                     </span>
                                                     <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.24em] text-[#60708c] sm:text-xs">
-                                                        {quantityMode === 'people' ? (peopleCount === 1 ? 'Persona' : 'Personas') : (amountUnit === 'grams' ? 'Gramos' : 'Unidades')}
+                                                        {currentYieldLabel}
                                                     </p>
                                                 </div>
 
@@ -246,8 +257,8 @@ export function RecipeSetupScreen({
 
                                             <div className="mt-4 rounded-[1rem] bg-[#f4ddd1] px-4 py-3 text-center text-sm font-medium text-primary">
                                                 {quantityMode === 'people'
-                                                    ? `Cocinando para ${peopleCount} raciones`
-                                                    : `Usando ${availableCount}${amountUnit === 'grams' ? ' g' : ' unidades'} de ${selectedRecipe?.ingredient || 'base'}`}
+                                                    ? `Rendimiento objetivo: ${peopleCount} ${currentYieldLabel}`
+                                                    : `Rendimiento objetivo: ${availableCount} ${currentYieldLabel}`}
                                             </div>
                                         </div>
 

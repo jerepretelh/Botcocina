@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { SubStep, Screen, RecipeStep, Portion } from '../../types';
+import { SubStep, Screen, RecipeStep, Portion, QuantityMode, Recipe, RecipeContent } from '../../types';
+import { resolveSubStepDisplayValue } from '../lib/recipeScaling';
 
 interface UseThermomixTimerProps {
     screen: Screen;
@@ -37,6 +38,10 @@ interface UseThermomixTimerProps {
     timerScaleFactor: number;
     speakInstruction: (text: string, force?: boolean) => void;
     currentRecipeData: RecipeStep[];
+    selectedRecipe: Recipe | null;
+    activeRecipeContent: RecipeContent;
+    peopleCount: number;
+    quantityMode: QuantityMode;
 }
 
 export function useThermomixTimer({
@@ -75,6 +80,10 @@ export function useThermomixTimer({
     timerScaleFactor,
     speakInstruction,
     currentRecipeData,
+    selectedRecipe,
+    activeRecipeContent,
+    peopleCount,
+    quantityMode,
 }: UseThermomixTimerProps) {
     const beepAudioContextRef = useRef<AudioContext | null>(null);
     const initializedTimerKeyRef = useRef<string>('');
@@ -140,7 +149,14 @@ export function useThermomixTimer({
         } else if (currentStep?.stepNumber === 5) {
             const timerSubStep = currentStep.subSteps.find(sub => sub.isTimer);
             if (timerSubStep && currentSubStepIndex === 0) {
-                const timerValue = timerSubStep.portions[portion];
+                const timerValue = resolveSubStepDisplayValue({
+                    subStep: timerSubStep,
+                    recipe: selectedRecipe,
+                    content: activeRecipeContent,
+                    portion,
+                    peopleCount,
+                    quantityMode,
+                });
                 if (typeof timerValue === 'number') {
                     // For step 5, we only set it if it's currently 0 to avoid resets
                     if (timeRemaining === 0 && initializedTimerKeyRef.current !== currentKey) {
@@ -158,7 +174,21 @@ export function useThermomixTimer({
             setIsRunning(false);
             initializedTimerKeyRef.current = '';
         }
-    }, [screen, currentStepIndex, currentSubStepIndex, portion, currentSubStep?.isTimer, portionValue, timerScaleFactor]);
+    }, [
+        screen,
+        currentStepIndex,
+        currentSubStepIndex,
+        portion,
+        currentSubStep?.isTimer,
+        portionValue,
+        timerScaleFactor,
+        currentStep,
+        selectedRecipe,
+        activeRecipeContent,
+        peopleCount,
+        quantityMode,
+        timeRemaining,
+    ]);
 
     useEffect(() => {
         let interval: ReturnType<typeof setTimeout>;
@@ -176,7 +206,14 @@ export function useThermomixTimer({
                         }
 
                         if (nextSubStepObj) {
-                            const nextValue = nextSubStepObj.portions?.[portion];
+                            const nextValue = resolveSubStepDisplayValue({
+                                subStep: nextSubStepObj,
+                                recipe: selectedRecipe,
+                                content: activeRecipeContent,
+                                portion,
+                                peopleCount,
+                                quantityMode,
+                            });
                             const nextAmountText =
                                 typeof nextValue === 'number'
                                     ? ` Tiempo estimado: ${nextValue} segundos.`
@@ -217,7 +254,25 @@ export function useThermomixTimer({
         }
 
         return () => clearInterval(interval);
-    }, [screen, isRunning, timeRemaining, showFlipHint, showStirHint, isAtLastSubStep, hasPendingLoopItems]);
+    }, [
+        screen,
+        isRunning,
+        timeRemaining,
+        showFlipHint,
+        showStirHint,
+        isAtLastSubStep,
+        hasPendingLoopItems,
+        currentSubStepIndex,
+        currentStep,
+        currentStepIndex,
+        currentRecipeData,
+        portion,
+        selectedRecipe,
+        activeRecipeContent,
+        peopleCount,
+        quantityMode,
+        speakInstruction,
+    ]);
 
     useEffect(() => {
         if (isRetirarSubStep) {

@@ -28,6 +28,7 @@ interface AISettingsScreenProps {
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onOpenReleases: () => void;
   onSignOut: () => void;
@@ -103,6 +104,7 @@ export function AISettingsScreen({
   onGoFavorites,
   onGoWeeklyPlan,
   onGoShoppingList,
+  onGoCompoundLab,
   onGoSettings,
   onOpenReleases,
   onSignOut,
@@ -239,6 +241,7 @@ export function AISettingsScreen({
         onGoFavorites={onGoFavorites}
         onGoWeeklyPlan={onGoWeeklyPlan}
         onGoShoppingList={onGoShoppingList}
+        onGoCompoundLab={onGoCompoundLab}
         onGoSettings={onGoSettings}
         onSignOut={onSignOut}
       >
@@ -263,6 +266,7 @@ export function AISettingsScreen({
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
       onGoShoppingList={onGoShoppingList}
+      onGoCompoundLab={onGoCompoundLab}
       onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >

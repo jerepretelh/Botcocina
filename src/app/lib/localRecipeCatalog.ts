@@ -11,7 +11,7 @@ export async function loadLocalRecipeCatalog(): Promise<LocalRecipeCatalog> {
   if (!localRecipeCatalogPromise) {
     localRecipeCatalogPromise = import('../data/recipes').then((module) => ({
       defaultRecipes: module.defaultRecipes,
-      initialRecipeContent: module.initialRecipeContent,
+      initialRecipeContent: module.defaultRecipeContent ?? module.initialRecipeContent,
     }));
   }
 

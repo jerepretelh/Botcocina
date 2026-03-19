@@ -1,7 +1,15 @@
-export type Screen = 'category-select' | 'global-recipes' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list';
+import type { CookingContextV2, RecipeYieldV2 } from '../app/types/recipe-v2.js';
+
+export type Screen = 'category-select' | 'global-recipes' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'compound-lab';
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
+export type PortionValueMap<T> = {
+    1: T;
+    2: T;
+    4: T;
+};
+export type RecipeExperience = 'standard' | 'compound';
 export type RecipeCategoryId =
     | 'breakfast'
     | 'lunch'
@@ -101,6 +109,8 @@ export interface SavedRecipeContextSummary {
     quantityMode?: QuantityMode | null;
     amountUnit?: AmountUnit | null;
     availableCount?: number | null;
+    targetYield?: RecipeYieldV2 | null;
+    cookingContext?: CookingContextV2 | null;
     availableIngredients?: string[];
     avoidIngredients?: string[];
     summaryLabel?: string | null;
@@ -116,6 +126,8 @@ export interface UserRecipeCookingConfig {
     peopleCount: number | null;
     amountUnit: AmountUnit | null;
     availableCount: number | null;
+    targetYield?: RecipeYieldV2 | null;
+    cookingContext?: CookingContextV2 | null;
     selectedOptionalIngredients: string[];
     sourceContextSummary: SavedRecipeContextSummary | null;
     lastUsedAt: string;
@@ -138,6 +150,8 @@ export interface WeeklyPlanItemConfigSnapshot {
     peopleCount: number | null;
     amountUnit: AmountUnit | null;
     availableCount: number | null;
+    targetYield?: RecipeYieldV2 | null;
+    cookingContext?: CookingContextV2 | null;
     selectedOptionalIngredients: string[];
     sourceContextSummary: SavedRecipeContextSummary | null;
     resolvedPortion: Portion;
@@ -281,10 +295,34 @@ export interface Recipe {
     description: string;
     basePortions?: number;
     equipment?: CookingEquipment;
+    experience?: RecipeExperience;
     ownerUserId?: string | null;
     visibility?: 'public' | 'private';
     createdAt?: string;
     updatedAt?: string;
+}
+
+export interface CompoundRecipeComponent {
+    id: string;
+    name: string;
+    icon: string;
+    summary: string;
+}
+
+export interface CompoundTimelineItem {
+    id: string;
+    componentId: string;
+    stepIndex: number;
+    subStepIndex: number;
+    timerLabel?: string;
+    autoAdvanceOnStart?: boolean;
+    completionMessage?: string;
+    backgroundHint?: string;
+}
+
+export interface CompoundRecipeMeta {
+    components: CompoundRecipeComponent[];
+    timeline: CompoundTimelineItem[];
 }
 
 export interface UserRecipeList {
@@ -313,11 +351,9 @@ export interface UserFavorite {
 export interface SubStep {
     subStepName: string;
     notes: string;
-    portions: {
-        1: string | number;
-        2: string | number;
-        4: string | number;
-    };
+    portions: PortionValueMap<string | number>;
+    baseValue?: string | number;
+    timerScaling?: 'fixed' | 'gentle';
     isTimer: boolean;
 }
 
@@ -334,21 +370,74 @@ export interface Ingredient {
     name: string;
     emoji: string;
     indispensable?: boolean;
-    portions: {
-        1: string;
-        2: string;
-        4: string;
-    };
+    portions: PortionValueMap<string>;
+    baseValue?: string;
 }
 
 export interface RecipeContent {
     ingredients: Ingredient[];
     steps: RecipeStep[];
     tip: string;
+    baseServings?: number;
+    aiComplexity?: 'simple' | 'complex';
     portionLabels: {
         singular: string;
         plural: string;
     };
+    compoundMeta?: CompoundRecipeMeta;
+}
+
+export interface ActiveCompoundTimer {
+    timelineItemId: string;
+    componentId: string;
+    label: string;
+    remainingSeconds: number;
+    totalSeconds: number;
+    status: 'running' | 'paused' | 'expired';
+    expiredAt?: number;
+    stepIndex: number;
+    subStepIndex: number;
+}
+
+export interface CompoundComponentProgress {
+    componentId: string;
+    name: string;
+    icon: string;
+    summary: string;
+    completedCount: number;
+    totalCount: number;
+    isFocused: boolean;
+    hasActiveTimer: boolean;
+    hasExpiredTimer: boolean;
+    nextTimelineItemId: string | null;
+}
+
+export interface CompoundResolvedTimelineItem {
+    id: string;
+    componentId: string;
+    componentName: string;
+    componentIcon: string;
+    stepIndex: number;
+    subStepIndex: number;
+    subStepName: string;
+    notes: string;
+    displayValue: string | number | null;
+    durationSeconds: number | null;
+    timerLabel: string | null;
+    autoAdvanceOnStart: boolean;
+    completionMessage: string | null;
+    backgroundHint: string | null;
+}
+
+export interface CompoundCookingSessionState {
+    timeline: CompoundResolvedTimelineItem[];
+    currentTimelineIndex: number;
+    currentItem: CompoundResolvedTimelineItem | null;
+    nextItem: CompoundResolvedTimelineItem | null;
+    activeTimers: ActiveCompoundTimer[];
+    componentProgress: CompoundComponentProgress[];
+    focusedComponentId: string | null;
+    progressPercent: number;
 }
 
 export interface StepLoopState {

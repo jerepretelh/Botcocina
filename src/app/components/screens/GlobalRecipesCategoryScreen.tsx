@@ -24,6 +24,7 @@ interface GlobalRecipesCategoryScreenProps {
   onGoFavorites: () => void;
   onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
 }
@@ -43,6 +44,7 @@ export function GlobalRecipesCategoryScreen({
   onGoFavorites,
   onGoWeeklyPlan,
   onGoShoppingList,
+  onGoCompoundLab,
   onGoSettings,
   onSignOut,
 }: GlobalRecipesCategoryScreenProps) {
@@ -56,6 +58,7 @@ export function GlobalRecipesCategoryScreen({
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
       onGoShoppingList={onGoShoppingList}
+      onGoCompoundLab={onGoCompoundLab}
       onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >

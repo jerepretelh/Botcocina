@@ -69,8 +69,9 @@ export function usePortions({
 
     const setupScaleFactor = useMemo(() => {
         let factor = 1;
+        const baseServings = Math.max(1, selectedRecipe?.basePortions ?? 2);
         if (quantityMode === 'people') {
-            factor *= clampNumber(peopleCount / 2, 0.8, 2);
+            factor *= clampNumber(peopleCount / baseServings, 0.8, 2);
         } else if (amountUnit === 'grams') {
             factor *= clampNumber(availableCount / 500, 0.7, 2.2);
         } else {
@@ -91,7 +92,7 @@ export function usePortions({
             factor *= sizeFactorMap[produceSize];
         }
         return clampNumber(factor, 0.7, 2.5);
-    }, [quantityMode, peopleCount, amountUnit, availableCount, isTubersBoilRecipe, produceType, produceSize]);
+    }, [quantityMode, peopleCount, amountUnit, availableCount, isTubersBoilRecipe, produceType, produceSize, selectedRecipe?.basePortions]);
 
     const batchCountForRecipe = useMemo(() => {
         if (selectedRecipe?.id === 'papas-fritas') return 3;
@@ -100,8 +101,21 @@ export function usePortions({
     }, [selectedRecipe?.id, targetMainCount]);
 
     const batchUsageTips = useMemo(() => {
-        return buildBatchUsageTips(currentIngredients, portion, batchCountForRecipe);
-    }, [currentIngredients, portion, batchCountForRecipe]);
+        return buildBatchUsageTips(currentIngredients, portion, batchCountForRecipe, {
+            recipe: selectedRecipe,
+            content: activeRecipeContent,
+            peopleCount,
+            quantityMode,
+        });
+    }, [
+        currentIngredients,
+        portion,
+        batchCountForRecipe,
+        selectedRecipe,
+        activeRecipeContent,
+        peopleCount,
+        quantityMode,
+    ]);
 
     return {
         currentPortionLabel,

@@ -10,7 +10,9 @@ import type {
   WeeklyPlanItemConfigSnapshot,
   WeeklyPlanSlot,
 } from '../../types';
+import type { CookingContextV2, RecipeYieldV2 } from '../types/recipe-v2';
 import { isSupabaseEnabled, supabaseClient } from './supabaseClient';
+import { deriveTargetYieldFromLegacy } from './recipeV2';
 
 type DbWeeklyPlan = {
   id: string;
@@ -34,6 +36,7 @@ type DbWeeklyPlanItem = {
   people_count: number | null;
   amount_unit: 'units' | 'grams' | null;
   available_count: number | null;
+  target_yield?: unknown;
   selected_optional_ingredients: unknown;
   source_context_summary: unknown;
   resolved_portion: 1 | 2 | 4 | null;
@@ -144,15 +147,53 @@ function buildPlanSnapshotEquivalenceKey(input: {
     slot: input.slot ?? null,
     recipeId: input.recipeId ?? null,
     notes: input.notes?.trim() || null,
-    quantityMode: input.configSnapshot.quantityMode,
-    peopleCount: input.configSnapshot.peopleCount ?? null,
-    amountUnit: input.configSnapshot.amountUnit ?? null,
-    availableCount: input.configSnapshot.availableCount ?? null,
+    targetYield: input.configSnapshot.targetYield ?? null,
     selectedOptionalIngredients,
-    resolvedPortion: input.configSnapshot.resolvedPortion,
-    scaleFactor: Number(input.configSnapshot.scaleFactor.toFixed(4)),
     sourceSummary: summary ? JSON.stringify(summary) : null,
   });
+}
+
+function isMissingTargetYieldColumn(error: { message?: string | null; code?: string | null; details?: string | null } | null | undefined): boolean {
+  if (!error) return false;
+  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
+  return error.code === '42703' || (message.includes('column') && message.includes('target_yield'));
+}
+
+function coerceTargetYield(value: unknown, row: DbWeeklyPlanItem): RecipeYieldV2 | null {
+  if (value && typeof value === 'object' && 'type' in (value as Record<string, unknown>)) {
+    const candidate = value as Partial<RecipeYieldV2>;
+    if (typeof candidate.type === 'string') {
+      return {
+        type: candidate.type as RecipeYieldV2['type'],
+        value: typeof candidate.value === 'number' ? candidate.value : null,
+        canonicalUnit: typeof candidate.canonicalUnit === 'string' ? candidate.canonicalUnit : null,
+        visibleUnit: typeof candidate.visibleUnit === 'string' ? candidate.visibleUnit : null,
+        unit: typeof candidate.unit === 'string' ? candidate.unit : null,
+        label: typeof candidate.label === 'string' ? candidate.label : null,
+        containerKey: typeof candidate.containerKey === 'string' ? candidate.containerKey : null,
+        containerMeta: candidate.containerMeta && typeof candidate.containerMeta === 'object'
+          ? candidate.containerMeta as RecipeYieldV2['containerMeta']
+          : null,
+      };
+    }
+  }
+  return deriveTargetYieldFromLegacy({
+    quantityMode: row.quantity_mode ?? 'people',
+    peopleCount: row.people_count ?? row.fixed_servings ?? null,
+    amountUnit: row.amount_unit,
+    availableCount: row.available_count,
+  });
+}
+
+function coerceCookingContext(value: unknown): CookingContextV2 | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<CookingContextV2>;
+  return {
+    selectedContainerKey: typeof candidate.selectedContainerKey === 'string' ? candidate.selectedContainerKey : null,
+    selectedContainerMeta: candidate.selectedContainerMeta && typeof candidate.selectedContainerMeta === 'object'
+      ? candidate.selectedContainerMeta
+      : null,
+  };
 }
 
 function parseMoney(value: number | string | null): number | null {
@@ -181,6 +222,10 @@ function mapPlan(row: DbWeeklyPlan): WeeklyPlan {
 }
 
 function mapPlanItem(row: DbWeeklyPlanItem): WeeklyPlanItem {
+  const sourceSummary =
+    row.source_context_summary && typeof row.source_context_summary === 'object'
+      ? row.source_context_summary as WeeklyPlanItemConfigSnapshot['sourceContextSummary']
+      : null;
   return {
     id: row.id,
     weeklyPlanId: row.weekly_plan_id,
@@ -196,13 +241,12 @@ function mapPlanItem(row: DbWeeklyPlanItem): WeeklyPlanItem {
       peopleCount: row.people_count ?? row.fixed_servings ?? null,
       amountUnit: row.amount_unit,
       availableCount: row.available_count,
+      targetYield: coerceTargetYield(row.target_yield, row),
+      cookingContext: coerceCookingContext(sourceSummary?.cookingContext ?? null),
       selectedOptionalIngredients: Array.isArray(row.selected_optional_ingredients)
         ? row.selected_optional_ingredients.filter((item): item is string => typeof item === 'string')
         : [],
-      sourceContextSummary:
-        row.source_context_summary && typeof row.source_context_summary === 'object'
-          ? row.source_context_summary as WeeklyPlanItemConfigSnapshot['sourceContextSummary']
-          : null,
+      sourceContextSummary: sourceSummary,
       resolvedPortion: row.resolved_portion ?? 2,
       scaleFactor: row.scale_factor ?? 1,
     },
@@ -330,12 +374,24 @@ export async function getWeeklyPlanItems(weeklyPlanId: string): Promise<WeeklyPl
   const client = ensureReady();
   const { data, error } = await client
     .from('weekly_plan_items')
-    .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+    .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,target_yield,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
     .eq('weekly_plan_id', weeklyPlanId)
     .order('day_of_week', { ascending: true })
     .order('sort_order', { ascending: true });
 
-  if (error) throw new Error(error.message || 'No se pudieron cargar los items del plan semanal.');
+  if (error) {
+    if (isMissingTargetYieldColumn(error)) {
+      const legacy = await client
+        .from('weekly_plan_items')
+        .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+        .eq('weekly_plan_id', weeklyPlanId)
+        .order('day_of_week', { ascending: true })
+        .order('sort_order', { ascending: true });
+      if (legacy.error) throw new Error(legacy.error.message || 'No se pudieron cargar los items del plan semanal.');
+      return ((legacy.data ?? []) as DbWeeklyPlanItem[]).map((row) => mapPlanItem({ ...row, target_yield: null }));
+    }
+    throw new Error(error.message || 'No se pudieron cargar los items del plan semanal.');
+  }
   return ((data ?? []) as DbWeeklyPlanItem[]).map(mapPlanItem);
 }
 
@@ -346,7 +402,7 @@ export async function saveWeeklyPlanItem(weeklyPlanId: string, input: WeeklyPlan
   if (!resolvedId) {
     const { data: existingRows, error: existingError } = await client
       .from('weekly_plan_items')
-      .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+      .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,target_yield,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
       .eq('weekly_plan_id', weeklyPlanId)
       .eq('day_of_week', input.dayOfWeek ?? null)
       .eq('slot', input.slot ?? null)
@@ -391,8 +447,12 @@ export async function saveWeeklyPlanItem(weeklyPlanId: string, input: WeeklyPlan
     people_count: input.configSnapshot.peopleCount,
     amount_unit: input.configSnapshot.amountUnit,
     available_count: input.configSnapshot.availableCount,
+    target_yield: input.configSnapshot.targetYield ?? null,
     selected_optional_ingredients: input.configSnapshot.selectedOptionalIngredients,
-    source_context_summary: input.configSnapshot.sourceContextSummary,
+    source_context_summary: {
+      ...(input.configSnapshot.sourceContextSummary ?? {}),
+      cookingContext: input.configSnapshot.cookingContext ?? input.configSnapshot.sourceContextSummary?.cookingContext ?? null,
+    },
     resolved_portion: input.configSnapshot.resolvedPortion,
     scale_factor: input.configSnapshot.scaleFactor,
     notes: input.notes ?? null,
@@ -402,8 +462,24 @@ export async function saveWeeklyPlanItem(weeklyPlanId: string, input: WeeklyPlan
   const { data, error } = await client
     .from('weekly_plan_items')
     .upsert(payload)
-    .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+    .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,target_yield,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
     .single();
+
+  if (error && isMissingTargetYieldColumn(error)) {
+    const legacyPayload = {
+      ...payload,
+    };
+    delete (legacyPayload as Record<string, unknown>).target_yield;
+    const legacy = await client
+      .from('weekly_plan_items')
+      .upsert(legacyPayload, { onConflict: 'id' })
+      .select('id,weekly_plan_id,day_of_week,slot,recipe_id,recipe_name_snapshot,fixed_servings,quantity_mode,people_count,amount_unit,available_count,selected_optional_ingredients,source_context_summary,resolved_portion,scale_factor,notes,sort_order,created_at')
+      .single();
+    if (legacy.error || !legacy.data) {
+      throw new Error(legacy.error?.message || 'No se pudo guardar el item del plan semanal.');
+    }
+    return mapPlanItem({ ...(legacy.data as DbWeeklyPlanItem), target_yield: input.configSnapshot.targetYield ?? null });
+  }
 
   if (error || !data) throw new Error(error?.message || 'No se pudo guardar el item del plan semanal.');
   return mapPlanItem(data as DbWeeklyPlanItem);

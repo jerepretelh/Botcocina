@@ -30,6 +30,7 @@ interface ShoppingListScreenProps {
   onGoFavorites: () => void;
   onGoShoppingList: () => void;
   onGoWeeklyPlan: () => void;
+  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
   onRegenerateShopping: () => void;
@@ -326,6 +327,7 @@ export function ShoppingListScreen({
   onGoFavorites,
   onGoShoppingList,
   onGoWeeklyPlan,
+  onGoCompoundLab,
   onGoSettings,
   onSignOut,
   onRegenerateShopping,
@@ -397,6 +399,7 @@ export function ShoppingListScreen({
       onGoFavorites={onGoFavorites}
       onGoWeeklyPlan={onGoWeeklyPlan}
       onGoShoppingList={onGoShoppingList}
+      onGoCompoundLab={onGoCompoundLab}
       onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >

@@ -27,10 +27,22 @@ import { buildSavedRecipeSummary, deriveRecipeSetupBehavior } from '../lib/recip
 import { buildCookingSessionState } from '../lib/cookingSession';
 import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
 import { buildMixedRecipeSearchResults } from '../lib/mixedRecipeSearch';
+import { resolveSubStepDisplayValue } from '../lib/recipeScaling';
+import { resolvePersistedTargetYield } from '../lib/recipe-v2/resolvePersistedTargetYield';
+import { buildCookingPresentationV2 } from '../lib/presentation/buildCookingPresentationV2';
+import { buildCompoundCookingPresentationV2 } from '../lib/presentation/buildCompoundCookingPresentationV2';
+import { isCanonicalRecipeV2 } from '../lib/recipe-v2/canonicalRecipeV2';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
 import { useThermomixTimer } from '../hooks/useThermomixTimer';
 import { useThermomixHandlers } from '../hooks/useThermomixHandlers';
+import { useCompoundCookingSessionV2 } from '../hooks/useCompoundCookingSessionV2';
+import { useRecipeYield } from '../hooks/useRecipeYield';
+import { useScaledRecipe } from '../hooks/useScaledRecipe';
+import { useCookingProgressV2 } from '../hooks/useCookingProgressV2';
+import { useThermomixTimerV2 } from '../hooks/useThermomixTimerV2';
+import { resolveCookingPrimaryActionV2 } from '../lib/presentation/resolveCookingPrimaryActionV2';
+import { resolveCompoundPrimaryActionV2 } from '../lib/presentation/resolveCompoundPrimaryActionV2';
 
 import { CategorySelectScreen } from './screens/CategorySelectScreen';
 import { IngredientsScreen } from './screens/IngredientsScreen';
@@ -42,6 +54,8 @@ import { formatVersionLabel } from '../lib/appMetadata';
 const APPROX_GRAMS_PER_UNIT = 250;
 const RecipeSetupScreen = lazy(() => import('./screens/RecipeSetupScreen').then((module) => ({ default: module.RecipeSetupScreen })));
 const CookingScreen = lazy(() => import('./screens/CookingScreen').then((module) => ({ default: module.CookingScreen })));
+const CookingScreenV2 = lazy(() => import('./screens/CookingScreenV2').then((module) => ({ default: module.CookingScreenV2 })));
+const CompoundCookingScreen = lazy(() => import('./screens/CompoundCookingScreen').then((module) => ({ default: module.CompoundCookingScreen })));
 const AIClarifyScreen = lazy(() => import('./screens/AIClarifyScreen').then((module) => ({ default: module.AIClarifyScreen })));
 const DesignSystemScreen = lazy(() => import('./screens/DesignSystemScreen').then((module) => ({ default: module.DesignSystemScreen })));
 const AISettingsScreen = lazy(() => import('./screens/AISettingsScreen').then((module) => ({ default: module.AISettingsScreen })));
@@ -49,7 +63,10 @@ const RecipeSeedSearchScreen = lazy(() => import('./screens/RecipeSeedSearchScre
 const WeeklyPlanScreen = lazy(() => import('./screens/WeeklyPlanScreen').then((module) => ({ default: module.WeeklyPlanScreen })));
 const ShoppingListScreen = lazy(() => import('./screens/ShoppingListScreen').then((module) => ({ default: module.ShoppingListScreen })));
 const ReleasesScreen = lazy(() => import('./screens/ReleasesScreen').then((module) => ({ default: module.ReleasesScreen })));
+const CompoundLabScreen = lazy(() => import('./screens/CompoundLabScreen').then((module) => ({ default: module.CompoundLabScreen })));
 const PlanRecipeSheet = lazy(() => import('./screens/PlanRecipeSheet').then((module) => ({ default: module.PlanRecipeSheet })));
+const RecipeSetupScreenV2 = lazy(() => import('./screens/RecipeSetupScreenV2').then((module) => ({ default: module.RecipeSetupScreenV2 })));
+const IngredientsScreenV2 = lazy(() => import('./screens/IngredientsScreenV2').then((module) => ({ default: module.IngredientsScreenV2 })));
 
 function ScreenFallback() {
   return (
@@ -72,6 +89,52 @@ function dedupeRecipesById(recipes: Recipe[]): Recipe[] {
   }
   return [...byId.values()];
 }
+
+const COMPOUND_DEMO_IDS = new Set([
+  'arroz-lentejas-compuesto',
+  'tallarines-rojos-compuesto',
+]);
+
+function getCompoundCookingStorageKey(recipeId: string) {
+  return `compound_cooking_progress_${recipeId}`;
+}
+
+function getCompoundSavedSessionState(recipeId: string): { hasSnapshot: boolean; isRecipeComplete: boolean } {
+  try {
+    const raw = localStorage.getItem(getCompoundCookingStorageKey(recipeId));
+    if (!raw) return { hasSnapshot: false, isRecipeComplete: false };
+    const parsed = JSON.parse(raw) as { isRecipeComplete?: boolean };
+    return {
+      hasSnapshot: true,
+      isRecipeComplete: Boolean(parsed.isRecipeComplete),
+    };
+  } catch {
+    return { hasSnapshot: false, isRecipeComplete: false };
+  }
+}
+
+const COMPOUND_DEMO_FALLBACKS: Recipe[] = [
+  {
+    id: 'arroz-lentejas-compuesto',
+    categoryId: 'arroces',
+    name: 'Arroz con lentejas',
+    icon: '🍛',
+    emoji: '🍛',
+    ingredient: 'Porciones',
+    description: 'Fases guiadas · 45-55 min',
+    experience: 'compound',
+  },
+  {
+    id: 'tallarines-rojos-compuesto',
+    categoryId: 'almuerzos',
+    name: 'Tallarines rojos coordinados',
+    icon: '🍝',
+    emoji: '🍝',
+    ingredient: 'Porciones',
+    description: 'Salsa + pasta · flujo compuesto',
+    experience: 'compound',
+  },
+];
 
 function buildRecipeSignature(recipe: Recipe, content?: { ingredients: Array<{ name: string }>; steps: Array<{ stepName: string; subSteps: Array<{ subStepName: string }> }> } | null): string {
   const ingredientSignature = (content?.ingredients ?? [])
@@ -138,6 +201,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     userId: auth.userId,
     recipes: recipeSelection.availableRecipes,
     recipeContentById: recipeSelection.recipeContentById,
+    recipeV2ById: recipeSelection.recipeV2ById,
     userRecipeConfigsByRecipeId: userRecipeConfigs.configsByRecipeId,
   });
   const [planningRecipe, setPlanningRecipe] = useState<Recipe | null>(null);
@@ -191,6 +255,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setAwaitingNextUnitConfirmation: cookingProgress.setAwaitingNextUnitConfirmation,
     aiUserId: auth.userId,
     addRecipeToDefaultList: userLists.addRecipeToDefaultList,
+    setRecipeV2ById: recipeSelection.setRecipeV2ById,
   });
 
   const {
@@ -208,6 +273,44 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     currentStep,
     isRecipeFinished,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
+  const isCompoundRecipe = recipeSelection.selectedRecipe?.experience === 'compound' && Boolean(recipeSelection.activeRecipeContent.compoundMeta);
+  const currentRecipeV2 = recipeSelection.selectedRecipeV2;
+  const canonicalRecipeV2 = currentRecipeV2 && isCanonicalRecipeV2(currentRecipeV2) ? currentRecipeV2 : null;
+  const hasRecipeV2 = Boolean(canonicalRecipeV2);
+  const standardRecipeV2 = !isCompoundRecipe ? canonicalRecipeV2 : null;
+  const compoundRecipeV2 = isCompoundRecipe ? currentRecipeV2 : null;
+  const standardYield = useRecipeYield({
+    recipe: canonicalRecipeV2,
+    initialTargetYield:
+      canonicalRecipeV2 && recipeSelection.targetYield?.type === canonicalRecipeV2.baseYield.type
+        ? recipeSelection.targetYield
+        : canonicalRecipeV2?.baseYield ?? null,
+  });
+  const scaledStandardRecipe = useScaledRecipe({
+    recipe: canonicalRecipeV2,
+    targetYield: standardYield.selectedYield,
+    cookingContext: recipeSelection.cookingContext,
+    requireCanonical: true,
+  });
+  const isStandardRecipeV2 = Boolean(canonicalRecipeV2 && scaledStandardRecipe);
+  const scaledCompoundRecipe = compoundRecipeV2 ? scaledStandardRecipe : null;
+  const standardCooking = useCookingProgressV2({
+    recipe: scaledStandardRecipe,
+  });
+  const standardTimer = useThermomixTimerV2({
+    currentSubStep: standardCooking.currentSubStep,
+    active: screen === 'cooking' && isStandardRecipeV2,
+  });
+  const compoundCooking = useCompoundCookingSessionV2({
+    selectedRecipe: recipeSelection.selectedRecipe,
+    scaledRecipe: scaledCompoundRecipe,
+    screen,
+  });
+  const cookingFlowFinished = isCompoundRecipe
+    ? compoundCooking.isRecipeComplete
+    : hasRecipeV2
+      ? standardCooking.isRecipeFinished
+      : isRecipeFinished;
 
   const recipesForCurrentView = uniqueAvailableRecipes.filter((recipe) => {
     if (userLists.catalogViewMode === 'platform') {
@@ -290,6 +393,11 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   );
   const selectedRecipeSavedSummary = buildSavedRecipeSummary(selectedRecipeSavedConfig);
 
+  useEffect(() => {
+    if (!standardYield.selectedYield) return;
+    recipeSelection.setTargetYield(standardYield.selectedYield);
+  }, [recipeSelection.setTargetYield, standardYield.selectedYield]);
+
   const closeRecipeOverlays = () => {
     setIsRecipeSetupSheetOpen(false);
     setIsIngredientsSheetOpen(false);
@@ -316,8 +424,24 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setRecipeOverlayPinnedPath(null);
   };
 
+  const handleStandardIngredientToggle = (ingredientId: string) => {
+    if (!canonicalRecipeV2) return;
+    const recipeId = canonicalRecipeV2.id;
+    recipeSelection.setIngredientSelectionByRecipe((prev) => {
+      const current = prev[recipeId] ?? Object.fromEntries(canonicalRecipeV2.ingredients.map((ingredient) => [ingredient.id, true]));
+      return {
+        ...prev,
+        [recipeId]: {
+          ...current,
+          [ingredientId]: !(current[ingredientId] ?? true),
+        },
+      };
+    });
+  };
+
   const hydrateRecipeSelection = (recipe: Recipe) => {
     const content = recipeSelection.recipeContentById[recipe.id] ?? null;
+    const recipeV2 = recipeSelection.recipeV2ById[recipe.id] ?? null;
     const savedConfig = userRecipeConfigs.configsByRecipeId[recipe.id] ?? null;
     const setupBehavior = deriveRecipeSetupBehavior(recipe, content, savedConfig);
 
@@ -341,12 +465,30 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
     recipeSelection.setSelectedRecipe(recipe);
     recipeSelection.setSelectedCategory(recipe.categoryId);
+    if (recipeV2) {
+      recipeSelection.setTargetYield(
+        resolvePersistedTargetYield(
+          recipeV2,
+          savedConfig?.targetYield,
+        ),
+      );
+      recipeSelection.setCookingContext(savedConfig?.cookingContext ?? recipeV2.cookingContextDefaults ?? null);
+      if (!recipeSelection.ingredientSelectionByRecipe[recipe.id]) {
+        recipeSelection.setIngredientSelectionByRecipe((prev) => ({
+          ...prev,
+          [recipe.id]: Object.fromEntries(recipeV2.ingredients.map((ingredient) => [ingredient.id, true])),
+        }));
+      }
+    }
+    if (!recipeV2) {
+      recipeSelection.setCookingContext(null);
+    }
 
     const resolvedQuantityMode =
       savedConfig && (setupBehavior === 'saved_config_first' || setupBehavior === 'servings_or_quantity')
         ? (setupBehavior !== 'servings_only' && savedConfig.quantityMode === 'have' ? 'have' : 'people')
         : 'people';
-    const resolvedPeopleCount = savedConfig?.peopleCount ?? 2;
+    const resolvedPeopleCount = savedConfig?.peopleCount ?? recipe.basePortions ?? 2;
     const resolvedAvailableCount = savedConfig?.availableCount ?? 2;
     const resolvedAmountUnit = savedConfig?.amountUnit ?? 'units';
 
@@ -357,7 +499,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setAmountUnit(resolvedAmountUnit);
     } else {
       recipeSelection.setQuantityMode('people');
-      recipeSelection.setPeopleCount(2);
+      recipeSelection.setPeopleCount(recipe.basePortions ?? 2);
       recipeSelection.setAvailableCount(2);
       recipeSelection.setAmountUnit('units');
     }
@@ -381,6 +523,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       amountUnit: resolvedAmountUnit,
       availableCount: resolvedAvailableCount,
       portion: resolvedPortion,
+      recipeV2,
     };
   };
 
@@ -400,6 +543,23 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   ) => {
     const content = options?.content ?? recipeSelection.recipeContentById[recipe.id] ?? null;
     if (!content) return;
+    if (recipe.experience === 'compound') {
+      cookingProgress.setCookingSteps(null);
+      cookingProgress.setActiveStepLoop(null);
+      cookingProgress.setCurrentStepIndex(0);
+      cookingProgress.setCurrentSubStepIndex(0);
+      cookingProgress.setIsRunning(false);
+      cookingProgress.setFlipPromptVisible(false);
+      cookingProgress.setPendingFlipAdvance(false);
+      cookingProgress.setFlipPromptCountdown(0);
+      cookingProgress.setStirPromptVisible(false);
+      cookingProgress.setPendingStirAdvance(false);
+      cookingProgress.setStirPromptCountdown(0);
+      cookingProgress.setAwaitingNextUnitConfirmation(false);
+      cookingProgress.setTimerScaleFactor(options?.scaleFactor ?? 1);
+      cookingProgress.setTimingAdjustedLabel(options?.timingLabel ?? 'Tiempo estándar');
+      return;
+    }
 
     const quantityMode = options?.quantityMode ?? recipeSelection.quantityMode;
     const peopleCount = options?.peopleCount ?? recipeSelection.peopleCount;
@@ -528,6 +688,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('shopping-list');
       return;
     }
+    if (normalizedPath === '/experimentos/recetas-compuestas') {
+      recipeSelection.setScreenDirect('compound-lab');
+      return;
+    }
 
     const categoryMatch = normalizedPath.match(/^\/(?:categorias|recetas-globales)\/([^/]+)$/);
     if (categoryMatch) {
@@ -557,29 +721,48 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       }
 
       const hydratedRecipe = hydrateRecipeSelection(recipe);
-      if (stage === 'configurar') {
+        if (stage === 'configurar') {
         cookingProgress.setTimerScaleFactor(1);
         cookingProgress.setTimingAdjustedLabel('Tiempo estándar');
         recipeSelection.setScreenDirect('category-select');
         setRecipeOverlayPinnedPath(normalizedPath);
         openRecipeSetupSheet();
-      } else if (stage === 'ingredientes') {
+        } else if (stage === 'ingredientes') {
         cookingProgress.setTimerScaleFactor(1);
         cookingProgress.setTimingAdjustedLabel('Tiempo estándar');
         recipeSelection.setScreenDirect('category-select');
         setRecipeOverlayPinnedPath(normalizedPath);
         openIngredientsSheet();
-      } else {
-        setRecipeOverlayPinnedPath(null);
-        initializeCookingBase(recipe, {
-          content: hydratedRecipe?.content ?? null,
-          activeIngredientSelection: hydratedRecipe?.hydratedSelection,
-          quantityMode: hydratedRecipe?.quantityMode,
-          peopleCount: hydratedRecipe?.peopleCount,
-          amountUnit: hydratedRecipe?.amountUnit,
-          availableCount: hydratedRecipe?.availableCount,
-          portion: hydratedRecipe?.portion,
-        });
+        } else {
+          setRecipeOverlayPinnedPath(null);
+          if (recipe.experience === 'compound') {
+            resolveCompoundCookingEntry(recipe);
+          cookingProgress.setCookingSteps(null);
+          cookingProgress.setActiveStepLoop(null);
+          cookingProgress.setCurrentStepIndex(0);
+          cookingProgress.setCurrentSubStepIndex(0);
+          cookingProgress.setIsRunning(false);
+          cookingProgress.setFlipPromptVisible(false);
+          cookingProgress.setPendingFlipAdvance(false);
+          cookingProgress.setFlipPromptCountdown(0);
+          cookingProgress.setStirPromptVisible(false);
+            cookingProgress.setPendingStirAdvance(false);
+            cookingProgress.setStirPromptCountdown(0);
+            cookingProgress.setAwaitingNextUnitConfirmation(false);
+          } else if (hydratedRecipe?.recipeV2) {
+            standardCooking.reset();
+            standardTimer.resetTimer();
+          } else {
+            initializeCookingBase(recipe, {
+              content: hydratedRecipe?.content ?? null,
+            activeIngredientSelection: hydratedRecipe?.hydratedSelection,
+            quantityMode: hydratedRecipe?.quantityMode,
+            peopleCount: hydratedRecipe?.peopleCount,
+            amountUnit: hydratedRecipe?.amountUnit,
+            availableCount: hydratedRecipe?.availableCount,
+            portion: hydratedRecipe?.portion,
+          });
+        }
         recipeSelection.setScreenDirect('cooking');
         closeRecipeOverlays();
       }
@@ -617,6 +800,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           ? '/ajustes'
         : screen === 'releases'
           ? '/releases'
+        : screen === 'compound-lab'
+          ? '/experimentos/recetas-compuestas'
         : screen === 'my-recipes'
           ? '/mis-recetas'
         : screen === 'favorites'
@@ -690,11 +875,11 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   }, [screen, currentStepIndex, currentSubStepIndex, auth.userId, recipeSelection.selectedRecipe]);
 
   useEffect(() => {
-    if (!auth.userId || !isRecipeFinished || !recipeSelection.selectedRecipe) return;
+    if (!auth.userId || !cookingFlowFinished || !recipeSelection.selectedRecipe) return;
     void trackProductEvent(auth.userId, 'recipe_complete', {
       recipeId: recipeSelection.selectedRecipe.id,
     });
-  }, [auth.userId, isRecipeFinished, recipeSelection.selectedRecipe]);
+  }, [auth.userId, cookingFlowFinished, recipeSelection.selectedRecipe]);
 
   useEffect(() => {
     if (!isPlanSheetOpen) return;
@@ -770,11 +955,25 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const showFlipHint = Boolean(currentSubStep?.notes?.toLowerCase().includes('voltear') || currentSubStepText.includes('dar vuelta'));
   const showStirHint = Boolean(currentSubStep?.isTimer && (currentSubStepText.includes('dorar') || currentSubStepText.includes('freir')));
 
+  const rawResolvedSubStepValue = currentSubStep
+    ? resolveSubStepDisplayValue({
+      subStep: currentSubStep,
+      recipe: recipeSelection.selectedRecipe,
+      content: recipeSelection.activeRecipeContent,
+      portion: recipeSelection.portion,
+      peopleCount: recipeSelection.peopleCount,
+      quantityMode: recipeSelection.quantityMode,
+    })
+    : null;
   const portionValue = currentSubStep?.isTimer
-    ? (typeof currentSubStep.portions[recipeSelection.portion] === 'number'
-      ? Math.round((currentSubStep.portions[recipeSelection.portion] as number) * portions.setupScaleFactor)
-      : null)
-    : (currentSubStep?.portions[recipeSelection.portion] as string || null);
+    ? (
+      typeof rawResolvedSubStepValue === 'number'
+        ? (currentSubStep.baseValue != null
+          ? rawResolvedSubStepValue
+          : Math.round(rawResolvedSubStepValue * portions.setupScaleFactor))
+        : null
+    )
+    : (typeof rawResolvedSubStepValue === 'string' ? rawResolvedSubStepValue : null);
 
   const voice = useThermomixVoice({
     voiceEnabled,
@@ -793,6 +992,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     retirarMessage,
     effectiveReminderTitle,
     effectiveReminderMessage,
+    compoundCurrentItem: isCompoundRecipe ? compoundCooking.currentItem : null,
+    compoundCurrentTimer: isCompoundRecipe ? compoundCooking.currentTimer : null,
+    compoundTimerStarted: isCompoundRecipe ? compoundCooking.isCurrentTimerStarted : false,
+    compoundTimerExpired: isCompoundRecipe ? compoundCooking.isCurrentTimerExpired : false,
+    compoundIsRecipeComplete: isCompoundRecipe ? compoundCooking.isRecipeComplete : false,
+    compoundRecipeName: isCompoundRecipe ? recipeSelection.selectedRecipe?.name ?? null : null,
   });
 
   const handlers = useThermomixHandlers({
@@ -844,20 +1049,143 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setIsPlanSheetOpen(true);
   };
 
+  const resolveCompoundCookingEntry = (recipe: Recipe) => {
+    if (recipe.experience !== 'compound') return 'continue';
+
+    const savedState = getCompoundSavedSessionState(recipe.id);
+    if (!savedState.hasSnapshot) return 'continue';
+
+    if (savedState.isRecipeComplete) {
+      localStorage.removeItem(getCompoundCookingStorageKey(recipe.id));
+      if (recipeSelection.selectedRecipe?.id === recipe.id) {
+        compoundCooking.resetCompoundSession();
+      }
+      window.alert('Esta receta ya estaba terminada. La reiniciaremos desde cero.');
+      return 'restart';
+    }
+
+    const shouldContinue = window.confirm(
+      'Encontré una sesión guardada para esta receta compuesta.\n\nAceptar: continuar donde te quedaste.\nCancelar: reiniciar desde cero.',
+    );
+
+    if (!shouldContinue) {
+      localStorage.removeItem(getCompoundCookingStorageKey(recipe.id));
+      if (recipeSelection.selectedRecipe?.id === recipe.id) {
+        compoundCooking.resetCompoundSession();
+      }
+      return 'restart';
+    }
+
+    return 'continue';
+  };
+
+  const activeV2Ingredients = (scaledStandardRecipe?.ingredients ?? []).filter((ingredient) =>
+    recipeSelection.activeIngredientSelectionV2[ingredient.id] ?? true,
+  );
+  const standardPresentation = buildCookingPresentationV2({
+    recipe: scaledStandardRecipe,
+    currentStep: standardCooking.currentStep,
+    currentSubStep: standardCooking.currentSubStep,
+    nextStep: standardCooking.nextItem?.subStep ?? null,
+    currentIndex: standardCooking.currentIndex,
+    totalItems: standardCooking.session.totalItems,
+    progressPercent: standardCooking.progressPercent,
+    isRecipeFinished: standardCooking.isRecipeFinished,
+    timer: {
+      hasTimer: standardTimer.hasTimer,
+      isRunning: standardTimer.isRunning,
+      isExpired: standardTimer.isExpired,
+      timeRemaining: standardTimer.timeRemaining,
+    },
+  });
+  const compoundPresentation = buildCompoundCookingPresentationV2({
+    recipe: scaledCompoundRecipe,
+    currentItem: compoundCooking.currentItem,
+    nextItem: compoundCooking.nextItem,
+    currentTimelineIndex: compoundCooking.currentTimelineIndex,
+    totalTimelineItems: compoundCooking.timeline.length,
+    progressPercent: compoundCooking.progressPercent,
+    activeTimers: compoundCooking.activeTimers,
+    componentProgress: compoundCooking.componentProgress,
+    currentTimer: compoundCooking.currentTimer,
+    isCurrentTimerStarted: compoundCooking.isCurrentTimerStarted,
+    isCurrentTimerRunning: compoundCooking.isCurrentTimerRunning,
+    isCurrentTimerExpired: compoundCooking.isCurrentTimerExpired,
+    isRecipeComplete: compoundCooking.isRecipeComplete,
+    inlineMessage: compoundCooking.inlineMessage,
+  });
+  const standardPrimaryAction = resolveCookingPrimaryActionV2({
+    intent: standardPresentation.ctaIntent,
+    hasTimer: standardTimer.hasTimer,
+    isRunning: standardTimer.isRunning,
+    isExpired: standardTimer.isExpired,
+    isRecipeFinished: standardCooking.isRecipeFinished,
+    isLastSubStep: standardCooking.session.totalItems > 0 && standardCooking.currentIndex >= standardCooking.session.totalItems - 1,
+  });
+
+  const handleStandardPrimaryAction = () => {
+    if (standardPrimaryAction.kind === 'start_timer' || standardPrimaryAction.kind === 'pause_timer') {
+      standardTimer.togglePause();
+      return;
+    }
+    if (standardPrimaryAction.kind === 'continue_step' || standardPrimaryAction.kind === 'finish_recipe') {
+      standardTimer.resetTimer();
+      standardCooking.goNext();
+      return;
+    }
+  };
+  const compoundPrimaryAction = resolveCompoundPrimaryActionV2({
+    intent: compoundPresentation.ctaIntent,
+    hasCurrentTimer: compoundCooking.isCurrentTimerStarted,
+    isCurrentTimerRunning: compoundCooking.isCurrentTimerRunning,
+    isCurrentTimerExpired: compoundCooking.isCurrentTimerExpired,
+    isRecipeComplete: compoundCooking.isRecipeComplete,
+    nextFrontName: compoundCooking.nextItem?.componentName ?? null,
+  });
+  const handleCompoundPrimaryAction = () => {
+    if (compoundPrimaryAction.kind === 'start_timer') {
+      compoundCooking.handleNext();
+      return;
+    }
+    if (compoundPrimaryAction.kind === 'pause_timer') {
+      compoundCooking.handleToggleCurrentTimer();
+      return;
+    }
+    if (compoundPrimaryAction.kind === 'focus_front' && compoundCooking.nextItem?.componentId) {
+      compoundCooking.handleFocusComponent(compoundCooking.nextItem.componentId);
+      compoundCooking.handleNext();
+      return;
+    }
+    if (compoundPrimaryAction.kind === 'finish_recipe' && compoundCooking.isRecipeComplete) {
+      handlers.handleChangeMission();
+      return;
+    }
+    compoundCooking.handleNext();
+  };
+
   const applyPlannedRecipeSnapshot = (item: WeeklyPlanItem, targetScreen: 'recipe-setup' | 'cooking') => {
     const recipe = item.recipeId ? recipeSelection.availableRecipes.find((candidate) => candidate.id === item.recipeId) ?? null : null;
     if (!recipe) return;
     const content = recipeSelection.recipeContentById[recipe.id];
-    if (!content) return;
+    const recipeV2 = recipeSelection.recipeV2ById[recipe.id] ?? null;
+    if (!content && !recipeV2) return;
 
-    const hydratedSelection = Object.fromEntries(
-      content.ingredients.map((ingredient) => {
-        const key = getIngredientKey(ingredient.name);
-        if (ingredient.indispensable) return [key, true];
-        if (item.configSnapshot.selectedOptionalIngredients.length === 0) return [key, true];
-        return [key, item.configSnapshot.selectedOptionalIngredients.includes(key)];
-      }),
-    );
+    const hydratedSelection = recipeV2
+      ? Object.fromEntries(
+          recipeV2.ingredients.map((ingredient) => {
+            if (ingredient.indispensable) return [ingredient.id, true];
+            if (item.configSnapshot.selectedOptionalIngredients.length === 0) return [ingredient.id, true];
+            return [ingredient.id, item.configSnapshot.selectedOptionalIngredients.includes(ingredient.id) || item.configSnapshot.selectedOptionalIngredients.includes(getIngredientKey(ingredient.name))];
+          }),
+        )
+      : Object.fromEntries(
+          content!.ingredients.map((ingredient) => {
+            const key = getIngredientKey(ingredient.name);
+            if (ingredient.indispensable) return [key, true];
+            if (item.configSnapshot.selectedOptionalIngredients.length === 0) return [key, true];
+            return [key, item.configSnapshot.selectedOptionalIngredients.includes(key)];
+          }),
+        );
 
     recipeSelection.setIngredientSelectionByRecipe((prev) => ({
       ...prev,
@@ -865,34 +1193,54 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     }));
     recipeSelection.setSelectedRecipe(recipe);
     recipeSelection.setSelectedCategory(recipe.categoryId);
-    recipeSelection.setQuantityMode(item.configSnapshot.quantityMode);
-    recipeSelection.setPeopleCount(item.configSnapshot.peopleCount ?? 2);
-    recipeSelection.setAmountUnit((item.configSnapshot.amountUnit ?? 'units') as 'units' | 'grams');
-    recipeSelection.setAvailableCount(item.configSnapshot.availableCount ?? 2);
-    recipeSelection.setPortion(item.configSnapshot.resolvedPortion);
-    cookingProgress.setTimerScaleFactor(item.configSnapshot.scaleFactor);
-    cookingProgress.setTimingAdjustedLabel(
-      Math.abs(item.configSnapshot.scaleFactor - 1) < 0.01
-        ? 'Tiempo estándar'
-        : `Tiempo ajustado x${item.configSnapshot.scaleFactor.toFixed(2)}`,
+    recipeSelection.setTargetYield(
+      recipeV2
+        ? resolvePersistedTargetYield(recipeV2, item.configSnapshot.targetYield)
+        : recipeSelection.targetYield,
     );
+    recipeSelection.setCookingContext(item.configSnapshot.cookingContext ?? recipeV2?.cookingContextDefaults ?? null);
+    if (!recipeV2) {
+      recipeSelection.setQuantityMode(item.configSnapshot.quantityMode);
+      recipeSelection.setPeopleCount(item.configSnapshot.peopleCount ?? recipeSelection.selectedRecipe?.basePortions ?? 2);
+      recipeSelection.setAmountUnit((item.configSnapshot.amountUnit ?? 'units') as 'units' | 'grams');
+      recipeSelection.setAvailableCount(item.configSnapshot.availableCount ?? 2);
+      recipeSelection.setPortion(item.configSnapshot.resolvedPortion);
+      cookingProgress.setTimerScaleFactor(item.configSnapshot.scaleFactor);
+      cookingProgress.setTimingAdjustedLabel(
+        Math.abs(item.configSnapshot.scaleFactor - 1) < 0.01
+          ? 'Tiempo estándar'
+          : `Tiempo ajustado x${item.configSnapshot.scaleFactor.toFixed(2)}`,
+      );
+    } else {
+      cookingProgress.setTimerScaleFactor(1);
+      cookingProgress.setTimingAdjustedLabel('Tiempo resuelto por V2');
+    }
     setActivePlannedRecipeItemId(item.id);
 
     if (targetScreen === 'cooking') {
-      const session = buildCookingSessionState({
-        selectedRecipe: recipe,
-        activeRecipeContentSteps: content.steps,
-        currentIngredients: content.ingredients,
-        activeIngredientSelection: hydratedSelection,
-        quantityMode: item.configSnapshot.quantityMode,
-        amountUnit: (item.configSnapshot.amountUnit ?? 'units') as 'units' | 'grams',
-        availableCount: item.configSnapshot.availableCount ?? 2,
-        peopleCount: item.configSnapshot.peopleCount ?? 2,
-        portion: item.configSnapshot.resolvedPortion,
-        timerScaleFactor: item.configSnapshot.scaleFactor,
-      });
-      cookingProgress.setCookingSteps(session.steps);
-      cookingProgress.setActiveStepLoop(session.activeStepLoop);
+      if (recipe.experience === 'compound') {
+        resolveCompoundCookingEntry(recipe);
+        cookingProgress.setCookingSteps(null);
+        cookingProgress.setActiveStepLoop(null);
+      } else if (recipeV2) {
+        standardCooking.reset();
+        standardTimer.resetTimer();
+      } else {
+        const session = buildCookingSessionState({
+          selectedRecipe: recipe,
+          activeRecipeContentSteps: content!.steps,
+          currentIngredients: content!.ingredients,
+          activeIngredientSelection: hydratedSelection,
+          quantityMode: item.configSnapshot.quantityMode,
+          amountUnit: (item.configSnapshot.amountUnit ?? 'units') as 'units' | 'grams',
+          availableCount: item.configSnapshot.availableCount ?? 2,
+          peopleCount: item.configSnapshot.peopleCount ?? recipeSelection.selectedRecipe?.basePortions ?? 2,
+          portion: item.configSnapshot.resolvedPortion,
+          timerScaleFactor: item.configSnapshot.scaleFactor,
+        });
+        cookingProgress.setCookingSteps(session.steps);
+        cookingProgress.setActiveStepLoop(session.activeStepLoop);
+      }
       cookingProgress.setCurrentStepIndex(0);
       cookingProgress.setCurrentSubStepIndex(0);
       cookingProgress.setIsRunning(false);
@@ -914,7 +1262,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   const handleRecipeOpen = (recipe: Recipe) => {
     setActivePlannedRecipeItemId(null);
-    const hydratedRecipe = hydrateRecipeSelection(recipe);
+    hydrateRecipeSelection(recipe);
     setRecipeOverlayPinnedPath(null);
     cookingProgress.setCookingSteps(null);
     cookingProgress.setActiveStepLoop(null);
@@ -945,7 +1293,17 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   };
 
   const handleEnterCookingFromOverlay = () => {
-    handlers.handleStartCooking();
+    if (recipeSelection.selectedRecipe?.experience === 'compound') {
+      resolveCompoundCookingEntry(recipeSelection.selectedRecipe);
+      handlers.handleStartCooking();
+    } else if (hasRecipeV2) {
+      standardCooking.reset();
+      standardTimer.resetTimer();
+      closeRecipeOverlays();
+      recipeSelection.setScreen('cooking');
+    } else {
+      handlers.handleStartCooking();
+    }
     if (recipeSelection.selectedRecipe?.id) {
       const recipeId = encodeURIComponent(recipeSelection.selectedRecipe.id);
       navigate(`/recetas/${recipeId}/cocinar`);
@@ -956,6 +1314,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     ...recipeSelection,
     ...cookingProgress,
     ...portions,
+    screen: isCompoundRecipe || hasRecipeV2 ? 'category-select' : screen,
     portionValue: typeof portionValue === 'number' ? portionValue : 0,
     showFlipHint,
     showStirHint,
@@ -974,6 +1333,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         open={isPlanSheetOpen}
         recipe={planningRecipe}
         recipeContent={planningRecipe ? recipeSelection.recipeContentById[planningRecipe.id] ?? null : null}
+        recipeV2={planningRecipe ? recipeSelection.recipeV2ById[planningRecipe.id] ?? null : null}
         initialSnapshot={planningInitialSnapshot ?? (planningRecipe ? weeklyPlan.getDefaultPlanSnapshot(planningRecipe) : null)}
         editingItem={editingPlanItem}
         onOpenChange={(open) => {
@@ -995,79 +1355,116 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     <>
       {isRecipeSetupSheetOpen && recipeSelection.selectedRecipe ? (
         <Suspense fallback={null}>
-          <RecipeSetupScreen
-            selectedRecipe={recipeSelection.selectedRecipe}
-            setupBehavior={selectedRecipeSetupBehavior}
-            savedConfig={selectedRecipeSavedConfig}
-            savedContextSummary={selectedRecipeSavedSummary}
-            quantityMode={recipeSelection.quantityMode}
-            setQuantityMode={recipeSelection.setQuantityMode}
-            amountUnit={recipeSelection.amountUnit}
-            onAmountUnitChange={handlers.handleSetupAmountUnitChange}
-            peopleCount={recipeSelection.peopleCount}
-            setPeopleCount={recipeSelection.setPeopleCount}
-            availableCount={recipeSelection.availableCount}
-            setAvailableCount={recipeSelection.setAvailableCount}
-            isTubersBoilRecipe={portions.isTubersBoilRecipe}
-            produceType={recipeSelection.produceType}
-            setProduceType={recipeSelection.setProduceType}
-            produceSize={recipeSelection.produceSize}
-            setProduceSize={recipeSelection.setProduceSize}
-            setupPortionPreview={portions.setupPortionPreview}
-            setupScaleFactor={portions.setupScaleFactor}
-            onBack={closeRecipeSetupSheet}
-            onContinue={handlers.handleSetupContinue}
-            onPlanRecipe={() => {
-              if (recipeSelection.selectedRecipe) {
-                openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
-                  quantityMode: recipeSelection.quantityMode,
-                  peopleCount: recipeSelection.peopleCount,
-                  amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
-                  availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
-                  selectedOptionalIngredients: recipeSelection.currentIngredients
-                    .filter((ingredient) => !ingredient.indispensable)
-                    .map((ingredient) => getIngredientKey(ingredient.name))
-                    .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
-                  sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
-                  resolvedPortion: portions.setupPortionPreview,
-                  scaleFactor: portions.setupScaleFactor,
-                });
-              }
-            }}
-          />
+          {hasRecipeV2 ? (
+            <RecipeSetupScreenV2
+              selectedRecipe={recipeSelection.selectedRecipe}
+              recipe={canonicalRecipeV2}
+              selectedYield={standardYield.selectedYield}
+              selectedCookingContext={recipeSelection.cookingContext}
+              warnings={scaledStandardRecipe?.warnings ?? []}
+              onDecrement={standardYield.decrementYield}
+              onIncrement={standardYield.incrementYield}
+              onSelectedYieldChange={standardYield.setSelectedYield}
+              onSelectedCookingContextChange={recipeSelection.setCookingContext}
+              onBack={closeRecipeSetupSheet}
+              onContinue={() => {
+                setRecipeOverlayPinnedPath(null);
+                openIngredientsSheet();
+              }}
+            />
+          ) : (
+            <RecipeSetupScreen
+              selectedRecipe={recipeSelection.selectedRecipe}
+              setupBehavior={selectedRecipeSetupBehavior}
+              savedConfig={selectedRecipeSavedConfig}
+              savedContextSummary={selectedRecipeSavedSummary}
+              quantityMode={recipeSelection.quantityMode}
+              setQuantityMode={recipeSelection.setQuantityMode}
+              amountUnit={recipeSelection.amountUnit}
+              onAmountUnitChange={handlers.handleSetupAmountUnitChange}
+              peopleCount={recipeSelection.peopleCount}
+              setPeopleCount={recipeSelection.setPeopleCount}
+              availableCount={recipeSelection.availableCount}
+              setAvailableCount={recipeSelection.setAvailableCount}
+              isTubersBoilRecipe={portions.isTubersBoilRecipe}
+              produceType={recipeSelection.produceType}
+              setProduceType={recipeSelection.setProduceType}
+              produceSize={recipeSelection.produceSize}
+              setProduceSize={recipeSelection.setProduceSize}
+              setupPortionPreview={portions.setupPortionPreview}
+              setupScaleFactor={portions.setupScaleFactor}
+              targetYield={recipeSelection.targetYield}
+              onBack={closeRecipeSetupSheet}
+              onContinue={handlers.handleSetupContinue}
+              onPlanRecipe={() => {
+                if (recipeSelection.selectedRecipe) {
+                  openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
+                    quantityMode: recipeSelection.quantityMode,
+                    peopleCount: recipeSelection.peopleCount,
+                    amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
+                    availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
+                    targetYield: recipeSelection.targetYield,
+                    cookingContext: recipeSelection.cookingContext,
+                    selectedOptionalIngredients: recipeSelection.currentIngredients
+                      .filter((ingredient) => !ingredient.indispensable)
+                      .map((ingredient) => getIngredientKey(ingredient.name))
+                      .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
+                    sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
+                    resolvedPortion: portions.setupPortionPreview,
+                    scaleFactor: portions.setupScaleFactor,
+                  });
+                }
+              }}
+            />
+          )}
         </Suspense>
       ) : null}
       {isIngredientsSheetOpen && recipeSelection.selectedRecipe ? (
         <Suspense fallback={null}>
-          <IngredientsScreen
-            appVersion={appVersion}
-            voiceEnabled={voiceEnabled}
-            onVoiceToggle={voice.handleVoiceToggle}
-            speechSupported={voice.speechSupported}
-            selectedRecipe={recipeSelection.selectedRecipe}
-            portion={recipeSelection.portion}
-            currentPortionLabel={portions.currentPortionLabel}
-            quantityMode={recipeSelection.quantityMode}
-            peopleCount={recipeSelection.peopleCount}
-            availableCount={recipeSelection.availableCount}
-            amountUnit={recipeSelection.amountUnit}
-            timingAdjustedLabel={cookingProgress.timingAdjustedLabel}
-            currentIngredients={recipeSelection.currentIngredients}
-            activeIngredientSelection={recipeSelection.activeIngredientSelection}
-            onIngredientToggle={handlers.handleIngredientToggle}
-            batchCountForRecipe={portions.batchCountForRecipe}
-            batchUsageTips={portions.batchUsageTips}
-            currentTip={recipeSelection.activeRecipeContent.tip}
-            onBack={() => {
-              if (recipeSelection.ingredientsBackScreen === 'recipe-setup') {
+          {hasRecipeV2 ? (
+            <IngredientsScreenV2
+              selectedRecipe={recipeSelection.selectedRecipe}
+              scaledRecipe={scaledStandardRecipe}
+              selectedYield={standardYield.selectedYield}
+              activeIngredientSelection={recipeSelection.activeIngredientSelectionV2}
+              onIngredientToggle={handleStandardIngredientToggle}
+              onBack={() => {
                 openRecipeSetupSheet();
-                return;
-              }
-              closeIngredientsSheet();
-            }}
-            onStartCooking={handleEnterCookingFromOverlay}
-            currentRecipeData={recipeSelection.activeRecipeContent.steps}
-          />
+              }}
+              onStartCooking={handleEnterCookingFromOverlay}
+            />
+          ) : (
+            <IngredientsScreen
+              appVersion={appVersion}
+              voiceEnabled={voiceEnabled}
+              onVoiceToggle={voice.handleVoiceToggle}
+              speechSupported={voice.speechSupported}
+              selectedRecipe={recipeSelection.selectedRecipe}
+              portion={recipeSelection.portion}
+              currentPortionLabel={portions.currentPortionLabel}
+              quantityMode={recipeSelection.quantityMode}
+              peopleCount={recipeSelection.peopleCount}
+              availableCount={recipeSelection.availableCount}
+              amountUnit={recipeSelection.amountUnit}
+              targetYield={recipeSelection.targetYield}
+              timingAdjustedLabel={cookingProgress.timingAdjustedLabel}
+              currentIngredients={recipeSelection.currentIngredients}
+              activeIngredientSelection={recipeSelection.activeIngredientSelection}
+              onIngredientToggle={handlers.handleIngredientToggle}
+              batchCountForRecipe={portions.batchCountForRecipe}
+              batchUsageTips={portions.batchUsageTips}
+              currentTip={recipeSelection.activeRecipeContent.tip}
+              onBack={() => {
+                if (recipeSelection.ingredientsBackScreen === 'recipe-setup') {
+                  openRecipeSetupSheet();
+                  return;
+                }
+                closeIngredientsSheet();
+              }}
+              onStartCooking={handleEnterCookingFromOverlay}
+              currentRecipeData={recipeSelection.activeRecipeContent.steps}
+            />
+          )}
         </Suspense>
       ) : null}
     </>
@@ -1102,6 +1499,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onOpenFavorites={() => recipeSelection.setScreen('favorites')}
           onOpenWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
           onOpenShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onOpenCompoundLab={() => recipeSelection.setScreen('compound-lab')}
           onOpenAISettings={() => recipeSelection.setScreen('ai-settings')}
           currentUserEmail={auth.user?.email ?? null}
           onSignOut={() => void auth.signOut()}
@@ -1141,6 +1539,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
           onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
           onGoSettings={() => recipeSelection.setScreen('ai-settings')}
           onSignOut={() => void auth.signOut()}
         />
@@ -1169,6 +1568,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onSignOut={() => void auth.signOut()}
           />
@@ -1191,6 +1591,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onOpenReleases={() => recipeSelection.setScreen('releases')}
             onSignOut={() => void auth.signOut()}
@@ -1214,6 +1615,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onSignOut={() => void auth.signOut()}
           />
@@ -1244,6 +1646,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
           onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
           onGoSettings={() => recipeSelection.setScreen('ai-settings')}
           onSignOut={() => void auth.signOut()}
         />
@@ -1273,6 +1676,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         onGoFavorites={() => recipeSelection.setScreen('favorites')}
         onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
         onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+        onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
         onGoSettings={() => recipeSelection.setScreen('ai-settings')}
         onSignOut={() => void auth.signOut()}
       />
@@ -1299,6 +1703,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onSignOut={() => void auth.signOut()}
             onEditPlanItem={(item) => {
@@ -1339,6 +1744,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoFavorites={() => recipeSelection.setScreen('favorites')}
             onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
             onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onSignOut={() => void auth.signOut()}
             onRegenerateShopping={() => void weeklyPlan.regenerateShopping()}
@@ -1379,9 +1785,54 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           onGoFavorites={() => recipeSelection.setScreen('favorites')}
           onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
           onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+          onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
           onGoSettings={() => recipeSelection.setScreen('ai-settings')}
           onSignOut={() => void auth.signOut()}
         />
+        {recipeOverlays}
+        {planRecipeSheet}
+      </>
+    );
+  }
+
+  if (screen === 'compound-lab') {
+    const demoRecipes = dedupeRecipesById([
+      ...recipeSelection.availableRecipes.filter((recipe) => recipe.experience === 'compound'),
+      ...COMPOUND_DEMO_FALLBACKS,
+    ]).filter((recipe) => COMPOUND_DEMO_IDS.has(recipe.id));
+
+    return (
+      <>
+        <Suspense fallback={<ScreenFallback />}>
+          <CompoundLabScreen
+            currentUserEmail={auth.user?.email ?? null}
+            recipes={demoRecipes}
+            onOpenRecipe={handleRecipeOpen}
+            onQuickCook={(recipe) => {
+              const hydratedRecipe = hydrateRecipeSelection(recipe);
+              resolveCompoundCookingEntry(recipe);
+              initializeCookingBase(recipe, {
+                content: hydratedRecipe?.content ?? null,
+                activeIngredientSelection: hydratedRecipe?.hydratedSelection,
+                quantityMode: hydratedRecipe?.quantityMode,
+                peopleCount: hydratedRecipe?.peopleCount,
+                amountUnit: hydratedRecipe?.amountUnit,
+                availableCount: hydratedRecipe?.availableCount,
+                portion: hydratedRecipe?.portion,
+              });
+              recipeSelection.setScreen('cooking');
+            }}
+            onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
+            onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+            onGoFavorites={() => recipeSelection.setScreen('favorites')}
+            onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+            onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
+            onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+            onSignOut={() => void auth.signOut()}
+          />
+        </Suspense>
         {recipeOverlays}
         {planRecipeSheet}
       </>
@@ -1435,6 +1886,96 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   return (
     <>
     <Suspense fallback={<ScreenFallback />}>
+      {isCompoundRecipe ? (
+      <CompoundCookingScreen
+        selectedRecipe={recipeSelection.selectedRecipe}
+        presentation={compoundPresentation}
+        currentItem={compoundCooking.currentItem}
+        nextItem={compoundCooking.nextItem}
+        currentTimelineIndex={compoundCooking.currentTimelineIndex}
+        totalTimelineItems={compoundCooking.timeline.length}
+        progressPercent={compoundCooking.progressPercent}
+        activeTimers={compoundCooking.activeTimers}
+        componentProgress={compoundCooking.componentProgress}
+        currentTimer={compoundCooking.currentTimer}
+        isCurrentTimerStarted={compoundCooking.isCurrentTimerStarted}
+        isCurrentTimerRunning={compoundCooking.isCurrentTimerRunning}
+        isCurrentTimerExpired={compoundCooking.isCurrentTimerExpired}
+        isRecipeComplete={compoundCooking.isRecipeComplete}
+        primaryActionLabel={compoundPrimaryAction.label}
+        primaryActionKind={compoundPrimaryAction.kind}
+        voiceEnabled={voiceEnabled}
+        onVoiceToggle={voice.handleVoiceToggle}
+        speechSupported={voice.speechSupported}
+        inlineMessage={compoundCooking.inlineMessage}
+        onPrevious={compoundCooking.handlePrevious}
+        onNext={handleCompoundPrimaryAction}
+        onToggleCurrentTimer={compoundCooking.handleToggleCurrentTimer}
+        onFocusComponent={compoundCooking.handleFocusComponent}
+        onDismissTimer={compoundCooking.dismissTimer}
+        onOpenIngredients={handlers.handleOpenIngredientsFromCooking}
+        onOpenSetup={handlers.handleOpenSetupFromCooking}
+        onExitRecipe={handlers.handleExitCooking}
+        onChangeMission={() => {
+          compoundCooking.resetCompoundSession();
+          handlers.handleChangeMission();
+        }}
+        onPlanRecipe={() => {
+          if (recipeSelection.selectedRecipe) {
+            openPlanSheetForRecipe(recipeSelection.selectedRecipe, null, {
+              quantityMode: recipeSelection.quantityMode,
+              peopleCount: recipeSelection.peopleCount,
+              amountUnit: recipeSelection.quantityMode === 'have' ? recipeSelection.amountUnit : null,
+              availableCount: recipeSelection.quantityMode === 'have' ? recipeSelection.availableCount : null,
+              selectedOptionalIngredients: recipeSelection.currentIngredients
+                .filter((ingredient) => !ingredient.indispensable)
+                .map((ingredient) => getIngredientKey(ingredient.name))
+                .filter((key) => recipeSelection.activeIngredientSelection[key] ?? true),
+              sourceContextSummary: selectedRecipeSavedConfig?.sourceContextSummary ?? null,
+              resolvedPortion: recipeSelection.portion,
+              scaleFactor: cookingProgress.timerScaleFactor,
+            });
+          }
+        }}
+        isBackgroundMuted={isRecipeSetupSheetOpen || isIngredientsSheetOpen || isPlanSheetOpen}
+      />
+      ) : (
+      hasRecipeV2 ? (
+        <CookingScreenV2
+          selectedRecipe={recipeSelection.selectedRecipe}
+          scaledRecipe={scaledStandardRecipe}
+        presentation={standardPresentation}
+        currentStep={standardCooking.currentStep}
+        currentSubStep={standardCooking.currentSubStep}
+        currentIndex={standardCooking.currentIndex}
+        totalItems={standardCooking.session.totalItems}
+        progressPercent={standardCooking.progressPercent}
+        isRecipeFinished={standardCooking.isRecipeFinished}
+        activeIngredients={activeV2Ingredients}
+        isRunning={standardTimer.isRunning}
+        hasTimer={standardTimer.hasTimer}
+        isTimerExpired={standardTimer.isExpired}
+        timeRemaining={standardTimer.timeRemaining}
+        onResetTimer={() => {
+          standardTimer.resetTimer();
+          if (standardTimer.isExpired) {
+            standardTimer.togglePause();
+          }
+        }}
+        onPrevious={standardCooking.goPrevious}
+          onNext={handleStandardPrimaryAction}
+          primaryActionLabel={standardPrimaryAction.label}
+          primaryActionKind={standardPrimaryAction.kind}
+          onTogglePause={standardTimer.togglePause}
+        onOpenIngredients={openIngredientsSheet}
+        onOpenSetup={openRecipeSetupSheet}
+        onExitRecipe={() => {
+          standardCooking.reset();
+          standardTimer.resetTimer();
+          handlers.handleExitCooking();
+        }}
+      />
+      ) : (
       <CookingScreen
         appVersion={appVersion}
         voiceEnabled={voiceEnabled}
@@ -1491,8 +2032,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         activeIngredientSelection={recipeSelection.activeIngredientSelection}
         activeRecipeContent={recipeSelection.activeRecipeContent}
         selectedRecipe={recipeSelection.selectedRecipe}
+        peopleCount={recipeSelection.peopleCount}
+        quantityMode={recipeSelection.quantityMode}
         isBackgroundMuted={isRecipeSetupSheetOpen || isIngredientsSheetOpen || isPlanSheetOpen}
       />
+      )
+      )}
     </Suspense>
     {recipeOverlays}
     {planRecipeSheet}

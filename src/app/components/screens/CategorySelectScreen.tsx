@@ -26,6 +26,7 @@ interface CategorySelectScreenProps {
   onOpenFavorites: () => void;
   onOpenWeeklyPlan: () => void;
   onOpenShoppingList: () => void;
+  onOpenCompoundLab: () => void;
   onOpenAISettings: () => void;
   onSignOut: () => void;
   onPlanRecipe: (recipe: Recipe) => void;
@@ -54,6 +55,7 @@ export function CategorySelectScreen({
   onOpenFavorites,
   onOpenWeeklyPlan,
   onOpenShoppingList,
+  onOpenCompoundLab,
   onOpenAISettings,
   onSignOut,
   onPlanRecipe,
@@ -71,6 +73,7 @@ export function CategorySelectScreen({
       onGoFavorites={onOpenFavorites}
       onGoWeeklyPlan={onOpenWeeklyPlan}
       onGoShoppingList={onOpenShoppingList}
+      onGoCompoundLab={onOpenCompoundLab}
       onGoSettings={onOpenAISettings}
       onSignOut={onSignOut}
     >

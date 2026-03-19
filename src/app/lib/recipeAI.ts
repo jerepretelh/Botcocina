@@ -1,37 +1,51 @@
 import type { AIRecipeContextDraft, AIUsageMetadata, ClarificationNumberIntent, CookingEquipment } from '../../types';
+import type { IngredientAmountV2, RecipeTimeSummaryV2, RecipeYieldV2, ScalingPolicy } from '../types/recipe-v2';
 import { authenticatedJsonFetch } from './authenticatedApi';
 
 export type FireLevel = 'low' | 'medium' | 'high';
 
 export interface GeneratedSubStep {
-  subStepName: string;
+  subStepName?: string;
+  text?: string;
   notes: string;
-  portions: {
+  portions?: {
     1: string | number;
     2: string | number;
     4: string | number;
   };
+  baseValue?: string | number;
+  timerScaling?: 'fixed' | 'gentle';
   isTimer: boolean;
+  amount?: IngredientAmountV2 | null;
+  timer?: {
+    durationSeconds: number | null;
+    scalingPolicy: ScalingPolicy;
+  } | null;
 }
 
 export interface GeneratedRecipeStep {
-  stepNumber: number;
-  stepName: string;
+  stepNumber?: number;
+  stepName?: string;
+  title?: string;
   fireLevel?: FireLevel;
   temperature?: number;
   equipment?: CookingEquipment;
   subSteps: GeneratedSubStep[];
+  notes?: string | null;
 }
 
 export interface GeneratedIngredient {
   name: string;
-  emoji: string;
+  emoji?: string;
   indispensable?: boolean;
-  portions: {
+  portions?: {
     1: string;
     2: string;
     4: string;
   };
+  baseValue?: string;
+  amount?: IngredientAmountV2;
+  notes?: string | null;
 }
 
 export interface GeneratedRecipe {
@@ -41,12 +55,18 @@ export interface GeneratedRecipe {
   ingredient: string;
   description: string;
   tip: string;
+  baseServings?: number;
+  baseYield?: RecipeYieldV2;
+  complexity?: 'simple' | 'complex';
   portionLabels?: {
     singular: string;
     plural: string;
   };
   ingredients: GeneratedIngredient[];
   steps: GeneratedRecipeStep[];
+  timeSummary?: RecipeTimeSummaryV2 | null;
+  experience?: 'standard' | 'compound';
+  compoundMeta?: unknown;
   equipment?: CookingEquipment;
 }
 

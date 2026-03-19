@@ -37,13 +37,16 @@ import {
   replaceShoppingListItems,
   type WeeklyPlanItemInput,
 } from '../lib/planRepository';
-import { buildWeeklyShoppingAggregation } from '../lib/planShoppingAggregation';
-import { mapCountToPortion } from '../utils/recipeHelpers';
+import { buildWeeklyShoppingAggregationV2 } from '../lib/planShoppingAggregationV2';
+import { deriveTargetYieldFromLegacy } from '../lib/recipeV2';
+import { deriveLegacyPlanCompatFromTargetYield } from '../lib/planSnapshotCompat';
+import type { RecipeV2 } from '../types/recipe-v2';
 
 interface UseWeeklyPlanParams {
   userId: string | null;
   recipes: Recipe[];
   recipeContentById: Record<string, RecipeContent>;
+  recipeV2ById: Record<string, RecipeV2>;
   userRecipeConfigsByRecipeId: Record<string, UserRecipeCookingConfig>;
 }
 
@@ -71,13 +74,9 @@ function buildPlanItemEquivalenceKey(item: WeeklyPlanItem): string {
     recipeId: item.recipeId ?? null,
     recipeNameSnapshot: item.recipeNameSnapshot,
     notes: item.notes?.trim() || null,
-    quantityMode: item.configSnapshot.quantityMode,
-    peopleCount: item.configSnapshot.peopleCount ?? null,
-    amountUnit: item.configSnapshot.amountUnit ?? null,
-    availableCount: item.configSnapshot.availableCount ?? null,
+    targetYield: item.configSnapshot.targetYield ?? null,
+    cookingContext: item.configSnapshot.cookingContext ?? null,
     selectedOptionalIngredients: [...item.configSnapshot.selectedOptionalIngredients].sort(),
-    resolvedPortion: item.configSnapshot.resolvedPortion,
-    scaleFactor: Number(item.configSnapshot.scaleFactor.toFixed(4)),
     sourceContextSummary: item.configSnapshot.sourceContextSummary ?? null,
   });
 }
@@ -112,34 +111,33 @@ function dedupePlanItemsByEquivalence(items: WeeklyPlanItem[]): { uniqueItems: W
 
 function buildDefaultSnapshot(
   recipe: Recipe,
+  recipeV2?: RecipeV2 | null,
   savedConfig?: UserRecipeCookingConfig | null,
 ): WeeklyPlanItemConfigSnapshot {
-  const quantityMode = savedConfig?.quantityMode ?? 'people';
-  const peopleCount = savedConfig?.peopleCount ?? 2;
-  const amountUnit = savedConfig?.amountUnit ?? null;
-  const availableCount = savedConfig?.availableCount ?? null;
-  const resolvedPortion =
-    quantityMode === 'have'
-      ? mapCountToPortion(amountUnit === 'grams' ? Math.max(1, Math.round((availableCount ?? 500) / 250)) : Math.max(1, availableCount ?? 2))
-      : mapCountToPortion(peopleCount);
-  const scaleFactor =
-    quantityMode === 'have'
-      ? amountUnit === 'grams'
-        ? Math.max(0.25, (availableCount ?? 500) / (resolvedPortion === 1 ? 250 : resolvedPortion === 2 ? 500 : 1000))
-        : Math.max(0.25, (availableCount ?? resolvedPortion) / resolvedPortion)
-      : Math.max(0.25, peopleCount / resolvedPortion);
+  const targetYield = savedConfig?.targetYield
+    ?? recipeV2?.baseYield
+    ?? deriveTargetYieldFromLegacy({
+      quantityMode: savedConfig?.quantityMode ?? 'people',
+      peopleCount: savedConfig?.peopleCount ?? 2,
+      amountUnit: savedConfig?.amountUnit ?? null,
+      availableCount: savedConfig?.availableCount ?? null,
+    });
+  const compat = deriveLegacyPlanCompatFromTargetYield(targetYield, recipeV2);
 
   return {
-    quantityMode,
-    peopleCount,
-    amountUnit,
-    availableCount,
+    quantityMode: compat.quantityMode,
+    peopleCount: savedConfig?.peopleCount ?? compat.peopleCount,
+    amountUnit: savedConfig?.amountUnit ?? compat.amountUnit,
+    availableCount: savedConfig?.availableCount ?? compat.availableCount,
+    targetYield,
+    cookingContext: savedConfig?.cookingContext ?? recipeV2?.cookingContextDefaults ?? null,
     selectedOptionalIngredients: savedConfig?.selectedOptionalIngredients ?? [],
     sourceContextSummary: savedConfig?.sourceContextSummary ?? {
-      summaryLabel: `Planificada para ${peopleCount} persona${peopleCount === 1 ? '' : 's'}`,
+      summaryLabel: targetYield?.label ? `Planificada para ${targetYield.value ?? ''} ${targetYield.label}`.trim() : recipe.name,
+      cookingContext: savedConfig?.cookingContext ?? recipeV2?.cookingContextDefaults ?? null,
     },
-    resolvedPortion,
-    scaleFactor,
+    resolvedPortion: compat.resolvedPortion,
+    scaleFactor: compat.scaleFactor,
   };
 }
 
@@ -147,6 +145,7 @@ export function useWeeklyPlan({
   userId,
   recipes,
   recipeContentById,
+  recipeV2ById,
   userRecipeConfigsByRecipeId,
 }: UseWeeklyPlanParams) {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
@@ -165,8 +164,8 @@ export function useWeeklyPlan({
   const uniqueItems = useMemo(() => dedupePlanItemsById(items), [items]);
 
   const aggregation = useMemo<ShoppingAggregationResult>(
-    () => buildWeeklyShoppingAggregation(uniqueItems, recipeContentById, recipesById),
-    [uniqueItems, recipeContentById, recipesById],
+    () => buildWeeklyShoppingAggregationV2(uniqueItems, recipeV2ById, recipeContentById, recipesById),
+    [uniqueItems, recipeV2ById, recipeContentById, recipesById],
   );
   const autoShoppingItems = useMemo(
     () => shoppingItems.filter((item) => item.sourceType === 'plan_auto'),
@@ -205,7 +204,7 @@ export function useWeeklyPlan({
 
   const syncShopping = useCallback(async (nextPlan: WeeklyPlan, nextItems: WeeklyPlanItem[]) => {
     if (!userId) return;
-    const nextAggregation = buildWeeklyShoppingAggregation(nextItems, recipeContentById, recipesById);
+    const nextAggregation = buildWeeklyShoppingAggregationV2(nextItems, recipeV2ById, recipeContentById, recipesById);
     const ensuredShopping = await getOrCreateShoppingList(userId, nextPlan.id);
     await replaceShoppingListItems(
       ensuredShopping.id,
@@ -220,7 +219,7 @@ export function useWeeklyPlan({
     const refreshedItems = await getShoppingListItems(ensuredShopping.id);
     setShoppingList(ensuredShopping);
     setShoppingItems(refreshedItems);
-  }, [recipeContentById, recipesById, userId]);
+  }, [recipeContentById, recipeV2ById, recipesById, userId]);
 
   const refreshTrip = useCallback(async (currentShoppingList: ShoppingList | null) => {
     if (!currentShoppingList) {
@@ -424,8 +423,8 @@ export function useWeeklyPlan({
   }, [refreshCurrentTrip, shoppingTrip]);
 
   const getDefaultPlanSnapshot = useCallback((recipe: Recipe) => {
-    return buildDefaultSnapshot(recipe, userRecipeConfigsByRecipeId[recipe.id] ?? null);
-  }, [userRecipeConfigsByRecipeId]);
+    return buildDefaultSnapshot(recipe, recipeV2ById[recipe.id] ?? null, userRecipeConfigsByRecipeId[recipe.id] ?? null);
+  }, [recipeV2ById, userRecipeConfigsByRecipeId]);
 
   return {
     plan,

@@ -2,6 +2,7 @@ import { Portion, QuantityMode, AmountUnit, ClarificationNumberIntent, Clarifica
 import { AIClarificationQuestion, GeneratedRecipe, GeneratedRecipeStep, GeneratedSubStep } from '../lib/recipeAI';
 import { parseTimerSeconds } from './timerUtils';
 import { huevoFritoRecipeData } from '../data/recipeStepTemplates';
+import { buildLegacyPortionsFromBase, resolveIngredientDisplayValue } from '../lib/recipeScaling';
 
 export function buildRecipeId(name: string): string {
   const slug = name
@@ -393,7 +394,12 @@ export function parseFirstNumber(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function buildBatchUsageTips(ingredients: Ingredient[], portion: Portion, batches: number): string[] {
+export function buildBatchUsageTips(
+  ingredients: Ingredient[],
+  portion: Portion,
+  batches: number,
+  options?: { recipe?: Recipe | null; content?: RecipeContent | null; peopleCount?: number; quantityMode?: QuantityMode },
+): string[] {
   if (batches <= 1) return [];
 
   const tips: string[] = [];
@@ -401,7 +407,16 @@ export function buildBatchUsageTips(ingredients: Ingredient[], portion: Portion,
     const ingredientText = normalizeText(ingredient.name);
     if (!ingredientText.includes('aceite') && !ingredientText.includes('mantequilla')) continue;
 
-    const raw = normalizePortionText(ingredient.portions[portion]);
+    const raw = normalizePortionText(
+      resolveIngredientDisplayValue({
+        ingredient,
+        recipe: options?.recipe,
+        content: options?.content,
+        portion,
+        peopleCount: options?.peopleCount,
+        quantityMode: options?.quantityMode,
+      }),
+    );
     const total = parseFirstNumber(raw);
     if (!total) continue;
 
@@ -465,10 +480,23 @@ export function parseUnitCount(value: string): number | null {
   return rounded;
 }
 
-export function getLoopItemCount(ingredients: Ingredient[], portion: Portion): number {
+export function getLoopItemCount(
+  ingredients: Ingredient[],
+  portion: Portion,
+  options?: { recipe?: Recipe | null; content?: RecipeContent | null; peopleCount?: number; quantityMode?: QuantityMode },
+): number {
   const candidates = ingredients.filter((ingredient) => ingredient.indispensable !== false);
   for (const ingredient of candidates) {
-    const count = parseUnitCount(ingredient.portions[portion]);
+    const count = parseUnitCount(
+      resolveIngredientDisplayValue({
+        ingredient,
+        recipe: options?.recipe,
+        content: options?.content,
+        portion,
+        peopleCount: options?.peopleCount,
+        quantityMode: options?.quantityMode,
+      }),
+    );
     if (count && count > 1) {
       return count;
     }
@@ -592,6 +620,12 @@ export function ensureRecipeShape(data: GeneratedRecipe): GeneratedRecipe {
   const safeIngredients = Array.isArray(data.ingredients) ? data.ingredients : [];
   const safeStepsRaw = Array.isArray(data.steps) ? data.steps : [];
   const safeSteps = normalizeGeneratedStepOrder(safeStepsRaw);
+  const normalizedBaseServings =
+    typeof data.baseYield?.value === 'number' && Number.isFinite(data.baseYield.value) && data.baseYield.value > 0
+      ? Math.round(data.baseYield.value)
+      : typeof data.baseServings === 'number' && Number.isFinite(data.baseServings) && data.baseServings > 0
+      ? Math.round(data.baseServings)
+      : 2;
 
   // Detect equipment from prompt or category
   let detectedEquipment: CookingEquipment = data.equipment || 'stove';
@@ -612,8 +646,11 @@ export function ensureRecipeShape(data: GeneratedRecipe): GeneratedRecipe {
     ingredient: data.ingredient?.trim() || 'porciones',
     description: data.description?.trim() || `${safeSteps.flatMap((step) => step.subSteps).length || 1} subpasos`,
     tip: data.tip?.trim() || (detectedEquipment === 'airfryer' ? 'Precalienta la freidora si es necesario.' : 'Ten todos los ingredientes listos antes de empezar.'),
+    baseServings: normalizedBaseServings,
+    baseYield: data.baseYield,
+    complexity: data.complexity === 'complex' ? 'complex' : 'simple',
     ingredients: safeIngredients
-      .filter((ingredient) => ingredient?.name && ingredient?.portions)
+      .filter((ingredient) => ingredient?.name && (ingredient?.portions || ingredient?.baseValue || ingredient?.amount?.text || ingredient?.amount?.value != null))
       .map((ingredient, index) => ({
         ...ingredient,
         name: normalizeIngredientNamePeru(ingredient.name),
@@ -621,38 +658,95 @@ export function ensureRecipeShape(data: GeneratedRecipe): GeneratedRecipe {
           typeof ingredient.indispensable === 'boolean'
             ? ingredient.indispensable
             : index === 0 || !isLikelyDispensableIngredient(ingredient.name),
-        portions: {
-          1: normalizePortionText(ingredient.portions?.[1]),
-          2: normalizePortionText(ingredient.portions?.[2]),
-          4: normalizePortionText(ingredient.portions?.[4]),
-        },
+        emoji: ingredient.emoji || '🍽️',
+        baseValue: ingredient.baseValue
+          ? normalizePortionText(ingredient.baseValue)
+          : ingredient.amount?.text
+            ? normalizePortionText(ingredient.amount.text)
+            : ingredient.amount?.value != null
+              ? `${ingredient.amount.value}${ingredient.amount.unit ? ` ${ingredient.amount.unit}` : ''}`.trim()
+              : undefined,
+        portions: (ingredient.baseValue || ingredient.amount?.text || ingredient.amount?.value != null)
+          ? {
+            1: String(buildLegacyPortionsFromBase({
+              baseValue: normalizePortionText(
+                ingredient.baseValue
+                || ingredient.amount?.text
+                || `${ingredient.amount?.value ?? ''}${ingredient.amount?.unit ? ` ${ingredient.amount.unit}` : ''}`.trim(),
+              ),
+              baseServings: normalizedBaseServings,
+              isTimer: false,
+            })[1]),
+            2: String(buildLegacyPortionsFromBase({
+              baseValue: normalizePortionText(
+                ingredient.baseValue
+                || ingredient.amount?.text
+                || `${ingredient.amount?.value ?? ''}${ingredient.amount?.unit ? ` ${ingredient.amount.unit}` : ''}`.trim(),
+              ),
+              baseServings: normalizedBaseServings,
+              isTimer: false,
+            })[2]),
+            4: String(buildLegacyPortionsFromBase({
+              baseValue: normalizePortionText(
+                ingredient.baseValue
+                || ingredient.amount?.text
+                || `${ingredient.amount?.value ?? ''}${ingredient.amount?.unit ? ` ${ingredient.amount.unit}` : ''}`.trim(),
+              ),
+              baseServings: normalizedBaseServings,
+              isTimer: false,
+            })[4]),
+          }
+          : {
+            1: normalizePortionText(ingredient.portions?.[1]),
+            2: normalizePortionText(ingredient.portions?.[2]),
+            4: normalizePortionText(ingredient.portions?.[4]),
+          },
       })),
     steps: ensureEquipmentTransitionSubSteps(safeSteps, detectedEquipment)
-      .filter((step) => step?.stepName && Array.isArray(step.subSteps) && step.subSteps.length > 0)
+      .filter((step) => (step?.stepName || step?.title) && Array.isArray(step.subSteps) && step.subSteps.length > 0)
       .map((step, index) => {
         const stepEquipment = step.equipment || detectedEquipment;
         const normalizedSubSteps = step.subSteps
-          .filter((subStep) => subStep?.subStepName && subStep?.portions)
+          .filter((subStep) => (subStep?.subStepName || subStep?.text) && (subStep?.portions || subStep?.baseValue != null || subStep?.amount || subStep?.timer))
           .map((subStep) => {
-            const timer1 = parseTimerSeconds(subStep.portions?.[1]);
-            const timer2 = parseTimerSeconds(subStep.portions?.[2]);
-            const timer4 = parseTimerSeconds(subStep.portions?.[4]);
+            const baseTimer = subStep.timer?.durationSeconds ?? (subStep.baseValue != null ? parseTimerSeconds(subStep.baseValue) : null);
+            const timer1 = parseTimerSeconds(subStep.portions?.[1]) ?? baseTimer;
+            const timer2 = parseTimerSeconds(subStep.portions?.[2]) ?? baseTimer;
+            const timer4 = parseTimerSeconds(subStep.portions?.[4]) ?? baseTimer;
             const timerFallback = timer1 ?? timer2 ?? timer4 ?? 60;
-            const shouldUseTimer = Boolean(subStep.isTimer);
+            const shouldUseTimer = Boolean(subStep.isTimer || subStep.timer?.durationSeconds);
+            const amountText = subStep.amount?.text
+              ?? (subStep.amount?.value != null ? `${subStep.amount.value}${subStep.amount.unit ? ` ${subStep.amount.unit}` : ''}`.trim() : null);
+            const baseValue = subStep.baseValue
+              ?? (shouldUseTimer ? timerFallback : normalizePortionText(amountText ?? subStep.portions?.[2] ?? subStep.portions?.[1]));
+            const legacyTimerPortions = buildLegacyPortionsFromBase({
+              baseValue: typeof baseValue === 'number' ? baseValue : timerFallback,
+              baseServings: normalizedBaseServings,
+              isTimer: true,
+              timerScaling: subStep.timerScaling ?? (subStep.timer?.scalingPolicy === 'fixed' ? 'fixed' : 'gentle'),
+            });
+            const legacyTextPortions = buildLegacyPortionsFromBase({
+              baseValue: normalizePortionText(baseValue),
+              baseServings: normalizedBaseServings,
+              isTimer: false,
+            });
 
             return {
               ...subStep,
+              subStepName: subStep.subStepName ?? subStep.text ?? 'Continuar',
               isTimer: shouldUseTimer,
+              baseValue,
+              timerScaling: subStep.timerScaling ?? (subStep.timer?.scalingPolicy === 'fixed' ? 'fixed' : 'gentle'),
               portions: shouldUseTimer
                 ? ({
-                  1: timer1 ?? timerFallback,
-                  2: timer2 ?? timerFallback,
-                  4: timer4 ?? timerFallback,
+                  1: typeof subStep.baseValue !== 'undefined' ? legacyTimerPortions[1] : timer1 ?? timerFallback,
+                  2: typeof subStep.baseValue !== 'undefined' ? legacyTimerPortions[2] : timer2 ?? timerFallback,
+                  4: typeof subStep.baseValue !== 'undefined' ? legacyTimerPortions[4] : timer4 ?? timerFallback,
                 } as const)
                 : ({
-                  1: normalizePortionText(subStep.portions?.[1]),
-                  2: normalizePortionText(subStep.portions?.[2]),
-                  4: normalizePortionText(subStep.portions?.[4]),
+                  1: typeof subStep.baseValue !== 'undefined' ? String(legacyTextPortions[1]) : normalizePortionText(subStep.portions?.[1]),
+                  2: typeof subStep.baseValue !== 'undefined' ? String(legacyTextPortions[2]) : normalizePortionText(subStep.portions?.[2]),
+                  4: typeof subStep.baseValue !== 'undefined' ? String(legacyTextPortions[4]) : normalizePortionText(subStep.portions?.[4]),
                 } as any),
             };
           });
@@ -708,6 +802,7 @@ export function ensureRecipeShape(data: GeneratedRecipe): GeneratedRecipe {
         return {
           ...step,
           stepNumber: Number.isFinite(step.stepNumber) ? step.stepNumber : index + 1,
+          stepName: step.stepName ?? step.title ?? `Paso ${index + 1}`,
           fireLevel: step.fireLevel === 'low' || step.fireLevel === 'high' || step.fireLevel === 'medium' ? step.fireLevel : 'medium',
           subSteps: normalizedSubSteps,
         };

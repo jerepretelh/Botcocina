@@ -71,7 +71,7 @@ export const recipes: Recipe[] = [
   },
   {
     id: 'arroz',
-    categoryId: 'arroces',
+    categoryId: 'almuerzos',
     name: 'Arroz Perfecto',
     icon: '🍚',
     ingredient: 'Tazas de arroz',
@@ -87,11 +87,21 @@ export const recipes: Recipe[] = [
   },
   {
     id: 'arroz-lentejas-compuesto',
-    categoryId: 'arroces',
+    categoryId: 'saludables-veggies',
     name: 'Arroz con lentejas',
     icon: '🍛',
     ingredient: 'Porciones',
     description: 'Fases guiadas · 45-55 min',
+    experience: 'compound',
+  },
+  {
+    id: 'tallarines-rojos-compuesto',
+    categoryId: 'saludables-veggies',
+    name: 'Tallarines rojos coordinados',
+    icon: '🍝',
+    ingredient: 'Porciones',
+    description: 'Salsa + pasta · flujo compuesto',
+    experience: 'compound',
   },
   {
     id: 'huevo-frito',
@@ -111,7 +121,7 @@ export const recipes: Recipe[] = [
   },
   {
     id: 'huevo-sancochado',
-    categoryId: 'hervidos',
+    categoryId: 'desayunos',
     name: 'Huevo sancochado',
     icon: '🥚',
     ingredient: 'Huevos',
@@ -119,7 +129,7 @@ export const recipes: Recipe[] = [
   },
   {
     id: 'sopa-verduras',
-    categoryId: 'sopas',
+    categoryId: 'sopas-guisos',
     name: 'Sopa de verduras',
     icon: '🥣',
     ingredient: 'Porciones',
@@ -750,13 +760,13 @@ export const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
       {
         subStepName: 'Hervir agua para lentejas',
         notes: 'Usa olla mediana con parte del agua total.',
-        portions: { 1: 240, 2: 300, 4: 420 },
+        portions: { 1: 8, 2: 10, 4: 12 },
         isTimer: true,
       },
       {
         subStepName: 'Agregar lentejas',
         notes: 'Cocina hasta que estén casi tiernas.',
-        portions: { 1: 900, 2: 1080, 4: 1320 },
+        portions: { 1: 14, 2: 16, 4: 18 },
         isTimer: true,
       },
       {
@@ -775,19 +785,19 @@ export const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
       {
         subStepName: 'Precalentar olla del arroz',
         notes: 'Fuego medio, olla seca.',
-        portions: { 1: 45, 2: 60, 4: 75 },
+        portions: { 1: 6, 2: 8, 4: 10 },
         isTimer: true,
       },
       {
         subStepName: 'Calentar aceite y sofreír ajo/cebolla',
         notes: 'Sofríe sin quemar el ajo.',
-        portions: { 1: 120, 2: 150, 4: 180 },
+        portions: { 1: 10, 2: 12, 4: 14 },
         isTimer: true,
       },
       {
         subStepName: 'Nacarar el arroz',
         notes: 'Agrega arroz y revuelve para sellar.',
-        portions: { 1: 60, 2: 90, 4: 120 },
+        portions: { 1: 8, 2: 10, 4: 12 },
         isTimer: true,
       },
     ],
@@ -812,7 +822,7 @@ export const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
       {
         subStepName: 'Cocción abierta',
         notes: 'Hasta que baje el líquido en superficie.',
-        portions: { 1: 420, 2: 540, 4: 720 },
+        portions: { 1: 12, 2: 14, 4: 16 },
         isTimer: true,
       },
     ],
@@ -831,7 +841,7 @@ export const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
       {
         subStepName: 'Terminar cocción tapada',
         notes: 'No destapar durante este tramo.',
-        portions: { 1: 720, 2: 900, 4: 1080 },
+        portions: { 1: 14, 2: 16, 4: 18 },
         isTimer: true,
       },
     ],
@@ -844,12 +854,120 @@ export const arrozLentejasCompuestoRecipeData: RecipeStep[] = [
       {
         subStepName: 'Reposar y esponjar',
         notes: 'Apaga fuego, reposa y mezcla con tenedor.',
-        portions: { 1: 240, 2: 300, 4: 420 },
+        portions: { 1: 8, 2: 10, 4: 12 },
         isTimer: true,
       },
       {
         subStepName: 'Servir',
         notes: 'Prueba sal final antes de llevar a mesa.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+    ],
+  },
+];
+
+export const tallarinesRojosCompuestoIngredients: Ingredient[] = [
+  { name: 'Tallarines', emoji: '🍝', indispensable: true, portions: { 1: '120 g', 2: '240 g', 4: '480 g' } },
+  { name: 'Tomate licuado', emoji: '🍅', indispensable: true, portions: { 1: '1 taza', 2: '2 tazas', 4: '4 tazas' } },
+  { name: 'Cebolla', emoji: '🧅', indispensable: true, portions: { 1: '1/4 unidad', 2: '1/2 unidad', 4: '1 unidad' } },
+  { name: 'Ajo picado', emoji: '🧄', indispensable: false, portions: { 1: '1/2 cdta', 2: '1 cdta', 4: '2 cdtas' } },
+  { name: 'Aceite', emoji: '🫒', indispensable: true, portions: { 1: '1 cdta', 2: '2 cdtas', 4: '1 cda' } },
+  { name: 'Agua', emoji: '💧', indispensable: true, portions: { 1: '2 litros', 2: '2.5 litros', 4: '3 litros' } },
+  { name: 'Queso rallado', emoji: '🧀', indispensable: false, portions: { 1: '2 cdas', 2: '4 cdas', 4: '8 cdas' } },
+  { name: 'Sal', emoji: '🧂', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+];
+
+export const tallarinesRojosCompuestoRecipeData: RecipeStep[] = [
+  {
+    stepNumber: 1,
+    stepName: 'Preparación base',
+    fireLevel: 'low',
+    subSteps: [
+      {
+        subStepName: 'Picar cebolla y dejar ajo listo',
+        notes: 'Organiza la estación para avanzar salsa y pasta en paralelo.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Poner olla del agua a calentar',
+        notes: 'Usa olla amplia para que la pasta no se pegue.',
+        portions: { 1: 9, 2: 11, 4: 13 },
+        isTimer: true,
+      },
+    ],
+  },
+  {
+    stepNumber: 2,
+    stepName: 'Salsa roja',
+    fireLevel: 'medium',
+    subSteps: [
+      {
+        subStepName: 'Sofreír cebolla y ajo',
+        notes: 'Mueve con calma hasta que la cebolla quede translúcida.',
+        portions: { 1: 9, 2: 11, 4: 13 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Agregar tomate licuado',
+        notes: 'Baja un punto el fuego y mezcla bien.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Reducir salsa',
+        notes: 'Déjala espesar mientras se cocina la pasta.',
+        portions: { 1: 12, 2: 14, 4: 16 },
+        isTimer: true,
+      },
+    ],
+  },
+  {
+    stepNumber: 3,
+    stepName: 'Pasta',
+    fireLevel: 'high',
+    subSteps: [
+      {
+        subStepName: 'Agregar sal al agua y echar tallarines',
+        notes: 'Revuelve de inmediato para separar la pasta.',
+        portions: { 1: '120 g', 2: '240 g', 4: '480 g' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Cocer tallarines',
+        notes: 'Cocina al dente mientras la salsa termina de tomar cuerpo.',
+        portions: { 1: 12, 2: 14, 4: 16 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Escurrir y reservar un poco del agua',
+        notes: 'Ese líquido ayuda a unir mejor la salsa al final.',
+        portions: { 1: '1/4 taza', 2: '1/3 taza', 4: '1/2 taza' },
+        isTimer: false,
+      },
+    ],
+  },
+  {
+    stepNumber: 4,
+    stepName: 'Integración final',
+    fireLevel: 'medium',
+    subSteps: [
+      {
+        subStepName: 'Unir pasta con salsa',
+        notes: 'Añade un poco del agua reservada si la salsa quedó muy espesa.',
+        portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
+        isTimer: false,
+      },
+      {
+        subStepName: 'Reposo corto',
+        notes: 'Deja que la salsa se adhiera bien antes de servir.',
+        portions: { 1: 6, 2: 8, 4: 10 },
+        isTimer: true,
+      },
+      {
+        subStepName: 'Servir con queso rallado',
+        notes: 'Ajusta sal y termina con queso si lo usarás.',
         portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' },
         isTimer: false,
       },
@@ -1206,6 +1324,55 @@ export const initialRecipeContent: Record<string, RecipeContent> = {
     steps: arrozLentejasCompuestoRecipeData,
     tip: 'Empieza por lentejas y avanza el arroz en paralelo; al unir, controla siempre el nivel de líquido.',
     portionLabels: { singular: 'porción', plural: 'porciones' },
+    compoundMeta: {
+      components: [
+        { id: 'lentejas', name: 'Lentejas', icon: '🫘', summary: 'Hervor y cocción base' },
+        { id: 'arroz', name: 'Arroz', icon: '🍚', summary: 'Olla principal y graneado' },
+        { id: 'sofrito', name: 'Sofrito', icon: '🧄', summary: 'Aromáticos para unir sabores' },
+      ],
+      timeline: [
+        { id: 'al-setup-lavado', componentId: 'lentejas', stepIndex: 0, subStepIndex: 0 },
+        { id: 'al-setup-picado', componentId: 'sofrito', stepIndex: 0, subStepIndex: 1 },
+        { id: 'al-lentejas-hervor', componentId: 'lentejas', stepIndex: 1, subStepIndex: 0, timerLabel: 'Hervor inicial', autoAdvanceOnStart: true, backgroundHint: 'Las lentejas ya están al fuego. Continúa ahora con la olla del arroz.', completionMessage: 'El hervor inicial de lentejas ya está listo.' },
+        { id: 'al-arroz-precalentar', componentId: 'arroz', stepIndex: 2, subStepIndex: 0, timerLabel: 'Precalentar olla' },
+        { id: 'al-sofrito-base', componentId: 'sofrito', stepIndex: 2, subStepIndex: 1, timerLabel: 'Sofrito base' },
+        { id: 'al-arroz-nacarar', componentId: 'arroz', stepIndex: 2, subStepIndex: 2, timerLabel: 'Nacarar arroz' },
+        { id: 'al-lentejas-coccion', componentId: 'lentejas', stepIndex: 1, subStepIndex: 1, timerLabel: 'Cocción de lentejas', autoAdvanceOnStart: true, backgroundHint: 'Las lentejas siguen cocinándose en segundo plano. Avanza con la integración del arroz.', completionMessage: 'Las lentejas ya quedaron casi tiernas.' },
+        { id: 'al-lentejas-check', componentId: 'lentejas', stepIndex: 1, subStepIndex: 2 },
+        { id: 'al-integracion-unir', componentId: 'arroz', stepIndex: 3, subStepIndex: 0 },
+        { id: 'al-integracion-ajuste', componentId: 'sofrito', stepIndex: 3, subStepIndex: 1 },
+        { id: 'al-integracion-abierta', componentId: 'arroz', stepIndex: 3, subStepIndex: 2, timerLabel: 'Cocción abierta', autoAdvanceOnStart: true, backgroundHint: 'El arroz ya quedó en cocción abierta. Continúa con el control del fuego y el siguiente frente.', completionMessage: 'La cocción abierta del arroz ya terminó.' },
+        { id: 'al-graneado-bajar', componentId: 'arroz', stepIndex: 4, subStepIndex: 0 },
+        { id: 'al-graneado-final', componentId: 'arroz', stepIndex: 4, subStepIndex: 1, timerLabel: 'Graneado tapado', autoAdvanceOnStart: true, backgroundHint: 'El arroz terminó de graneado. Puedes preparar el cierre de la receta mientras tanto.', completionMessage: 'El graneado tapado ya terminó.' },
+        { id: 'al-final-reposo', componentId: 'arroz', stepIndex: 5, subStepIndex: 0, timerLabel: 'Reposo final', autoAdvanceOnStart: true, backgroundHint: 'La olla está reposando. Ve preparando el servido final.', completionMessage: 'El reposo final ya quedó listo.' },
+        { id: 'al-final-servir', componentId: 'arroz', stepIndex: 5, subStepIndex: 1 },
+      ],
+    },
+  },
+  'tallarines-rojos-compuesto': {
+    ingredients: tallarinesRojosCompuestoIngredients,
+    steps: tallarinesRojosCompuestoRecipeData,
+    tip: 'El experimento aquí es coordinar salsa y pasta sin perder el punto de ninguna.',
+    portionLabels: { singular: 'porción', plural: 'porciones' },
+    compoundMeta: {
+      components: [
+        { id: 'pasta', name: 'Pasta', icon: '🍝', summary: 'Agua, cocción y escurrido' },
+        { id: 'salsa', name: 'Salsa', icon: '🍅', summary: 'Base roja y reducción' },
+      ],
+      timeline: [
+        { id: 'tr-prep-picar', componentId: 'salsa', stepIndex: 0, subStepIndex: 0 },
+        { id: 'tr-prep-agua', componentId: 'pasta', stepIndex: 0, subStepIndex: 1, timerLabel: 'Agua calentando', autoAdvanceOnStart: true, backgroundHint: 'El agua ya está calentando. Continúa ahora con la salsa.', completionMessage: 'El agua ya alcanzó el punto esperado.' },
+        { id: 'tr-salsa-sofrito', componentId: 'salsa', stepIndex: 1, subStepIndex: 0, timerLabel: 'Sofrito', autoAdvanceOnStart: true, backgroundHint: 'El sofrito ya está en curso. Aprovecha para avanzar con el siguiente paso de la salsa.', completionMessage: 'El sofrito ya quedó en su punto.' },
+        { id: 'tr-salsa-tomate', componentId: 'salsa', stepIndex: 1, subStepIndex: 1 },
+        { id: 'tr-salsa-reducir', componentId: 'salsa', stepIndex: 1, subStepIndex: 2, timerLabel: 'Reducción de salsa', autoAdvanceOnStart: true, backgroundHint: 'La salsa está reduciendo sola. Continúa ahora con la pasta.', completionMessage: 'La reducción de salsa ya quedó lista.' },
+        { id: 'tr-pasta-ingreso', componentId: 'pasta', stepIndex: 2, subStepIndex: 0 },
+        { id: 'tr-pasta-coccion', componentId: 'pasta', stepIndex: 2, subStepIndex: 1, timerLabel: 'Cocción pasta', autoAdvanceOnStart: true, backgroundHint: 'La pasta ya está en cocción. Vuelve a la salsa o prepárate para integrar.', completionMessage: 'La pasta ya terminó su cocción.' },
+        { id: 'tr-pasta-escurrir', componentId: 'pasta', stepIndex: 2, subStepIndex: 2 },
+        { id: 'tr-final-unir', componentId: 'salsa', stepIndex: 3, subStepIndex: 0 },
+        { id: 'tr-final-reposo', componentId: 'salsa', stepIndex: 3, subStepIndex: 1, timerLabel: 'Reposo corto', autoAdvanceOnStart: true, backgroundHint: 'La mezcla ya está reposando. Ve cerrando el servido.', completionMessage: 'El reposo corto ya terminó.' },
+        { id: 'tr-final-servir', componentId: 'pasta', stepIndex: 3, subStepIndex: 2 },
+      ],
+    },
   },
   'quinua-desayuno': {
     ingredients: quinuaDesayunoIngredients,
@@ -1257,4 +1424,18 @@ export const initialRecipeContent: Record<string, RecipeContent> = {
   },
 };
 
-export const defaultRecipes: Recipe[] = recipes;
+const TEST_RECIPE_IDS = new Set([
+  'arroz',
+  'huevo-sancochado',
+  'sopa-verduras',
+  'quinua-desayuno',
+  'pan-palta-huevo',
+  'lomo-saltado-casero',
+  'arroz-lentejas-compuesto',
+  'tallarines-rojos-compuesto',
+]);
+
+export const defaultRecipes: Recipe[] = recipes.filter((recipe) => TEST_RECIPE_IDS.has(recipe.id));
+export const defaultRecipeContent: Record<string, RecipeContent> = Object.fromEntries(
+  Object.entries(initialRecipeContent).filter(([recipeId]) => TEST_RECIPE_IDS.has(recipeId)),
+);

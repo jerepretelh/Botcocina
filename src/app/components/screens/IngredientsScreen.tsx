@@ -4,6 +4,9 @@ import { Recipe, Ingredient, QuantityMode, AmountUnit, Portion, RecipeStep } fro
 import { getIngredientKey, splitIngredientQuantity, normalizeText } from '../../utils/recipeHelpers';
 import { ProductSurface } from '../ui/product-system';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
+import { resolveIngredientDisplayValue } from '../../lib/recipeScaling';
+import type { RecipeYieldV2 } from '../../types/recipe-v2';
+import { describeRecipeYield } from '../../lib/recipeV2';
 
 const RoadmapModal = lazy(() => import('../ui/RoadmapModal').then((module) => ({ default: module.RoadmapModal })));
 
@@ -18,6 +21,7 @@ interface IngredientsScreenProps {
     peopleCount: number;
     availableCount: number;
     amountUnit: AmountUnit;
+    targetYield?: RecipeYieldV2 | null;
     timingAdjustedLabel: string;
     currentIngredients: Ingredient[];
     activeIngredientSelection: Record<string, boolean>;
@@ -42,6 +46,7 @@ export function IngredientsScreen({
     peopleCount,
     availableCount,
     amountUnit,
+    targetYield,
     timingAdjustedLabel,
     currentIngredients,
     activeIngredientSelection,
@@ -90,9 +95,9 @@ export function IngredientsScreen({
                                             {selectedRecipe?.name ?? 'Checklist previo'}
                                         </h1>
                                         <p className="mt-2 max-w-lg text-sm leading-6 text-slate-600">
-                                            {`Base: ${quantityMode === 'people'
-                                                ? `para ${peopleCount} persona${peopleCount === 1 ? '' : 's'}`
-                                                : `con ${availableCount} ${amountUnit === 'grams' ? 'g' : selectedRecipe?.ingredient ?? 'unidades'}`} · ${timingAdjustedLabel}`}
+                                            {`Base: ${describeRecipeYield(targetYield) || (quantityMode === 'people'
+                                                ? `${peopleCount} persona${peopleCount === 1 ? '' : 's'}`
+                                                : `${availableCount} ${amountUnit === 'grams' ? 'g' : selectedRecipe?.ingredient ?? 'unidades'}`)} · ${timingAdjustedLabel}`}
                                         </p>
                                     </div>
                                 </div>
@@ -127,7 +132,7 @@ export function IngredientsScreen({
                                             <div>
                                                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Porcion activa</p>
                                                 <p className="mt-1 text-base font-black text-[#131d36] sm:text-lg">
-                                                    {portion} {currentPortionLabel}
+                                                    {describeRecipeYield(targetYield) || `${quantityMode === 'people' ? peopleCount : portion} ${currentPortionLabel}`}
                                                 </p>
                                             </div>
                                         </div>
@@ -144,7 +149,13 @@ export function IngredientsScreen({
                                                     const displayPortionValue =
                                                         selectedRecipe?.id === 'huevo-frito' && normalizeText(ingredient.name).includes('huevo')
                                                             ? `${Math.max(1, batchCountForRecipe)} huevos`
-                                                            : ingredient.portions[portion];
+                                                            : resolveIngredientDisplayValue({
+                                                                ingredient,
+                                                                recipe: selectedRecipe,
+                                                                portion,
+                                                                peopleCount,
+                                                                quantityMode,
+                                                            });
                                                     const quantity = splitIngredientQuantity(String(displayPortionValue));
                                                     const isSelected = activeIngredientSelection[getIngredientKey(ingredient.name)] ?? true;
 

@@ -14,6 +14,7 @@ import {
     ClarificationNumberMode,
     ClarificationQuantityUnit,
 } from '../../types';
+import type { RecipeYieldV2 } from '../types/recipe-v2';
 import { AIClarificationQuestion } from '../lib/recipeAI';
 import { buildCookingSessionState } from '../lib/cookingSession';
 import {
@@ -74,6 +75,7 @@ interface UseThermomixHandlersProps {
     amountUnit: AmountUnit;
     availableCount: number;
     peopleCount: number;
+    targetYield?: RecipeYieldV2 | null;
     portion: Portion;
     timerScaleFactor: number;
     selectedRecipe: Recipe | null;
@@ -103,6 +105,7 @@ interface UseThermomixHandlersProps {
         peopleCount: number | null;
         amountUnit: AmountUnit | null;
         availableCount: number | null;
+        targetYield?: RecipeYieldV2 | null;
         selectedOptionalIngredients: string[];
         sourceContextSummary: UserRecipeCookingConfig['sourceContextSummary'];
         resolvedPortion: Portion;
@@ -164,6 +167,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         amountUnit,
         availableCount,
         peopleCount,
+        targetYield,
         portion,
         timerScaleFactor,
         selectedRecipe,
@@ -202,6 +206,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         peopleCount: number | null;
         amountUnit: AmountUnit | null;
         availableCount: number | null;
+        targetYield?: RecipeYieldV2 | null;
         selectedOptionalIngredients: string[];
         sourceContextSummary: UserRecipeCookingConfig['sourceContextSummary'];
         resolvedPortion: Portion;
@@ -237,12 +242,12 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         if (savedConfig && (setupBehavior === 'saved_config_first' || setupBehavior === 'servings_or_quantity')) {
             const shouldUseHave = setupBehavior !== 'servings_only' && savedConfig.quantityMode === 'have';
             setQuantityMode(shouldUseHave ? 'have' : 'people');
-            setPeopleCount(savedConfig.peopleCount ?? 2);
+            setPeopleCount(savedConfig.peopleCount ?? recipe.basePortions ?? 2);
             setAvailableCount(savedConfig.availableCount ?? 2);
             setAmountUnit(savedConfig.amountUnit ?? 'units');
         } else {
             setQuantityMode('people');
-            setPeopleCount(2);
+            setPeopleCount(recipe.basePortions ?? 2);
             setAvailableCount(2);
             setAmountUnit('units');
         }
@@ -302,6 +307,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
                 peopleCount: quantityMode === 'people' ? peopleCount : peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,
                 availableCount: quantityMode === 'have' ? availableCount : null,
+                targetYield: targetYield ?? null,
                 selectedOptionalIngredients: currentIngredients
                     .filter((ingredient) => !ingredient.indispensable)
                     .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
@@ -316,6 +322,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
                 peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,
                 availableCount: quantityMode === 'have' ? availableCount : null,
+                targetYield: targetYield ?? null,
                 selectedOptionalIngredients: currentIngredients
                     .filter((ingredient) => !ingredient.indispensable)
                     .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
@@ -345,21 +352,26 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
     };
 
     const handleStartCooking = () => {
-        const session = buildCookingSessionState({
-            selectedRecipe,
-            activeRecipeContentSteps: activeRecipeContent.steps,
-            currentIngredients,
-            activeIngredientSelection,
-            quantityMode,
-            amountUnit,
-            availableCount,
-            peopleCount,
-            portion,
-            timerScaleFactor,
-        });
+        if (selectedRecipe?.experience === 'compound' && activeRecipeContent.compoundMeta) {
+            setCookingSteps(null);
+            setActiveStepLoop(null);
+        } else {
+            const session = buildCookingSessionState({
+                selectedRecipe,
+                activeRecipeContentSteps: activeRecipeContent.steps,
+                currentIngredients,
+                activeIngredientSelection,
+                quantityMode,
+                amountUnit,
+                availableCount,
+                peopleCount,
+                portion,
+                timerScaleFactor,
+            });
 
-        setCookingSteps(session.steps);
-        setActiveStepLoop(session.activeStepLoop);
+            setCookingSteps(session.steps);
+            setActiveStepLoop(session.activeStepLoop);
+        }
         setScreen('cooking');
         closeRecipeOverlays();
         setCurrentStepIndex(0);
@@ -372,6 +384,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
                 peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,
                 availableCount: quantityMode === 'have' ? availableCount : null,
+                targetYield: targetYield ?? null,
                 selectedOptionalIngredients: currentIngredients
                     .filter((ingredient) => !ingredient.indispensable)
                     .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
@@ -386,6 +399,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
                 peopleCount,
                 amountUnit: quantityMode === 'have' ? amountUnit : null,
                 availableCount: quantityMode === 'have' ? availableCount : null,
+                targetYield: targetYield ?? null,
                 selectedOptionalIngredients: currentIngredients
                     .filter((ingredient) => !ingredient.indispensable)
                     .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_'))
@@ -426,7 +440,7 @@ export function useThermomixHandlers(props: UseThermomixHandlersProps) {
         setSelectedCategory(null);
         setSelectedRecipe(null);
         setQuantityMode('people');
-        setPeopleCount(2);
+        setPeopleCount(selectedRecipe?.basePortions ?? 2);
         setAvailableCount(2);
         setAmountUnit('units');
         setProduceType('blanca');
