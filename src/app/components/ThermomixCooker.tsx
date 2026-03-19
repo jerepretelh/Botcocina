@@ -325,9 +325,34 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const visibleRecipesForCurrentView = recipeSelection.selectedCategory
     ? recipesForCurrentView.filter((recipe) => matchesRecipeCategory(recipeSelection.selectedCategory, recipe.categoryId))
     : [];
+  const publicLocalV2LibraryRecipes = useMemo(() => {
+    const existingRecipeIds = new Set(uniqueAvailableRecipes.map((recipe) => recipe.id));
+
+    return Object.values(recipeSelection.recipeV2ById)
+      .filter((recipeV2) => recipeV2.isCoreRecipe)
+      .filter((recipeV2) => !existingRecipeIds.has(recipeV2.id))
+      .filter((recipeV2) => Boolean(recipeV2.categoryId))
+      .map((recipeV2): Recipe => ({
+        id: recipeV2.id,
+        categoryId: recipeV2.categoryId as RecipeCategoryId,
+        name: recipeV2.name,
+        icon: recipeV2.icon ?? '🍳',
+        ingredient: recipeV2.ingredient ?? 'receta',
+        description: recipeV2.description ?? 'Receta disponible',
+        experience: recipeV2.experience,
+        visibility: 'public',
+      }));
+  }, [recipeSelection.recipeV2ById, uniqueAvailableRecipes]);
   const publicRecipes = useMemo(
-    () => uniqueAvailableRecipes.filter((recipe) => (recipe.visibility ?? 'public') === 'public'),
-    [uniqueAvailableRecipes],
+    () => [
+      ...uniqueAvailableRecipes.filter((recipe) => (recipe.visibility ?? 'public') === 'public'),
+      ...publicLocalV2LibraryRecipes,
+    ],
+    [publicLocalV2LibraryRecipes, uniqueAvailableRecipes],
+  );
+  const selectableRecipesById = useMemo(
+    () => new Map(publicRecipes.map((recipe) => [recipe.id, recipe])),
+    [publicRecipes],
   );
   const globalCategories = useMemo(
     () => [
@@ -717,7 +742,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     if (recipeStageMatch) {
       const recipeId = decodeURIComponent(recipeStageMatch[1]);
       const stage = recipeStageMatch[2];
-      const recipe = recipeSelection.availableRecipes.find((item) => item.id === recipeId);
+      const recipe = selectableRecipesById.get(recipeId)
+        ?? recipeSelection.availableRecipes.find((item) => item.id === recipeId);
 
       if (!recipe) {
         if (recipeSelection.isSyncingCatalog) return;
@@ -777,7 +803,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
     routeSyncRef.current = false;
     navigate('/', { replace: true });
-  }, [location.pathname, recipeSelection.availableRecipes, recipeSelection.isSyncingCatalog, userRecipeConfigs.configsByRecipeId, recipeSelection.recipeContentById, recipeSelection.ingredientSelectionByRecipe]);
+  }, [location.pathname, recipeSelection.availableRecipes, recipeSelection.isSyncingCatalog, userRecipeConfigs.configsByRecipeId, recipeSelection.recipeContentById, recipeSelection.ingredientSelectionByRecipe, selectableRecipesById]);
 
   useEffect(() => {
     if (routeSyncRef.current) {

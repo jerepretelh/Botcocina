@@ -142,6 +142,7 @@ export function useRecipeSelection() {
     }, []);
 
     useEffect(() => {
+        if (selectedRecipeV2) return;
         setTargetYield(deriveTargetYieldFromLegacy({
             quantityMode,
             peopleCount,
@@ -150,7 +151,7 @@ export function useRecipeSelection() {
             recipe: selectedRecipe,
             content: activeRecipeContent,
         }));
-    }, [quantityMode, peopleCount, amountUnit, availableCount, selectedRecipe, activeRecipeContent]);
+    }, [quantityMode, peopleCount, amountUnit, availableCount, selectedRecipe, activeRecipeContent, selectedRecipeV2]);
 
     const navigateToScreen = (nextScreen: Screen) => {
         setScreenState((currentScreen) => {
