@@ -33,9 +33,9 @@ function getYieldCardLabel(recipe: RecipeV2 | null | undefined, baseIngredientLa
     return `Cantidad base de ${baseIngredientLabel}`;
   }
   if (recipe?.scalingModel === 'container_bound') {
-    return 'Recipiente de referencia';
+    return 'Recipiente que usarás';
   }
-  return 'Rendimiento objetivo';
+  return 'Cantidad que quieres preparar';
 }
 
 function getYieldBaseSummary(recipe: RecipeV2 | null | undefined, baseIngredientLabel: string) {
@@ -45,7 +45,7 @@ function getYieldBaseSummary(recipe: RecipeV2 | null | undefined, baseIngredient
   if (recipe?.scalingModel === 'container_bound') {
     return 'Recipiente base';
   }
-  return 'Base de la receta';
+  return 'Referencia de la receta';
 }
 
 const MAX_REASONABLE_YIELD_DISPLAY_VALUE = 1_000_000;
@@ -176,7 +176,7 @@ export function RecipeSetupScreenV2({
       <SheetContent side="right" className="w-full max-w-xl overflow-hidden border-primary/10 bg-[#ede4dc] p-0">
         <SheetHeader className="sr-only">
           <SheetTitle>{selectedRecipe?.name ?? 'Configurar receta'}</SheetTitle>
-          <SheetDescription>Ajusta el rendimiento de la receta en V2.</SheetDescription>
+          <SheetDescription>Ajusta solo lo necesario antes de revisar ingredientes.</SheetDescription>
         </SheetHeader>
 
         <div className="flex h-full flex-col">
@@ -190,7 +190,7 @@ export function RecipeSetupScreenV2({
                 <ArrowLeft className="size-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Runtime V2</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Configura tu receta</p>
                 <h1 className="mt-2 text-[1.45rem] font-bold leading-[1.12] tracking-tight text-slate-900 sm:text-[1.75rem]">
                   {selectedRecipe?.name ?? recipe?.name ?? 'Configurar receta'}
                 </h1>
@@ -366,7 +366,7 @@ export function RecipeSetupScreenV2({
 
                 {warnings.length > 0 ? (
                   <div className="mt-4 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Ajustes manuales</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Ten en cuenta</p>
                     <div className="mt-3 space-y-2">
                       {warnings.map((warning) => (
                         <p key={warning} className="text-sm leading-6 text-slate-600">

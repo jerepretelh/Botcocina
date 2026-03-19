@@ -40,6 +40,10 @@ function getYieldDisplayValue(yieldValue: RecipeYieldV2 | null | undefined) {
   return `${yieldValue.value}`;
 }
 
+export function shouldShowPlanYieldStepper(yieldValue: RecipeYieldV2 | null | undefined) {
+  return yieldValue?.type !== 'pan_size' && yieldValue?.type !== 'tray_size';
+}
+
 interface PlanRecipeSheetProps {
   open: boolean;
   recipe: Recipe | null;
@@ -123,6 +127,7 @@ export function PlanRecipeSheet({
   const isYieldDriven = Boolean(recipeV2 && activeYield);
   const showCookingContextBlock = shouldShowCookingContextBlock(recipeV2, activeYield);
   const hasDiscreteContainerYield = usesDiscreteContainerControl(activeYield);
+  const showYieldStepper = !isYieldDriven || shouldShowPlanYieldStepper(activeYield);
   const yieldStep = activeYield?.type === 'weight'
     ? 50
     : activeYield?.type === 'volume'
@@ -282,9 +287,9 @@ export function PlanRecipeSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full max-w-xl overflow-y-auto border-primary/10 bg-background">
         <SheetHeader>
-          <SheetTitle className="text-left text-2xl font-bold">Planificar receta</SheetTitle>
+          <SheetTitle className="text-left text-2xl font-bold">Configurar para el plan</SheetTitle>
           <SheetDescription className="text-left">
-            Guarda una snapshot de la receta con su configuración semanal. Los cambios futuros en la receta no alterarán este ítem.
+            Guarda esta receta con la configuración que quieres usar en la semana.
           </SheetDescription>
         </SheetHeader>
 
@@ -296,11 +301,11 @@ export function PlanRecipeSheet({
                   {recipe.icon}
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Receta</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Configuración de receta</p>
                   <h3 className="text-lg font-bold">{recipe.name}</h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{recipe.description}</p>
                   <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
-                    Base {describeRecipeYield(recipeV2?.baseYield ?? initialSnapshot?.targetYield ?? deriveTargetYieldFromLegacy({
+                    Referencia {describeRecipeYield(recipeV2?.baseYield ?? initialSnapshot?.targetYield ?? deriveTargetYieldFromLegacy({
                       quantityMode: 'people',
                       peopleCount: recipe.basePortions ?? recipeContent?.baseServings ?? 2,
                       recipe,
@@ -372,7 +377,7 @@ export function PlanRecipeSheet({
 
               <div className="rounded-[1.5rem] border border-primary/10 bg-background/80 p-5">
                 <div className="flex items-center justify-between">
-                  {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                  {showYieldStepper ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -388,7 +393,7 @@ export function PlanRecipeSheet({
                     >
                       <Minus className="size-5" />
                     </button>
-                  )}
+                  ) : <div className="size-12 shrink-0" aria-hidden="true" />}
                   <div className="text-center">
                     <div className="text-5xl font-black text-primary">
                       {isYieldDriven ? (yieldValue ?? 'Base') : quantityMode === 'people' ? peopleCount : availableCount}
@@ -408,7 +413,7 @@ export function PlanRecipeSheet({
                       </p>
                     ) : null}
                   </div>
-                  {hasDiscreteContainerYield ? <div className="size-12 shrink-0" aria-hidden="true" /> : (
+                  {showYieldStepper ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -424,7 +429,7 @@ export function PlanRecipeSheet({
                     >
                       <Plus className="size-5" />
                     </button>
-                  )}
+                  ) : <div className="size-12 shrink-0" aria-hidden="true" />}
                 </div>
                 {isYieldDriven && activeYield?.type === 'volume' ? (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
