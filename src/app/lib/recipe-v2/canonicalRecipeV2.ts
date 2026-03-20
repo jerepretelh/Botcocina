@@ -34,7 +34,16 @@ function assertIngredientAmount(amount: unknown, path: string): void {
   if (typeof typed.scalable !== 'boolean') {
     throw new Error(`Receta inválida en ${path}: amount.scalable inválido.`);
   }
+  const allowsTextOnlyCustomAmount =
+    typed.scalable === false
+    && typed.family === 'custom'
+    && typeof typed.text === 'string'
+    && typed.text.trim().length > 0
+    && typed.canonicalUnit == null;
   if (typeof typed.canonicalUnit !== 'string' || !typed.canonicalUnit) {
+    if (allowsTextOnlyCustomAmount) {
+      return;
+    }
     throw new Error(`Receta inválida en ${path}: amount.canonicalUnit requerido.`);
   }
   if (!typed.family || !VALID_FAMILIES.includes(typed.family)) {

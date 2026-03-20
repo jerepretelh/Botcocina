@@ -196,6 +196,7 @@ export function CompoundCookingScreen({
   isCurrentTimerExpired,
   isRecipeComplete,
   primaryActionLabel,
+  primaryActionKind,
   voiceEnabled,
   speechSupported,
   inlineMessage,

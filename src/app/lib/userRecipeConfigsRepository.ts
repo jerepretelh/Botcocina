@@ -41,6 +41,10 @@ function isMissingTargetYieldColumn(error: { message?: string | null; code?: str
   return error.code === '42703' || (message.includes('column') && message.includes('target_yield'));
 }
 
+function getTargetYieldSchemaErrorMessage() {
+  return 'Falta aplicar la migracion de target_yield para configuraciones V2.';
+}
+
 function coerceTargetYield(value: unknown, row: DbUserRecipeCookingConfig): RecipeYieldV2 | null {
   if (value && typeof value === 'object' && 'type' in (value as Record<string, unknown>)) {
     const candidate = value as Partial<RecipeYieldV2>;
@@ -127,26 +131,11 @@ export async function getUserRecipeCookingConfigs(userId: string): Promise<UserR
     .order('last_used_at', { ascending: false });
 
   if (error) {
-    if (isMissingTargetYieldColumn(error)) {
-      const legacy = await client
-        .from('user_recipe_cooking_configs')
-        .select('user_id, recipe_id, quantity_mode, people_count, amount_unit, available_count, selected_optional_ingredients, source_context_summary, last_used_at, created_at, updated_at')
-        .eq('user_id', userId)
-        .order('last_used_at', { ascending: false });
-      if (legacy.error) {
-        if (isMissingTableError(legacy.error)) {
-          disableUserRecipeConfigsForSession();
-          return [];
-        }
-        throw new Error(legacy.error.message || 'No se pudieron cargar las configuraciones de recetas.');
-      }
-      return ((legacy.data ?? []) as DbUserRecipeCookingConfig[]).map((row) => mapRow({ ...row, target_yield: null }));
-    }
     if (isMissingTableError(error)) {
       disableUserRecipeConfigsForSession();
       return [];
     }
-    throw new Error(error.message || 'No se pudieron cargar las configuraciones de recetas.');
+    throw new Error(isMissingTargetYieldColumn(error) ? getTargetYieldSchemaErrorMessage() : error.message || 'No se pudieron cargar las configuraciones de recetas.');
   }
 
   return ((data ?? []) as DbUserRecipeCookingConfig[]).map(mapRow);
@@ -187,32 +176,6 @@ export async function upsertUserRecipeCookingConfig(config: Omit<UserRecipeCooki
     .single();
 
   if (error || !data) {
-    if (isMissingTargetYieldColumn(error)) {
-      const legacyPayload = {
-        user_id: config.userId,
-        recipe_id: config.recipeId,
-        quantity_mode: config.quantityMode,
-        people_count: config.peopleCount,
-        amount_unit: config.amountUnit,
-        available_count: config.availableCount,
-        selected_optional_ingredients: config.selectedOptionalIngredients,
-        source_context_summary: {
-          ...(config.sourceContextSummary ?? {}),
-          cookingContext: config.cookingContext ?? config.sourceContextSummary?.cookingContext ?? null,
-        },
-        last_used_at: config.lastUsedAt,
-        updated_at: now,
-      };
-      const legacy = await client
-        .from('user_recipe_cooking_configs')
-        .upsert(legacyPayload, { onConflict: 'user_id,recipe_id' })
-        .select('user_id, recipe_id, quantity_mode, people_count, amount_unit, available_count, selected_optional_ingredients, source_context_summary, last_used_at, created_at, updated_at')
-        .single();
-      if (legacy.error || !legacy.data) {
-        throw new Error(legacy.error?.message || 'No se pudo guardar la configuración de la receta.');
-      }
-      return mapRow({ ...(legacy.data as DbUserRecipeCookingConfig), target_yield: config.targetYield ?? null });
-    }
     if (isMissingTableError(error)) {
       disableUserRecipeConfigsForSession();
       return {
@@ -221,8 +184,12 @@ export async function upsertUserRecipeCookingConfig(config: Omit<UserRecipeCooki
         updatedAt: now,
       };
     }
-    throw new Error(error?.message || 'No se pudo guardar la configuración de la receta.');
+    throw new Error(isMissingTargetYieldColumn(error) ? getTargetYieldSchemaErrorMessage() : error?.message || 'No se pudo guardar la configuración de la receta.');
   }
 
   return mapRow(data as DbUserRecipeCookingConfig);
 }
+
+export const __testing = {
+  mapRow,
+};

@@ -1,6 +1,18 @@
 import { ArrowLeft, Heart, HeartOff, Sparkles } from 'lucide-react';
 import type { Recipe, RecipeCategory } from '../../../types';
+import {
+  getRecipeCatalogCapabilityLabel,
+  getRecipeCatalogFlowMeta,
+  getRecipeCatalogFlowStatusLabel,
+  type RecipeCatalogFlowStatus,
+} from '../../lib/recipeCatalogFlowMeta';
 import { MainShellLayout } from './MainShellLayout';
+
+const FLOW_STATUS_BADGE_STYLES: Record<RecipeCatalogFlowStatus, string> = {
+  journey: 'bg-[#dff7ea] text-[#0f8a4b]',
+  legacy: 'bg-[#eef1f5] text-[#667085]',
+  review: 'bg-[#fff1dc] text-[#c56a1a]',
+};
 
 interface GlobalCategoryItem {
   id: string;
@@ -91,6 +103,7 @@ export function GlobalRecipesCategoryScreen({
               const ingredient = recipe?.ingredient ?? 'Receta';
               const dateLabel = recipe?.createdAt ? new Date(recipe.createdAt).toLocaleDateString() : 'Receta disponible';
               const isFavorite = recipe ? favoriteRecipeIds.has(recipe.id) : false;
+              const flowMeta = recipe ? getRecipeCatalogFlowMeta(recipe.id) : null;
 
               return (
                 <article
@@ -122,6 +135,18 @@ export function GlobalRecipesCategoryScreen({
                               <span className="rounded-2xl bg-[#eef1f5] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#667085]">
                                 Pública
                               </span>
+                            ) : null}
+                            {flowMeta ? (
+                              <>
+                                <span
+                                  className={`rounded-2xl px-2.5 py-0.5 text-[0.75rem] font-bold ${FLOW_STATUS_BADGE_STYLES[flowMeta.status]}`}
+                                >
+                                  {getRecipeCatalogFlowStatusLabel(flowMeta.status)}
+                                </span>
+                                <span className="rounded-2xl bg-[#f4ddd1] px-2.5 py-0.5 text-[0.75rem] font-bold text-[#a64d1f]">
+                                  {getRecipeCatalogCapabilityLabel(flowMeta.primaryCapability)}
+                                </span>
+                              </>
                             ) : null}
                           </div>
                         </div>

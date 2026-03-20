@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Beaker,
   BookHeart,
@@ -114,6 +115,18 @@ export function MainShellLayout({
 
   const moreActive = activeItem === 'my-recipes' || activeItem === 'favorites' || activeItem === 'settings';
   const pageLabel = getPageLabel(activeItem);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+  const [isBottomMenuOpen, setIsBottomMenuOpen] = useState(false);
+
+  const runHeaderMenuAction = (action: () => void) => {
+    setIsHeaderMenuOpen(false);
+    action();
+  };
+
+  const runBottomMenuAction = (action: () => void) => {
+    setIsBottomMenuOpen(false);
+    action();
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground xl:flex">
@@ -188,7 +201,7 @@ export function MainShellLayout({
               </div>
             </div>
 
-            <Sheet>
+            <Sheet open={isHeaderMenuOpen} onOpenChange={setIsHeaderMenuOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"
@@ -221,7 +234,7 @@ export function MainShellLayout({
 
                   <button
                     type="button"
-                    onClick={onGoMyRecipes}
+                    onClick={() => runHeaderMenuAction(onGoMyRecipes)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'my-recipes')}`}
                   >
                     <BookHeart className="size-5" />
@@ -229,7 +242,7 @@ export function MainShellLayout({
                   </button>
                   <button
                     type="button"
-                    onClick={onGoFavorites}
+                    onClick={() => runHeaderMenuAction(onGoFavorites)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'favorites')}`}
                   >
                     <Heart className="size-5" />
@@ -237,7 +250,7 @@ export function MainShellLayout({
                   </button>
                   <button
                     type="button"
-                    onClick={onGoSettings}
+                    onClick={() => runHeaderMenuAction(onGoSettings)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'settings')}`}
                   >
                     <Settings className="size-5" />
@@ -245,7 +258,7 @@ export function MainShellLayout({
                   </button>
                   <button
                     type="button"
-                    onClick={onGoCompoundLab}
+                    onClick={() => runHeaderMenuAction(onGoCompoundLab)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'compound-lab')}`}
                   >
                     <Beaker className="size-5" />
@@ -254,7 +267,7 @@ export function MainShellLayout({
                   <Button
                     variant="outline"
                     className="w-full rounded-[1.25rem] border-primary/20 bg-transparent"
-                    onClick={onSignOut}
+                    onClick={() => runHeaderMenuAction(onSignOut)}
                   >
                     Cerrar sesión
                   </Button>
@@ -289,7 +302,7 @@ export function MainShellLayout({
               );
             })}
 
-            <Sheet>
+            <Sheet open={isBottomMenuOpen} onOpenChange={setIsBottomMenuOpen}>
               <SheetTrigger asChild>
                 <button
                   type="button"
@@ -309,7 +322,7 @@ export function MainShellLayout({
                 <div className="space-y-3 px-5">
                   <button
                     type="button"
-                    onClick={onGoFavorites}
+                    onClick={() => runBottomMenuAction(onGoFavorites)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'favorites')}`}
                   >
                     <Heart className="size-5" />
@@ -317,7 +330,7 @@ export function MainShellLayout({
                   </button>
                   <button
                     type="button"
-                    onClick={onGoSettings}
+                    onClick={() => runBottomMenuAction(onGoSettings)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'settings')}`}
                   >
                     <Settings className="size-5" />
@@ -325,7 +338,7 @@ export function MainShellLayout({
                   </button>
                   <button
                     type="button"
-                    onClick={onGoCompoundLab}
+                    onClick={() => runBottomMenuAction(onGoCompoundLab)}
                     className={`flex w-full items-center gap-3 rounded-[1.25rem] px-4 py-3 text-left text-sm font-semibold transition-colors ${navClasses(activeItem === 'compound-lab')}`}
                   >
                     <Beaker className="size-5" />
@@ -334,7 +347,7 @@ export function MainShellLayout({
                   <Button
                     variant="outline"
                     className="w-full rounded-[1.25rem] border-primary/20 bg-transparent"
-                    onClick={onSignOut}
+                    onClick={() => runBottomMenuAction(onSignOut)}
                   >
                     Cerrar sesión
                   </Button>

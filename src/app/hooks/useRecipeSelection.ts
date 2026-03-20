@@ -32,7 +32,7 @@ export function useRecipeSelection() {
     const [ingredientSelectionByRecipe, setIngredientSelectionByRecipe] = useState<Record<string, Record<string, boolean>>>({});
     const [catalogSource, setCatalogSource] = useState<CatalogSource>('local-dev');
     const [catalogWarning, setCatalogWarning] = useState<string | null>(null);
-    const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
+    const [isSyncingCatalog, setIsSyncingCatalog] = useState(true);
     const [localRecipeV2ById, setLocalRecipeV2ById] = useState<Record<string, CanonicalRecipeV2>>({});
     const setRecipeV2ById = useCallback((recipeId: string, recipeV2: CanonicalRecipeV2) => {
         setLocalRecipeV2ById((prev) => ({ ...prev, [recipeId]: recipeV2 }));

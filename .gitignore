@@ -7,3 +7,4 @@ dist/
 .vercel
 .playwright-cli/
 output/playwright/
+playwright/.auth/user.json

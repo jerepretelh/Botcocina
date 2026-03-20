@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GLOBAL_RECIPES_ALL_PATH, GLOBAL_RECIPES_HOME_PATH, isGlobalRecipesAllPath } from '../lib/globalRecipesRoute';
+import { resolveRecipeOverlayCloseDestination } from '../lib/recipeNavigation';
 import { resolveRecipeOverlayHostScreen } from '../lib/recipeOverlayHostScreen';
 import { isRecipeOverlayRoute, resolveOverlayPinnedRoute } from '../lib/recipeOverlayRoute';
 import { resolveRoutableCategoryId } from '../lib/routableRecipeCategory';
@@ -89,4 +90,19 @@ test('all recipes to papas-airfryer to ingredients keeps the library host screen
   const ingredientsHostScreen = resolveRecipeOverlayHostScreen('recipe-select', setupHostScreen);
   assert.equal(ingredientsHostScreen, 'recipe-select');
   assert.notEqual(ingredientsHostScreen, 'category-select');
+});
+
+test('closing from ingredients returns to Todas instead of collapsing to home', () => {
+  assert.deepEqual(
+    resolveRecipeOverlayCloseDestination({
+      currentScreen: 'ingredients',
+      currentHostScreen: 'recipe-select',
+      explicitHostPath: GLOBAL_RECIPES_ALL_PATH,
+      selectedCategory: null,
+    }),
+    {
+      screen: 'recipe-select',
+      path: GLOBAL_RECIPES_ALL_PATH,
+    },
+  );
 });

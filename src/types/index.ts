@@ -1,6 +1,6 @@
 import type { CookingContextV2, RecipeYieldV2 } from '../app/types/recipe-v2.js';
 
-export type Screen = 'category-select' | 'global-recipes' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'compound-lab';
+export type Screen = 'category-select' | 'global-recipes' | 'recipe-select' | 'recipe-seed-search' | 'ai-clarify' | 'recipe-setup' | 'ingredients' | 'cooking' | 'design-system' | 'ai-settings' | 'releases' | 'backlog' | 'my-recipes' | 'favorites' | 'weekly-plan' | 'shopping-list' | 'compound-lab';
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 export type AppEnvironment = 'production' | 'preview' | 'development';
 export type Portion = 1 | 2 | 4;
@@ -101,6 +101,38 @@ export interface AppRelease {
     summary: string;
     changes: string[];
     environmentNote?: string | null;
+}
+
+export type BacklogStatus = 'pending' | 'in_progress' | 'done';
+export type BacklogPriority = 'high' | 'medium' | 'low';
+export type BacklogArea = 'recipe-v2' | 'library-navigation' | 'compound' | 'planning-shopping' | 'qa';
+export type BacklogItemType = 'story' | 'task';
+
+export interface BacklogLinks {
+    recipeIds?: string[];
+    screenIds?: Screen[];
+    releaseVersions?: string[];
+    notes?: string | null;
+}
+
+export interface BacklogItem {
+    id: string;
+    type: BacklogItemType;
+    title: string;
+    summary: string;
+    status: BacklogStatus;
+    priority: BacklogPriority;
+    links?: BacklogLinks;
+}
+
+export interface BacklogEpic {
+    id: string;
+    title: string;
+    summary: string;
+    status: BacklogStatus;
+    area: BacklogArea;
+    priority: BacklogPriority;
+    items: BacklogItem[];
 }
 
 export interface SavedRecipeContextSummary {

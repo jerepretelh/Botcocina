@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import type { RecipeV2 } from '../../types/recipe-v2';
 import { createRecipeYield } from '../../lib/recipeV2';
-import { getYieldDisplayValue } from './RecipeSetupScreenV2';
+import { getYieldDisplayValue } from './recipeSetupScreenV2.helpers';
 
 test('RecipeSetupScreenV2 does not render scientific notation for out-of-range selected yield', () => {
   const recipe: RecipeV2 = {

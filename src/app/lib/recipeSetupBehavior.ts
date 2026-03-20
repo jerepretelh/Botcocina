@@ -7,6 +7,9 @@ import type {
 } from '../../types';
 import { normalizeText } from '../utils/recipeHelpers';
 
+// Fallback-only legacy setup heuristics.
+// Keep this file stable for non-migrated recipes, but do not add new product
+// capabilities or new setup branches here. Model new behavior in the unified journey.
 const QUANTITY_CAPABLE_PHRASES = [
   'huevo frito',
   'huevos fritos',
@@ -123,6 +126,7 @@ export function deriveRecipeSetupBehavior(
   content: RecipeContent | null,
   savedConfig: UserRecipeCookingConfig | null,
 ): RecipeSetupBehavior {
+  // Legacy-only decision point. This should shrink over time as recipes migrate.
   if (!recipe || !content) return 'servings_only';
 
   const supportsIngredientBase =
