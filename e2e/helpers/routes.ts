@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = 'http://127.0.0.1:4173';
+import { getPlaywrightBaseUrl } from './environment';
 
 export const globalRecipesHomePath = '/recetas-globales';
 export const globalRecipesAllPath = '/recetas-globales/todas';
@@ -14,7 +14,7 @@ export function toHashRoute(pathname: string): string {
   return `#${normalizeHashPath(pathname)}`;
 }
 
-export function toAppUrl(pathname: string, baseUrl = DEFAULT_BASE_URL): string {
+export function toAppUrl(pathname: string, baseUrl = getPlaywrightBaseUrl()): string {
   return `${baseUrl.replace(/\/+$/, '')}/${toHashRoute(pathname)}`;
 }
 

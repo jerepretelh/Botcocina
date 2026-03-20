@@ -35,6 +35,14 @@ Abrir la UI de Playwright:
 npm run test:e2e:ui
 ```
 
+Smoke oficial productivo autenticado:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://tu-deploy-real \
+PLAYWRIGHT_STORAGE_STATE=playwright/.auth/user.json \
+npm run test:e2e:prod:smoke
+```
+
 ## Auth opcional por storageState
 
 Si quieres reutilizar una sesión autenticada ya guardada, pasa la ruta del archivo por variable de entorno:
@@ -69,10 +77,17 @@ Para usar ese estado local al correr los smoke tests:
 PLAYWRIGHT_STORAGE_STATE=playwright/.auth/user.json npx playwright test e2e/specs/global-library-smoke.spec.ts
 ```
 
+Para regenerar auth directamente contra el deploy productivo:
+
+```bash
+PLAYWRIGHT_BASE_URL=https://tu-deploy-real npm run test:e2e:auth:generate
+```
+
 ## Estructura
 
 - `e2e/helpers/app.ts`: navegación base y espera de hidratación
 - `e2e/helpers/routes.ts`: helpers hash-aware
+- `e2e/helpers/environment.ts`: resolución del target local vs productivo
 - `e2e/helpers/selectors.ts`: selectores reutilizables
 - `e2e/helpers/auth.ts`: utilidades opcionales para `storageState`
 - `e2e/specs/`: carpeta reservada para futuras specs
@@ -80,5 +95,6 @@ PLAYWRIGHT_STORAGE_STATE=playwright/.auth/user.json npx playwright test e2e/spec
 ## Notas
 
 - La app usa `HashRouter`, por eso los helpers navegan con `#/ruta`.
-- El `webServer` levanta Vite localmente en `http://127.0.0.1:4173`.
+- El `webServer` levanta Vite localmente solo cuando `PLAYWRIGHT_BASE_URL` apunta a `localhost` o `127.0.0.1`.
 - Los artefactos y auth state deben quedar fuera de git.
+- Para el flujo operativo de hallazgos y conversión a regresiones, ver [docs/ops/product-smoke-regression-playbook.md](/Users/trabajo/bot/AsistenteCocina/docs/ops/product-smoke-regression-playbook.md).
