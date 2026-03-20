@@ -10,6 +10,7 @@
     "test:e2e:headed": "playwright test --headed --pass-with-no-tests",
     "test:e2e:ui": "playwright test --ui --pass-with-no-tests",
     "test:e2e:prod:smoke": "playwright test e2e/specs/product-production-smoke.spec.ts --pass-with-no-tests",
+    "test:e2e:capabilities": "playwright test e2e/specs/recipe-capability-smoke.spec.ts --pass-with-no-tests",
     "test:e2e:install": "playwright install chromium",
     "test:e2e:auth:generate": "bash scripts/playwright/generate_storage_state.sh",
     "typecheck:vercel-api": "tsc -p tsconfig.api.json --noEmit",
