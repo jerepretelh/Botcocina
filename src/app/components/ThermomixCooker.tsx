@@ -29,6 +29,7 @@ import { GLOBAL_RECIPES_ALL_PATH, GLOBAL_RECIPES_HOME_PATH, isGlobalRecipesAllPa
 import { resolveRecipeOverlayHostScreen } from '../lib/recipeOverlayHostScreen';
 import { matchesRecipeCategory } from '../lib/recipeCategoryMapping';
 import { buildMixedRecipeSearchResults } from '../lib/mixedRecipeSearch';
+import { shouldClosePlanSheet } from '../lib/planSheetNavigation';
 import { isRecipeOverlayRoute, resolveOverlayPinnedRoute } from '../lib/recipeOverlayRoute';
 import {
   resolveRecipeOverlayCloseDestination,
@@ -1104,17 +1105,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   useEffect(() => {
     if (!isPlanSheetOpen) return;
 
-    if (planSheetSourceScreen && screen !== planSheetSourceScreen) {
-      closePlanSheet();
-      return;
-    }
-
-    if (
-      planningRecipe &&
-      recipeSelection.selectedRecipe &&
-      recipeSelection.selectedRecipe.id !== planningRecipe.id &&
-      screen !== 'weekly-plan'
-    ) {
+    if (shouldClosePlanSheet({
+      screen,
+      sourceScreen: planSheetSourceScreen,
+      planningRecipeId: planningRecipe?.id ?? null,
+      selectedRecipeId: recipeSelection.selectedRecipe?.id ?? null,
+    })) {
       closePlanSheet();
     }
   }, [isPlanSheetOpen, planSheetSourceScreen, planningRecipe, recipeSelection.selectedRecipe, screen]);

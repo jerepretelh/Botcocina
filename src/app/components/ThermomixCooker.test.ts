@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GLOBAL_RECIPES_ALL_PATH, GLOBAL_RECIPES_HOME_PATH, isGlobalRecipesAllPath } from '../lib/globalRecipesRoute';
+import { shouldClosePlanSheet } from '../lib/planSheetNavigation';
 import { resolveRecipeOverlayCloseDestination } from '../lib/recipeNavigation';
 import { resolveRecipeOverlayHostScreen } from '../lib/recipeOverlayHostScreen';
 import { isRecipeOverlayRoute, resolveOverlayPinnedRoute } from '../lib/recipeOverlayRoute';
@@ -104,5 +105,29 @@ test('closing from ingredients returns to Todas instead of collapsing to home', 
       screen: 'recipe-select',
       path: GLOBAL_RECIPES_ALL_PATH,
     },
+  );
+});
+
+test('plan sheet stays open in all recipes even if a stale selectedRecipe exists', () => {
+  assert.equal(
+    shouldClosePlanSheet({
+      screen: 'recipe-select',
+      sourceScreen: 'recipe-select',
+      planningRecipeId: 'keke-platano-molde',
+      selectedRecipeId: 'arroz-lentejas-compuesto',
+    }),
+    false,
+  );
+});
+
+test('plan sheet closes in cooking when selected recipe changes away from the planned recipe', () => {
+  assert.equal(
+    shouldClosePlanSheet({
+      screen: 'cooking',
+      sourceScreen: 'cooking',
+      planningRecipeId: 'keke-platano-molde',
+      selectedRecipeId: 'arroz-lentejas-compuesto',
+    }),
+    true,
   );
 });
