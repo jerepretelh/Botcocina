@@ -56,6 +56,16 @@ test.describe('Global library smoke', () => {
     await expect(page.getByText('Ingredientes', { exact: true })).toBeVisible();
   });
 
+  test('all recipes exposes planning CTA and opens the planning sheet', async ({ page }) => {
+    const recipeCard = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Keke de plátano', exact: true }) }).first();
+    await expect(recipeCard).toBeVisible();
+    await expect(recipeCard.getByRole('button', { name: 'Planificar', exact: true })).toBeVisible();
+
+    await recipeCard.getByRole('button', { name: 'Planificar', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: 'Agregar al plan', exact: true })).toBeVisible();
+  });
+
   test('keke unified journey opens as a single recipe page and closes back to the library', async ({ page }) => {
     await openRecipeFromAllRecipes(page, 'Keke de plátano');
     await expectHashPath(page, recipeSetupPath('keke-platano-molde'));

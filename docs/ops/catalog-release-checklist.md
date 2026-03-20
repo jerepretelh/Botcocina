@@ -3,8 +3,11 @@
 ## 1) Preparación
 
 - `git pull` y rama limpia.
-- Cambios de recetas consolidados en `/Users/trabajo/bot/AsistenteCocina/src/app/data/recipes.ts`.
+- Cambios de recetas consolidados en el catálogo canónico local:
+  - `/Users/trabajo/bot/AsistenteCocina/src/app/data/recipes.ts`
+  - `/Users/trabajo/bot/AsistenteCocina/src/app/data/recipes.v2.ts`
 - `.env` con claves válidas para entorno objetivo (staging o producción).
+- Aplicar antes cualquier migración pendiente del catálogo, incluyendo `/Users/trabajo/bot/AsistenteCocina/supabase/migrations/20260320_v19_recipe_v2_catalog_columns.sql` cuando el entorno aún no tenga columnas V2 en `public.recipes`.
 
 ## 2) Validación local de catálogo
 
@@ -16,6 +19,7 @@
 
 - Ejecutar: `npm run seed:catalog:generate`
 - Archivo esperado: `/Users/trabajo/bot/AsistenteCocina/supabase/migrations/20260305_seed_catalog_from_local_data.sql`
+- Este seed ya incluye el catálogo legacy gestionado más recetas core V2 visibles en runtime.
 
 ## 4) Publicación en staging
 
@@ -51,4 +55,3 @@
 
 - Registrar release en `/Users/trabajo/bot/AsistenteCocina/docs/ops/catalog-release-log.md`.
 - Registrar recetas afectadas y resultado.
-

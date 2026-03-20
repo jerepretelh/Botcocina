@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, HeartOff, Sparkles } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Heart, HeartOff, Sparkles } from 'lucide-react';
 import type { Recipe, RecipeCategory } from '../../../types';
 import {
   getRecipeCatalogCapabilityLabel,
@@ -32,6 +32,7 @@ interface GlobalRecipesCategoryScreenProps {
   favoriteRecipeIds: Set<string>;
   onBack: () => void;
   onOpenRecipe: (recipe: Recipe) => void;
+  onPlanRecipe: (recipe: Recipe) => void;
   onToggleFavorite: (recipeId: string) => void;
   onGoHome: () => void;
   onGoGlobalRecipes: () => void;
@@ -51,6 +52,7 @@ export function GlobalRecipesCategoryScreen({
   favoriteRecipeIds,
   onBack,
   onOpenRecipe,
+  onPlanRecipe,
   onToggleFavorite,
   onGoHome,
   onGoGlobalRecipes,
@@ -153,6 +155,16 @@ export function GlobalRecipesCategoryScreen({
                     </button>
 
                     <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                      {recipe ? (
+                        <button
+                          type="button"
+                          onClick={() => onPlanRecipe(recipe)}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-[0.8rem] border border-[#c5c8ce] bg-transparent px-3.5 text-[0.875rem] font-bold text-[#4f5d73] transition-colors hover:bg-white/60"
+                        >
+                          <CalendarDays className="size-[0.95rem]" />
+                          Planificar
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => {
