@@ -2,6 +2,19 @@ import type { AppRelease } from '../../types';
 
 export const appReleases: AppRelease[] = [
   {
+    version: '0.0.5',
+    title: 'Backlog curado y continuidad interna del producto',
+    date: '2026-03-19',
+    summary: 'Se añadió una pantalla interna de backlog para ordenar épicas, historias y tareas del producto, manteniendo visibles tanto el trabajo resuelto como lo pendiente.',
+    changes: [
+      'Ajustes ahora incluye acceso directo a un backlog curado junto a Releases, sin agregar ruido a la navegación principal.',
+      'Se incorporó una nueva pantalla interna de Backlog con vista por estado: Pendiente, En progreso y Hecho.',
+      'El backlog quedó modelado en una fuente manual dentro del repo para reflejar continuidad real de trabajo sin depender de Supabase ni derivación automática desde git.',
+      'Se sembraron épicas iniciales para RecipeV2 core, biblioteca y overlays, compound, planning/shopping y QA regresión.',
+      'Se añadieron tests mínimos para validar la fuente del backlog y su agrupación por estado.',
+    ],
+  },
+  {
     version: '0.0.4',
     title: 'RecipeV2 más confiable, setup saneado y catálogo core',
     date: '2026-03-18',

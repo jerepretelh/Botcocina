@@ -67,6 +67,7 @@ const RecipeSeedSearchScreen = lazy(() => import('./screens/RecipeSeedSearchScre
 const WeeklyPlanScreen = lazy(() => import('./screens/WeeklyPlanScreen').then((module) => ({ default: module.WeeklyPlanScreen })));
 const ShoppingListScreen = lazy(() => import('./screens/ShoppingListScreen').then((module) => ({ default: module.ShoppingListScreen })));
 const ReleasesScreen = lazy(() => import('./screens/ReleasesScreen').then((module) => ({ default: module.ReleasesScreen })));
+const BacklogScreen = lazy(() => import('./screens/BacklogScreen').then((module) => ({ default: module.BacklogScreen })));
 const CompoundLabScreen = lazy(() => import('./screens/CompoundLabScreen').then((module) => ({ default: module.CompoundLabScreen })));
 const PlanRecipeSheet = lazy(() => import('./screens/PlanRecipeSheet').then((module) => ({ default: module.PlanRecipeSheet })));
 const RecipeSetupScreenV2 = lazy(() => import('./screens/RecipeSetupScreenV2').then((module) => ({ default: module.RecipeSetupScreenV2 })));
@@ -715,6 +716,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setScreenDirect('releases');
       return;
     }
+    if (normalizedPath === '/backlog') {
+      recipeSelection.setScreenDirect('backlog');
+      return;
+    }
     if (normalizedPath === '/mis-recetas') {
       recipeSelection.setScreenDirect('my-recipes');
       return;
@@ -837,6 +842,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           ? '/ajustes'
           : screen === 'releases'
             ? '/releases'
+            : screen === 'backlog'
+              ? '/backlog'
             : screen === 'compound-lab'
               ? '/experimentos/recetas-compuestas'
               : screen === 'my-recipes'
@@ -1636,6 +1643,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onOpenReleases={() => recipeSelection.setScreen('releases')}
+            onOpenBacklog={() => recipeSelection.setScreen('backlog')}
             onSignOut={() => void auth.signOut()}
           />
         </Suspense>
@@ -1650,6 +1658,29 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       <>
         <Suspense fallback={<ScreenFallback />}>
           <ReleasesScreen
+            currentUserEmail={auth.user?.email ?? null}
+            onGoHome={() => recipeSelection.setScreen('category-select')}
+            onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}
+            onGoMyRecipes={() => recipeSelection.setScreen('my-recipes')}
+            onGoFavorites={() => recipeSelection.setScreen('favorites')}
+            onGoWeeklyPlan={() => recipeSelection.setScreen('weekly-plan')}
+            onGoShoppingList={() => recipeSelection.setScreen('shopping-list')}
+            onGoCompoundLab={() => recipeSelection.setScreen('compound-lab')}
+            onGoSettings={() => recipeSelection.setScreen('ai-settings')}
+            onSignOut={() => void auth.signOut()}
+          />
+        </Suspense>
+        {recipeOverlays}
+        {planRecipeSheet}
+      </>
+    );
+  }
+
+  if (screen === 'backlog') {
+    return (
+      <>
+        <Suspense fallback={<ScreenFallback />}>
+          <BacklogScreen
             currentUserEmail={auth.user?.email ?? null}
             onGoHome={() => recipeSelection.setScreen('category-select')}
             onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}

@@ -31,6 +31,7 @@ interface AISettingsScreenProps {
   onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onOpenReleases: () => void;
+  onOpenBacklog: () => void;
   onSignOut: () => void;
 }
 
@@ -107,6 +108,7 @@ export function AISettingsScreen({
   onGoCompoundLab,
   onGoSettings,
   onOpenReleases,
+  onOpenBacklog,
   onSignOut,
 }: AISettingsScreenProps) {
   const [settings, setSettings] = useState<AIProviderSettings | null>(null);
@@ -493,22 +495,35 @@ export function AISettingsScreen({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Rocket className="h-5 w-5 text-primary" />
-              Versión y releases
+              Releases y backlog
             </CardTitle>
             <CardDescription>
-              Consulta qué build está corriendo y revisa el historial de actualizaciones publicadas.
+              Revisa la versión activa, el historial publicado y el backlog curado del producto.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">{formatVersionLabel()}</p>
-              <Badge variant="outline" className="border-primary/10 text-slate-600 dark:text-slate-300">
-                Entorno {getEnvironmentLabel(appBuildMetadata.environment)}
-              </Badge>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{formatVersionLabel()}</p>
+                <Badge variant="outline" className="border-primary/10 text-slate-600 dark:text-slate-300">
+                  Entorno {getEnvironmentLabel(appBuildMetadata.environment)}
+                </Badge>
+              </div>
+              <Button variant="outline" onClick={onOpenReleases} className="mt-4 w-full">
+                Ver actualizaciones
+              </Button>
             </div>
-            <Button variant="outline" onClick={onOpenReleases}>
-              Ver actualizaciones
-            </Button>
+            <div className="rounded-2xl border border-primary/10 bg-background/80 p-4">
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Backlog curado</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Sigue épicas, historias y tareas ya resueltas o pendientes sin salir del contexto interno del producto.
+                </p>
+              </div>
+              <Button variant="outline" onClick={onOpenBacklog} className="mt-4 w-full">
+                Ver backlog
+              </Button>
+            </div>
           </CardContent>
         </Card>
         </ProductContainer>
