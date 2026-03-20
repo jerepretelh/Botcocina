@@ -267,5 +267,5 @@ export async function openPlannedShoppingAndExpectRecipe(page: Page, recipe: Smo
   await page.getByRole('button', { name: 'Abrir compras', exact: true }).click();
   await expectHashPath(page, '/compras');
   await expect(page.getByRole('heading', { name: 'Lista planeada', exact: true })).toBeVisible();
-  await expect(page.getByText(new RegExp(`Para: ${recipe.displayName}`, 'i'))).toBeVisible();
+  await expect(page.getByText(new RegExp(`Para: ${recipe.displayName}`, 'i')).first()).toBeVisible();
 }
