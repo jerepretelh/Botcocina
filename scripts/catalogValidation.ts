@@ -1,5 +1,5 @@
-import { initialRecipeContent, recipeCategories, recipes } from '../src/app/data/recipes';
 import type { Portion, Recipe, RecipeContent } from '../src/types';
+import { buildPublicationCatalog } from './catalogPublication';
 
 export type CatalogValidationLevel = 'error' | 'warning';
 
@@ -149,28 +149,30 @@ function validateRecipeShape(recipe: Recipe, content: RecipeContent | undefined,
 }
 
 export function validateCatalogData(): CatalogValidationResult {
+  const publicationCatalog = buildPublicationCatalog();
   const issues: CatalogValidationIssue[] = [];
-  const categoryIds = new Set(recipeCategories.map((category) => category.id));
-  const recipeIds = new Set(recipes.map((recipe) => recipe.id));
+  const categoryIds = new Set(publicationCatalog.categories.map((category) => category.id));
+  const recipeIds = new Set(publicationCatalog.entries.map(({ recipe }) => recipe.id));
+  const contentsByRecipeId = Object.fromEntries(publicationCatalog.entries.map(({ recipe, content }) => [recipe.id, content]));
 
-  for (const recipe of recipes) {
-    validateRecipeShape(recipe, initialRecipeContent[recipe.id], categoryIds, issues);
+  for (const { recipe, content } of publicationCatalog.entries) {
+    validateRecipeShape(recipe, content, categoryIds, issues);
   }
 
-  Object.keys(initialRecipeContent).forEach((contentRecipeId) => {
+  Object.keys(contentsByRecipeId).forEach((contentRecipeId) => {
     if (!recipeIds.has(contentRecipeId)) {
       issues.push({
         level: 'warning',
         code: 'content.orphan',
         recipeId: contentRecipeId,
-        message: `initialRecipeContent contiene "${contentRecipeId}" sin entrada en recipes[].`,
+        message: `El catálogo publicado contiene "${contentRecipeId}" sin entrada en recipes[].`,
       });
     }
   });
 
   let ingredients = 0;
   let substeps = 0;
-  Object.values(initialRecipeContent).forEach((content) => {
+  Object.values(contentsByRecipeId).forEach((content) => {
     ingredients += content.ingredients.length;
     substeps += content.steps.reduce((sum, step) => sum + step.subSteps.length, 0);
   });
@@ -183,9 +185,9 @@ export function validateCatalogData(): CatalogValidationResult {
     errors,
     warnings,
     summary: {
-      categories: recipeCategories.length,
-      recipes: recipes.length,
-      contents: Object.keys(initialRecipeContent).length,
+      categories: publicationCatalog.categories.length,
+      recipes: publicationCatalog.entries.length,
+      contents: Object.keys(contentsByRecipeId).length,
       ingredients,
       substeps,
     },
@@ -214,4 +216,3 @@ export function printCatalogValidation(result: CatalogValidationResult): void {
     console.log(`[catalog] warnings=${result.warnings.length}`);
   }
 }
-

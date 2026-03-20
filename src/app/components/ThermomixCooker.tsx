@@ -2100,6 +2100,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
           favoriteRecipeIds={userFavorites.favoriteRecipeIds}
           onBack={() => recipeSelection.goBackScreen('global-recipes')}
           onOpenRecipe={handleRecipeOpen}
+          onPlanRecipe={(recipe) => openPlanSheetForRecipe(recipe)}
           onToggleFavorite={(recipeId) => void userFavorites.toggleFavorite(recipeId)}
           onGoHome={() => recipeSelection.setScreen('category-select')}
           onGoGlobalRecipes={() => recipeSelection.setScreen('global-recipes')}

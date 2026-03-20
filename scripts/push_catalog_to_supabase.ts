@@ -1,7 +1,24 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import { initialRecipeContent, recipeCategories, recipes } from '../src/app/data/recipes';
+import type { RecipeContent } from '../src/types';
 import { printCatalogValidation, validateCatalogData } from './catalogValidation';
+import { buildPublicationCatalog } from './catalogPublication';
+
+const OPTIONAL_RECIPE_COLUMNS = [
+  'owner_user_id',
+  'visibility',
+  'experience',
+  'compound_meta',
+  'base_yield_type',
+  'base_yield_value',
+  'base_yield_unit',
+  'base_yield_label',
+  'ingredients_json',
+  'steps_json',
+  'time_summary_json',
+] as const;
+
+type OptionalRecipeColumn = (typeof OPTIONAL_RECIPE_COLUMNS)[number];
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -11,6 +28,24 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+async function detectSupportedRecipeColumns(client: ReturnType<typeof createClient>) {
+  const supported = new Set<OptionalRecipeColumn>();
+
+  for (const column of OPTIONAL_RECIPE_COLUMNS) {
+    const response = await client.from('recipes').select(column).limit(1);
+    if (!response.error) {
+      supported.add(column);
+      continue;
+    }
+
+    if (response.error.code !== 'PGRST204' && response.error.code !== '42703') {
+      throw response.error;
+    }
+  }
+
+  return supported;
+}
+
 async function main() {
   const validation = validateCatalogData();
   printCatalogValidation(validation);
@@ -18,15 +53,23 @@ async function main() {
     throw new Error('Catálogo inválido. Corrige errores antes de publicar.');
   }
 
+  const publicationCatalog = buildPublicationCatalog();
+
   const supabaseUrl = requiredEnv('SUPABASE_URL');
   const serviceRoleKey = requiredEnv('SUPABASE_SERVICE_ROLE_KEY');
   const client = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const supportedRecipeColumns = await detectSupportedRecipeColumns(client);
+  const missingRecipeColumns = OPTIONAL_RECIPE_COLUMNS.filter((column) => !supportedRecipeColumns.has(column));
 
-  const managedRecipeIds = recipes.map((recipe) => recipe.id);
+  if (missingRecipeColumns.length > 0) {
+    console.warn(`[catalog] recipes schema incompleto en destino. Se publicará en modo legacy-compatible. Faltan: ${missingRecipeColumns.join(', ')}`);
+  }
 
-  const categoriesPayload = recipeCategories.map((category, index) => ({
+  const managedRecipeIds = publicationCatalog.entries.map(({ recipe }) => recipe.id);
+
+  const categoriesPayload = publicationCatalog.categories.map((category, index) => ({
     id: category.id,
     name: category.name,
     icon: category.icon,
@@ -34,9 +77,8 @@ async function main() {
     sort_order: index,
   }));
 
-  const recipesPayload = recipes.map((recipe) => {
-    const content = initialRecipeContent[recipe.id];
-    return {
+  const recipesPayload = publicationCatalog.entries.map(({ recipe, content, persistence }) => {
+    const payload: Record<string, unknown> = {
       id: recipe.id,
       category_id: recipe.categoryId,
       name: recipe.name,
@@ -49,10 +91,22 @@ async function main() {
       portion_label_singular: content?.portionLabels?.singular ?? 'porción',
       portion_label_plural: content?.portionLabels?.plural ?? 'porciones',
       source: 'imported',
-      owner_user_id: null,
-      visibility: 'public',
       is_published: true,
     };
+
+    if (supportedRecipeColumns.has('owner_user_id')) payload.owner_user_id = null;
+    if (supportedRecipeColumns.has('visibility')) payload.visibility = 'public';
+    if (supportedRecipeColumns.has('experience')) payload.experience = recipe.experience ?? 'standard';
+    if (supportedRecipeColumns.has('compound_meta')) payload.compound_meta = content?.compoundMeta ?? null;
+    if (supportedRecipeColumns.has('base_yield_type')) payload.base_yield_type = persistence?.base_yield_type ?? null;
+    if (supportedRecipeColumns.has('base_yield_value')) payload.base_yield_value = persistence?.base_yield_value ?? null;
+    if (supportedRecipeColumns.has('base_yield_unit')) payload.base_yield_unit = persistence?.base_yield_unit ?? null;
+    if (supportedRecipeColumns.has('base_yield_label')) payload.base_yield_label = persistence?.base_yield_label ?? null;
+    if (supportedRecipeColumns.has('ingredients_json')) payload.ingredients_json = persistence?.ingredients_json ?? null;
+    if (supportedRecipeColumns.has('steps_json')) payload.steps_json = persistence?.steps_json ?? null;
+    if (supportedRecipeColumns.has('time_summary_json')) payload.time_summary_json = persistence?.time_summary_json ?? null;
+
+    return payload;
   });
 
   const ingredientsPayload: Array<{
@@ -81,11 +135,11 @@ async function main() {
     equipment: 'stove' | 'airfryer' | 'oven' | null;
   }> = [];
 
-  recipes.forEach((recipe) => {
-    const content = initialRecipeContent[recipe.id];
-    if (!content) return;
+  publicationCatalog.entries.forEach(({ recipe, content }) => {
+    const safeContent: RecipeContent | undefined = content;
+    if (!safeContent) return;
 
-    content.ingredients.forEach((ingredient, index) => {
+    safeContent.ingredients.forEach((ingredient, index) => {
       ingredientsPayload.push({
         recipe_id: recipe.id,
         sort_order: index,
@@ -99,7 +153,7 @@ async function main() {
     });
 
     let substepOrder = 1;
-    content.steps.forEach((step) => {
+    safeContent.steps.forEach((step) => {
       step.subSteps.forEach((subStep) => {
         substepsPayload.push({
           recipe_id: recipe.id,
@@ -154,7 +208,11 @@ async function main() {
 }
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'object' && error !== null
+      ? JSON.stringify(error, null, 2)
+      : String(error);
   console.error(`[catalog] push failed: ${message}`);
   process.exit(1);
 });
