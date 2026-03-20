@@ -11,7 +11,7 @@ import type { ContainerMetaV2, CookingContextV2, RecipeV2, RecipeYieldV2 } from 
 import { deriveRecipeSetupBehavior } from '../../lib/recipeSetupBehavior';
 import { getIngredientKey, mapCountToPortion } from '../../utils/recipeHelpers';
 import { deriveTargetYieldFromLegacy, describeRecipeYield } from '../../lib/recipeV2';
-import { deriveLegacyPlanCompatFromTargetYield } from '../../lib/planSnapshotCompat';
+import { resolvePlanningSnapshotV2 } from '../../lib/planningSnapshotV2';
 import { convertCanonicalVolumeToVisible, requiresExplicitContainerCapacity } from '../../lib/recipe-v2/measurements';
 import { getSetupQuestion, shouldShowCookingContextBlock, usesDiscreteContainerControl } from '../../lib/recipe-v2/setupUxContract';
 import {
@@ -76,6 +76,17 @@ export function PlanRecipeSheet({
     () => deriveRecipeSetupBehavior(recipe, recipeContent, null) !== 'servings_only',
     [recipe, recipeContent],
   );
+  const resolvedInitialSnapshot = useMemo(
+    () => (recipe
+      ? resolvePlanningSnapshotV2({
+          recipe,
+          recipeContent,
+          recipeV2,
+          snapshot: editingItem?.configSnapshot ?? initialSnapshot,
+        })
+      : null),
+    [editingItem?.configSnapshot, initialSnapshot, recipe, recipeContent, recipeV2],
+  );
   const [dayOfWeek, setDayOfWeek] = useState<number | null>(editingItem?.dayOfWeek ?? 0);
   const [slot, setSlot] = useState<WeeklyPlanSlot | null>(editingItem?.slot ?? 'almuerzo');
   const [notes, setNotes] = useState<string>(editingItem?.notes ?? '');
@@ -90,7 +101,7 @@ export function PlanRecipeSheet({
 
   useEffect(() => {
     if (!open || !recipe) return;
-    const snapshot = editingItem?.configSnapshot ?? initialSnapshot;
+    const snapshot = resolvedInitialSnapshot;
     if (!snapshot) return;
     setDayOfWeek(editingItem?.dayOfWeek ?? 0);
     setSlot(editingItem?.slot ?? 'almuerzo');
@@ -102,7 +113,7 @@ export function PlanRecipeSheet({
     setSelectedYield(snapshot.targetYield ?? recipeV2?.baseYield ?? null);
     setSelectedCookingContext(snapshot.cookingContext ?? recipeV2?.cookingContextDefaults ?? null);
     setSelectedOptionalIngredients(snapshot.selectedOptionalIngredients);
-  }, [editingItem, initialSnapshot, open, recipe, recipeV2]);
+  }, [editingItem, open, recipe, resolvedInitialSnapshot, recipeV2]);
 
   const optionalIngredients = useMemo(() => {
     if (recipeV2) {
@@ -250,32 +261,34 @@ export function PlanRecipeSheet({
             recipe,
             content: recipeContent,
           });
-      const compat = deriveLegacyPlanCompatFromTargetYield(targetYield, recipeV2);
-      await onSave({
-        id: editingItem?.id,
+      const configSnapshot = resolvePlanningSnapshotV2({
         recipe,
-        dayOfWeek,
-        slot,
-        notes: notes.trim() || null,
-        configSnapshot: {
-          quantityMode: isYieldDriven ? compat.quantityMode : quantityMode,
-          peopleCount: isYieldDriven ? compat.peopleCount : peopleCount,
-          amountUnit: isYieldDriven ? compat.amountUnit : quantityMode === 'have' ? amountUnit : null,
-          availableCount: isYieldDriven ? compat.availableCount : quantityMode === 'have' ? availableCount : null,
+        recipeContent,
+        recipeV2,
+        snapshot: {
+          quantityMode,
+          peopleCount,
+          amountUnit: quantityMode === 'have' ? amountUnit : null,
+          availableCount: quantityMode === 'have' ? availableCount : null,
           targetYield,
           cookingContext: recipeV2?.steps.some((step) => step.equipment === 'airfryer')
             ? selectedCookingContext ?? recipeV2?.cookingContextDefaults ?? null
             : null,
           selectedOptionalIngredients,
           sourceContextSummary: {
-            ...(initialSnapshot?.sourceContextSummary ?? editingItem?.configSnapshot.sourceContextSummary ?? {}),
-            cookingContext: recipeV2?.steps.some((step) => step.equipment === 'airfryer')
-              ? selectedCookingContext ?? recipeV2?.cookingContextDefaults ?? null
-              : null,
+            ...(resolvedInitialSnapshot?.sourceContextSummary ?? editingItem?.configSnapshot.sourceContextSummary ?? {}),
           },
-          resolvedPortion: isYieldDriven ? compat.resolvedPortion : legacyResolvedPortion,
-          scaleFactor: isYieldDriven ? compat.scaleFactor : legacyScaleFactor,
+          resolvedPortion: legacyResolvedPortion,
+          scaleFactor: legacyScaleFactor,
         },
+      });
+      await onSave({
+        id: editingItem?.id,
+        recipe,
+        dayOfWeek,
+        slot,
+        notes: notes.trim() || null,
+        configSnapshot,
       });
       onOpenChange(false);
     } finally {

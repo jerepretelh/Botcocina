@@ -38,8 +38,7 @@ import {
   type WeeklyPlanItemInput,
 } from '../lib/planRepository';
 import { buildWeeklyShoppingAggregationV2 } from '../lib/planShoppingAggregationV2';
-import { deriveTargetYieldFromLegacy } from '../lib/recipeV2';
-import { deriveLegacyPlanCompatFromTargetYield } from '../lib/planSnapshotCompat';
+import { hydrateWeeklyPlanItemForV2, resolvePlanningSnapshotV2 } from '../lib/planningSnapshotV2';
 import type { RecipeV2 } from '../types/recipe-v2';
 
 interface UseWeeklyPlanParams {
@@ -109,38 +108,6 @@ function dedupePlanItemsByEquivalence(items: WeeklyPlanItem[]): { uniqueItems: W
   };
 }
 
-function buildDefaultSnapshot(
-  recipe: Recipe,
-  recipeV2?: RecipeV2 | null,
-  savedConfig?: UserRecipeCookingConfig | null,
-): WeeklyPlanItemConfigSnapshot {
-  const targetYield = savedConfig?.targetYield
-    ?? recipeV2?.baseYield
-    ?? deriveTargetYieldFromLegacy({
-      quantityMode: savedConfig?.quantityMode ?? 'people',
-      peopleCount: savedConfig?.peopleCount ?? 2,
-      amountUnit: savedConfig?.amountUnit ?? null,
-      availableCount: savedConfig?.availableCount ?? null,
-    });
-  const compat = deriveLegacyPlanCompatFromTargetYield(targetYield, recipeV2);
-
-  return {
-    quantityMode: compat.quantityMode,
-    peopleCount: savedConfig?.peopleCount ?? compat.peopleCount,
-    amountUnit: savedConfig?.amountUnit ?? compat.amountUnit,
-    availableCount: savedConfig?.availableCount ?? compat.availableCount,
-    targetYield,
-    cookingContext: savedConfig?.cookingContext ?? recipeV2?.cookingContextDefaults ?? null,
-    selectedOptionalIngredients: savedConfig?.selectedOptionalIngredients ?? [],
-    sourceContextSummary: savedConfig?.sourceContextSummary ?? {
-      summaryLabel: targetYield?.label ? `Planificada para ${targetYield.value ?? ''} ${targetYield.label}`.trim() : recipe.name,
-      cookingContext: savedConfig?.cookingContext ?? recipeV2?.cookingContextDefaults ?? null,
-    },
-    resolvedPortion: compat.resolvedPortion,
-    scaleFactor: compat.scaleFactor,
-  };
-}
-
 export function useWeeklyPlan({
   userId,
   recipes,
@@ -161,6 +128,17 @@ export function useWeeklyPlan({
     () => Object.fromEntries(recipes.map((recipe) => [recipe.id, recipe])),
     [recipes],
   );
+  const hydratePlanItem = useCallback((item: WeeklyPlanItem): WeeklyPlanItem => {
+    const recipe = item.recipeId ? recipesById[item.recipeId] ?? null : null;
+    if (!recipe) return item;
+    return hydrateWeeklyPlanItemForV2({
+      item,
+      recipe,
+      recipeContent: recipeContentById[recipe.id] ?? null,
+      recipeV2: recipeV2ById[recipe.id] ?? null,
+      savedConfig: userRecipeConfigsByRecipeId[recipe.id] ?? null,
+    });
+  }, [recipeContentById, recipeV2ById, recipesById, userRecipeConfigsByRecipeId]);
   const uniqueItems = useMemo(() => dedupePlanItemsById(items), [items]);
 
   const aggregation = useMemo<ShoppingAggregationResult>(
@@ -242,7 +220,7 @@ export function useWeeklyPlan({
     setError(null);
     try {
       const nextPlan = await ensureWeeklyPlan(userId, getWeekStartDate());
-      const rawItems = dedupePlanItemsById(await getWeeklyPlanItems(nextPlan.id));
+      const rawItems = dedupePlanItemsById((await getWeeklyPlanItems(nextPlan.id)).map(hydratePlanItem));
       const { uniqueItems: nextItems, duplicateIds } = dedupePlanItemsByEquivalence(rawItems);
       if (duplicateIds.length > 0) {
         await Promise.all(duplicateIds.map((itemId) => deleteWeeklyPlanItem(itemId)));
@@ -270,6 +248,13 @@ export function useWeeklyPlan({
 
   const saveItem = useCallback(async (input: SavePlanItemInput) => {
     if (!plan) return null;
+    const normalizedSnapshot = resolvePlanningSnapshotV2({
+      recipe: input.recipe,
+      recipeContent: recipeContentById[input.recipe.id] ?? null,
+      recipeV2: recipeV2ById[input.recipe.id] ?? null,
+      snapshot: input.configSnapshot,
+      savedConfig: userRecipeConfigsByRecipeId[input.recipe.id] ?? null,
+    });
     const payload: WeeklyPlanItemInput = {
       id: input.id,
       dayOfWeek: input.dayOfWeek,
@@ -278,25 +263,29 @@ export function useWeeklyPlan({
       recipeNameSnapshot: input.recipe.name,
       notes: input.notes ?? null,
       sortOrder: input.dayOfWeek !== null && input.dayOfWeek !== undefined ? input.dayOfWeek * 10 : 0,
-      configSnapshot: input.configSnapshot,
+      configSnapshot: normalizedSnapshot,
     };
     const saved = await saveWeeklyPlanItem(plan.id, payload);
-    const { uniqueItems: nextItems, duplicateIds } = dedupePlanItemsByEquivalence(dedupePlanItemsById(await getWeeklyPlanItems(plan.id)));
+    const { uniqueItems: nextItems, duplicateIds } = dedupePlanItemsByEquivalence(
+      dedupePlanItemsById((await getWeeklyPlanItems(plan.id)).map(hydratePlanItem)),
+    );
     if (duplicateIds.length > 0) {
       await Promise.all(duplicateIds.map((itemId) => deleteWeeklyPlanItem(itemId)));
     }
     setItems(nextItems);
     await syncShopping(plan, nextItems);
     return saved;
-  }, [plan, syncShopping]);
+  }, [hydratePlanItem, plan, recipeContentById, recipeV2ById, syncShopping, userRecipeConfigsByRecipeId]);
 
   const removeItem = useCallback(async (itemId: string) => {
     if (!plan) return;
     await deleteWeeklyPlanItem(itemId);
-    const { uniqueItems: nextItems } = dedupePlanItemsByEquivalence(dedupePlanItemsById(await getWeeklyPlanItems(plan.id)));
+    const { uniqueItems: nextItems } = dedupePlanItemsByEquivalence(
+      dedupePlanItemsById((await getWeeklyPlanItems(plan.id)).map(hydratePlanItem)),
+    );
     setItems(nextItems);
     await syncShopping(plan, nextItems);
-  }, [plan, syncShopping]);
+  }, [hydratePlanItem, plan, syncShopping]);
 
   const regenerateShopping = useCallback(async () => {
     if (!plan) return;
@@ -423,8 +412,13 @@ export function useWeeklyPlan({
   }, [refreshCurrentTrip, shoppingTrip]);
 
   const getDefaultPlanSnapshot = useCallback((recipe: Recipe) => {
-    return buildDefaultSnapshot(recipe, recipeV2ById[recipe.id] ?? null, userRecipeConfigsByRecipeId[recipe.id] ?? null);
-  }, [recipeV2ById, userRecipeConfigsByRecipeId]);
+    return resolvePlanningSnapshotV2({
+      recipe,
+      recipeContent: recipeContentById[recipe.id] ?? null,
+      recipeV2: recipeV2ById[recipe.id] ?? null,
+      savedConfig: userRecipeConfigsByRecipeId[recipe.id] ?? null,
+    });
+  }, [recipeContentById, recipeV2ById, userRecipeConfigsByRecipeId]);
 
   return {
     plan,

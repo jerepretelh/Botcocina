@@ -45,3 +45,29 @@ test('compound config signature changes when effective recipe configuration chan
 
   assert.notEqual(getCompoundConfigSignature(recipeA), getCompoundConfigSignature(recipeB));
 });
+
+test('compound config signature changes when cooking context changes', () => {
+  const recipeA = buildScaledRecipe(2);
+  const recipeB = {
+    ...buildScaledRecipe(2),
+    selectedCookingContext: {
+      selectedContainerKey: 'molde-redondo',
+      selectedContainerMeta: {
+        sizeLabel: '24 cm',
+        capacityMl: 1800,
+      },
+    },
+  } as ScaledRecipeV2;
+
+  assert.notEqual(getCompoundConfigSignature(recipeA), getCompoundConfigSignature(recipeB));
+});
+
+test('compound config signature changes when batch count changes', () => {
+  const recipeA = buildScaledRecipe(2);
+  const recipeB = {
+    ...buildScaledRecipe(2),
+    batchResolution: { batchCount: 2, perBatchScaleFactor: 1, containerFactor: 1 },
+  } as ScaledRecipeV2;
+
+  assert.notEqual(getCompoundConfigSignature(recipeA), getCompoundConfigSignature(recipeB));
+});

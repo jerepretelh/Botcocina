@@ -1,5 +1,12 @@
 # Playwright Browser Workflow Automation
 
+Official E2E harness note:
+
+- The repo now uses `@playwright/test` as the official E2E harness.
+- Use the root-level `playwright.config.ts` and `npm run test:e2e*` scripts for the standard workflow.
+- The shell scripts in this folder remain useful for manual exploration and one-off browser automation.
+- To regenerate a local authenticated Playwright storage state from macOS Keychain, use `npm run test:e2e:auth:generate`.
+
 This folder contains a CLI-first Playwright automation for the Thermomix app flow:
 
 1. Open app landing screen

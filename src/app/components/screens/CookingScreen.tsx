@@ -3,6 +3,8 @@ import { RotateCcw, Play, Pause, ChevronsRight, ArrowRight, ListChecks, SlidersH
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { resolveIngredientDisplayValue, resolveSubStepDisplayValue } from '../../lib/recipeScaling';
 
+// Fallback-only legacy cooking screen.
+// Keep this operational for non-migrated recipes, but do not add new variants here.
 interface CookingScreenProps {
   appVersion: string;
   voiceEnabled: boolean;

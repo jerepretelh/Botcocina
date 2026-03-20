@@ -1,6 +1,6 @@
 import type { BacklogEpic } from '../../types';
 
-export const productBacklogLastUpdated = '2026-03-19';
+export const productBacklogLastUpdated = '2026-03-20';
 
 export const productBacklog: BacklogEpic[] = [
   {
@@ -177,8 +177,8 @@ export const productBacklog: BacklogEpic[] = [
         id: 'qa-authenticated-smoke',
         type: 'task',
         title: 'Ejecutar smoke autenticado en producción',
-        summary: 'Queda validar manualmente biblioteca, setup V2, cooking y persistencia sobre el deploy productivo autenticado.',
-        status: 'pending',
+        summary: 'El harness y el smoke oficial ya están listos; queda correrlo recurrentemente sobre el deploy productivo autenticado y convertir hallazgos en regresiones.',
+        status: 'in_progress',
         priority: 'medium',
       },
     ],

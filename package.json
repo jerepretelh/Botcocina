@@ -6,6 +6,12 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:e2e:headed": "playwright test --headed --pass-with-no-tests",
+    "test:e2e:ui": "playwright test --ui --pass-with-no-tests",
+    "test:e2e:prod:smoke": "playwright test e2e/specs/product-production-smoke.spec.ts --pass-with-no-tests",
+    "test:e2e:install": "playwright install chromium",
+    "test:e2e:auth:generate": "bash scripts/playwright/generate_storage_state.sh",
     "typecheck:vercel-api": "tsc -p tsconfig.api.json --noEmit",
     "catalog:validate": "tsx scripts/validate_catalog.ts",
     "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",
@@ -72,6 +78,7 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",

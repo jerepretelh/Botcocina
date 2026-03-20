@@ -1,8 +1,10 @@
-import { ArrowLeft, Lock } from 'lucide-react';
+import { ArrowLeft, Lock, X } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { Recipe } from '../../../types';
 import type { RecipeYieldV2, ScaledRecipeIngredientV2, ScaledRecipeV2 } from '../../types/recipe-v2';
 import { describeRecipeYield } from '../../lib/recipeV2';
 import { ProductSurface } from '../ui/product-system';
+import { JourneyPageShell } from '../ui/journey-page-shell';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 
 interface IngredientsScreenV2Props {
@@ -10,13 +12,114 @@ interface IngredientsScreenV2Props {
   scaledRecipe: ScaledRecipeV2 | null;
   selectedYield: RecipeYieldV2 | null;
   activeIngredientSelection: Record<string, boolean>;
+  presentationMode?: 'sheet' | 'page';
   onIngredientToggle: (ingredientId: string) => void;
   onBack: () => void;
+  onClose?: () => void;
   onStartCooking: () => void;
+}
+
+interface RecipeIngredientsContentV2Props {
+  scaledRecipe: ScaledRecipeV2 | null;
+  activeIngredientSelection: Record<string, boolean>;
+  onIngredientToggle: (ingredientId: string) => void;
+  layout?: 'stacked' | 'panel';
 }
 
 function isSelected(ingredient: ScaledRecipeIngredientV2, selection: Record<string, boolean>) {
   return selection[ingredient.id] ?? true;
+}
+
+export function RecipeIngredientsContentV2({
+  scaledRecipe,
+  activeIngredientSelection,
+  onIngredientToggle,
+  layout = 'stacked',
+}: RecipeIngredientsContentV2Props) {
+  const ingredients = scaledRecipe?.ingredients ?? [];
+  const isPanelLayout = layout === 'panel';
+  return (
+    <div className={isPanelLayout ? 'h-full' : 'px-5 pb-6 pt-4'}>
+      <ProductSurface className={`border-[#dfd5cd] bg-[#f7f5f2] ${isPanelLayout ? 'h-full p-6 sm:p-8' : 'p-4 sm:p-5'}`}>
+        <div className="mb-6 flex items-center justify-between border-b border-[#ecd9cd] pb-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Ingredientes</p>
+            <h2 className="mt-2 text-xl font-black tracking-tight text-[#131d36]">Checklist final</h2>
+          </div>
+          <span className="rounded-full bg-[#f4ddd1] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+            {ingredients.some((ingredient) => ingredient.indispensable) ? 'Indispensable' : 'Opcional'}
+          </span>
+        </div>
+        <div className="space-y-2">
+          {ingredients.map((ingredient) => (
+            <button
+              key={ingredient.id}
+              type="button"
+              onClick={() => onIngredientToggle(ingredient.id)}
+              disabled={ingredient.indispensable}
+              className="flex w-full items-center gap-3 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] px-3 py-3.5 text-left transition-colors hover:border-primary/25 disabled:cursor-not-allowed"
+            >
+              <div className="w-4 shrink-0">
+                {ingredient.indispensable ? (
+                  <div className="flex size-6 items-center justify-center rounded-full border border-[#edd9cc] bg-[#fbf6f2]">
+                    <Lock className="size-3 text-slate-500" />
+                  </div>
+                ) : (
+                  <div className={`flex size-6 items-center justify-center rounded-full border ${isSelected(ingredient, activeIngredientSelection) ? 'border-primary bg-primary text-white' : 'border-[#edd9cc] bg-[#fbf6f2] text-transparent'}`}>
+                    ✓
+                  </div>
+                )}
+              </div>
+
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#f4ddd1] text-lg sm:size-12 sm:text-xl">
+                {ingredient.emoji}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-[0.95rem] font-black text-[#131d36] sm:text-base">{ingredient.name}</p>
+                  {ingredient.indispensable ? (
+                    <span className="rounded-full bg-[#f4ddd1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                      indispensable
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-sm font-black text-primary sm:text-[15px]">{ingredient.scaledAmount.displayText}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {scaledRecipe?.warnings.length ? (
+          <div className="mt-5 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Avisos</p>
+            <div className="mt-3 space-y-2">
+              {scaledRecipe.warnings.map((warning) => (
+                <p key={warning} className="text-sm leading-6 text-slate-600">
+                  • {warning}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </ProductSurface>
+    </div>
+  );
+}
+
+function renderIngredientsFooter(onStartCooking: () => void): ReactNode {
+  return (
+    <button
+      type="button"
+      onClick={onStartCooking}
+      className="mx-auto block w-full rounded-[1.15rem] bg-primary py-4 text-base font-bold text-primary-foreground shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
+    >
+      Empezar a cocinar
+    </button>
+  );
 }
 
 export function IngredientsScreenV2({
@@ -24,21 +127,49 @@ export function IngredientsScreenV2({
   scaledRecipe,
   selectedYield,
   activeIngredientSelection,
+  presentationMode = 'sheet',
   onIngredientToggle,
   onBack,
+  onClose,
   onStartCooking,
 }: IngredientsScreenV2Props) {
-  const ingredients = scaledRecipe?.ingredients ?? [];
+  const handleClose = onClose ?? onBack;
+  const content = (
+    <RecipeIngredientsContentV2
+      scaledRecipe={scaledRecipe}
+      activeIngredientSelection={activeIngredientSelection}
+      onIngredientToggle={onIngredientToggle}
+    />
+  );
+
+  if (presentationMode === 'page') {
+    return (
+      <JourneyPageShell
+        eyebrow="Ingredientes"
+        title={selectedRecipe?.name ?? scaledRecipe?.name ?? 'Checklist'}
+        description={`${describeRecipeYield(selectedYield)} · ${scaledRecipe?.timeSummary.totalMinutes ?? '-'} min estimados`}
+        onBack={onBack}
+        onClose={handleClose}
+        footer={renderIngredientsFooter(onStartCooking)}
+      >
+        <div className="sr-only">
+          <span>{selectedRecipe?.name ?? 'Ingredientes'}</span>
+          <p>Checklist de ingredientes resuelto por RecipeV2.</p>
+        </div>
+        {content}
+      </JourneyPageShell>
+    );
+  }
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onBack()}>
+    <Sheet open onOpenChange={(open) => !open && handleClose()}>
       <SheetContent side="right" className="w-full max-w-xl overflow-hidden border-primary/10 bg-[#ede4dc] p-0">
-        <SheetHeader className="sr-only">
-          <SheetTitle>{selectedRecipe?.name ?? 'Ingredientes'}</SheetTitle>
-          <SheetDescription>Checklist de ingredientes resuelto por RecipeV2.</SheetDescription>
-        </SheetHeader>
-
         <div className="flex h-full flex-col">
+          <SheetHeader className="sr-only">
+            <SheetTitle>{selectedRecipe?.name ?? 'Ingredientes'}</SheetTitle>
+            <SheetDescription>Checklist de ingredientes resuelto por RecipeV2.</SheetDescription>
+          </SheetHeader>
+
           <div className="sticky top-0 z-20 border-b border-[#ecd9cd] bg-[#ede4dc]/95 px-5 pb-4 pt-6 backdrop-blur">
             <div className="flex items-start gap-3">
               <button
@@ -49,7 +180,7 @@ export function IngredientsScreenV2({
                 <ArrowLeft className="size-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Ingredientes V2</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/80">Ingredientes</p>
                 <h1 className="mt-2 text-[1.45rem] font-bold leading-[1.12] tracking-tight text-slate-900 sm:text-[1.75rem]">
                   {selectedRecipe?.name ?? scaledRecipe?.name ?? 'Checklist'}
                 </h1>
@@ -60,74 +191,12 @@ export function IngredientsScreenV2({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 pb-24 pt-4">
-            <ProductSurface className="border-[#dfd5cd] bg-[#f7f5f2] p-4 sm:p-5">
-              <div className="space-y-2">
-                {ingredients.map((ingredient) => (
-                  <button
-                    key={ingredient.id}
-                    type="button"
-                    onClick={() => onIngredientToggle(ingredient.id)}
-                    disabled={ingredient.indispensable}
-                    className="flex w-full items-center gap-3 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] px-3 py-3.5 text-left transition-colors hover:border-primary/25 disabled:cursor-not-allowed"
-                  >
-                    <div className="w-4 shrink-0">
-                      {ingredient.indispensable ? (
-                        <div className="flex size-6 items-center justify-center rounded-full border border-[#edd9cc] bg-[#fbf6f2]">
-                          <Lock className="size-3 text-slate-500" />
-                        </div>
-                      ) : (
-                        <div className={`flex size-6 items-center justify-center rounded-full border ${isSelected(ingredient, activeIngredientSelection) ? 'border-primary bg-primary text-white' : 'border-[#edd9cc] bg-[#fbf6f2] text-transparent'}`}>
-                          ✓
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#f4ddd1] text-lg sm:size-12 sm:text-xl">
-                      {ingredient.emoji}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-[0.95rem] font-black text-[#131d36] sm:text-base">{ingredient.name}</p>
-                        {ingredient.indispensable ? (
-                          <span className="rounded-full bg-[#f4ddd1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-                            indispensable
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className="text-sm font-black text-primary sm:text-[15px]">{ingredient.scaledAmount.displayText}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {scaledRecipe?.warnings.length ? (
-                <div className="mt-4 rounded-[1.15rem] border border-[#edd9cc] bg-[#f3ece4] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Avisos</p>
-                  <div className="mt-3 space-y-2">
-                    {scaledRecipe.warnings.map((warning) => (
-                      <p key={warning} className="text-sm leading-6 text-slate-600">
-                        • {warning}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </ProductSurface>
+          <div className="flex-1 overflow-y-auto">
+            {content}
           </div>
 
           <div className="sticky bottom-0 z-20 border-t border-[#ecd9cd] bg-[#ede4dc]/95 px-5 pb-5 pt-4 backdrop-blur">
-            <button
-              type="button"
-              onClick={onStartCooking}
-              className="mx-auto block w-full rounded-[1.15rem] bg-primary py-4 text-base font-bold text-primary-foreground shadow-xl shadow-primary/20 transition-all active:scale-[0.98]"
-            >
-              Empezar a cocinar
-            </button>
+            {renderIngredientsFooter(onStartCooking)}
           </div>
         </div>
       </SheetContent>

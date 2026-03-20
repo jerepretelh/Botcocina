@@ -4,6 +4,8 @@ import type { RecipeYieldV2 } from '../../types/recipe-v2';
 import { ProductSurface } from '../ui/product-system';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet';
 
+// Fallback-only legacy setup screen.
+// New recipes and new setup capabilities should not enter here.
 interface RecipeSetupScreenProps {
     selectedRecipe: Recipe | null;
     setupBehavior: RecipeSetupBehavior;

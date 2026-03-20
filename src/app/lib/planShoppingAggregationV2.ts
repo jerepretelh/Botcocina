@@ -7,6 +7,7 @@ import type {
   WeeklyPlanItem,
 } from '../../types';
 import type { RecipeV2, ScaledRecipeIngredientV2 } from '../types/recipe-v2';
+import { isPlannedOptionalIngredientSelected } from './planningSnapshotV2';
 import { buildScaledRecipe } from './recipe-v2/buildScaledRecipe';
 import { getIngredientKey, normalizeText } from '../utils/recipeHelpers';
 
@@ -114,9 +115,7 @@ function getAggregationKey(normalized: NormalizedIngredientAmount, itemId: strin
 
 function includeV2Ingredient(item: WeeklyPlanItem, ingredient: ScaledRecipeIngredientV2): boolean {
   if (ingredient.indispensable) return true;
-  const selected = item.configSnapshot.selectedOptionalIngredients;
-  if (selected.length === 0) return true;
-  return selected.includes(ingredient.id) || selected.includes(getIngredientKey(ingredient.name));
+  return isPlannedOptionalIngredientSelected(item.configSnapshot.selectedOptionalIngredients, ingredient.id, ingredient.name);
 }
 
 function normalizeV2IngredientLine(
@@ -201,8 +200,11 @@ export function buildWeeklyShoppingAggregationV2(
 
     let itemEntries: ShoppingAggregationEntry[] = [];
 
-    if (recipeV2 && item.configSnapshot.targetYield) {
-      const scaledRecipe = buildScaledRecipe(recipeV2, item.configSnapshot.targetYield);
+    if (recipeV2) {
+      if (!item.configSnapshot.targetYield) {
+        throw new Error(`La receta planificada "${item.recipeNameSnapshot}" no tiene targetYield V2 para compras.`);
+      }
+      const scaledRecipe = buildScaledRecipe(recipeV2, item.configSnapshot.targetYield, item.configSnapshot.cookingContext ?? recipeV2.cookingContextDefaults ?? null);
       itemEntries = scaledRecipe.ingredients
         .filter((ingredient) => includeV2Ingredient(item, ingredient))
         .map((ingredient) => normalizeV2IngredientLine(ingredient, item))
