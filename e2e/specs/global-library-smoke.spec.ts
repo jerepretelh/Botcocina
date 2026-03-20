@@ -66,6 +66,31 @@ test.describe('Global library smoke', () => {
     await expect(page.getByRole('button', { name: 'Agregar al plan', exact: true })).toBeVisible();
   });
 
+  test('a freshly planned published recipe stays re-openable from Plan semanal', async ({ page }) => {
+    const recipeCard = page.locator('article').filter({ has: page.getByRole('heading', { name: 'Keke de plátano', exact: true }) }).first();
+    await expect(recipeCard).toBeVisible();
+
+    await recipeCard.getByRole('button', { name: 'Planificar', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Agregar al plan', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Agregar al plan', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Agregar al plan', exact: true })).toBeHidden({ timeout: 10_000 });
+
+    await gotoApp(page, '/plan-semanal');
+    await assertAppSessionReady(page);
+    await expectHashPath(page, '/plan-semanal');
+    await expect(page.getByText('Plan semanal', { exact: true })).toBeVisible();
+
+    const plannedTitle = page.getByRole('heading', { name: 'Keke de plátano', exact: false }).last();
+    await expect(plannedTitle).toBeVisible();
+    const plannedCard = plannedTitle.locator('xpath=ancestor::div[contains(@class, "rounded-[1.5rem]")][1]');
+    await expect(plannedCard).toBeVisible();
+    await expect(plannedCard.getByRole('button', { name: 'Abrir', exact: true })).toBeVisible();
+    await expect(plannedCard.getByRole('button', { name: 'Cocinar', exact: true })).toBeVisible();
+
+    await plannedCard.getByRole('button', { name: 'Abrir', exact: true }).click();
+    await expectHashPath(page, recipeSetupPath('keke-platano-molde'));
+  });
+
   test('keke unified journey opens as a single recipe page and closes back to the library', async ({ page }) => {
     await openRecipeFromAllRecipes(page, 'Keke de plátano');
     await expectHashPath(page, recipeSetupPath('keke-platano-molde'));

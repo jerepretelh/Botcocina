@@ -4,6 +4,7 @@ import type { Recipe, WeeklyPlan, WeeklyPlanItem, WeeklyPlanSlot, WeeklyPlanView
 import { MainShellLayout } from './MainShellLayout';
 import { ProductContainer, ProductEmptyState, ProductHeader, ProductPage, ProductSectionTitle, ProductSurface } from '../ui/product-system';
 import { describeRecipeYield } from '../../lib/recipeV2';
+import { resolvePlannedRecipeItem } from '../../lib/plannedRecipeResolution';
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const SLOTS: WeeklyPlanSlot[] = ['desayuno', 'almuerzo', 'cena'];
@@ -192,7 +193,7 @@ export function WeeklyPlanScreen({
                                 <p className="text-sm text-slate-400">Sin recetas</p>
                               ) : (
                                 slotItems.map((item) => {
-                                  const recipe = item.recipeId ? recipesById[item.recipeId] ?? null : null;
+                                  const { isResolvable, isUnresolvable } = resolvePlannedRecipeItem(item, recipesById);
                                   return (
                                     <div key={item.id} className="rounded-xl border border-primary/10 bg-background/85 p-3">
                                       <div className="flex items-start justify-between gap-3">
@@ -209,13 +210,18 @@ export function WeeklyPlanScreen({
                                           </button>
                                         </div>
                                       </div>
+                                      {isUnresolvable ? (
+                                        <p className="mt-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+                                          Receta no disponible en el catalogo actual. Puedes editar este item o quitarlo del plan.
+                                        </p>
+                                      ) : null}
                                       <div className="mt-3 flex flex-wrap gap-2">
-                                        {recipe ? (
+                                        {isResolvable ? (
                                           <button className="rounded-full border border-primary/15 px-3 py-2 text-xs font-semibold" onClick={() => onOpenRecipeFromPlan(item)}>
                                             Abrir
                                           </button>
                                         ) : null}
-                                        {recipe ? (
+                                        {isResolvable ? (
                                           <button className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" onClick={() => onCookFromPlan(item)}>
                                             Cocinar
                                           </button>
@@ -236,7 +242,7 @@ export function WeeklyPlanScreen({
             ) : (
               <div className="mt-6 space-y-3">
                 {items.map((item) => {
-                  const recipe = item.recipeId ? recipesById[item.recipeId] ?? null : null;
+                  const { isResolvable, isUnresolvable } = resolvePlannedRecipeItem(item, recipesById);
                   return (
                     <div key={item.id} className="rounded-[1.5rem] border border-primary/10 bg-background/80 p-4">
                       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -247,14 +253,24 @@ export function WeeklyPlanScreen({
                           <h3 className="mt-2 text-xl font-bold">{item.recipeNameSnapshot}</h3>
                           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{configLabel(item)}</p>
                           {item.notes ? <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{item.notes}</p> : null}
+                          {isUnresolvable ? (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
+                                Receta no disponible
+                              </span>
+                              <p className="text-xs text-amber-700 dark:text-amber-300">
+                                Este item sigue en tu plan, pero esa receta ya no esta disponible para abrir o cocinar.
+                              </p>
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {recipe ? (
+                          {isResolvable ? (
                             <button className="rounded-full border border-primary/15 px-4 py-2 text-sm font-semibold" onClick={() => onOpenRecipeFromPlan(item)}>
                               Abrir
                             </button>
                           ) : null}
-                          {recipe ? (
+                          {isResolvable ? (
                             <button className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => onCookFromPlan(item)}>
                               <span className="inline-flex items-center gap-2">
                                 <UtensilsCrossed className="size-4" />

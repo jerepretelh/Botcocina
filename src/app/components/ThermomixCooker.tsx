@@ -39,6 +39,7 @@ import {
 import { resolveRoutableCategoryId } from '../lib/routableRecipeCategory';
 import { resolveSubStepDisplayValue } from '../lib/recipeScaling';
 import { hydratePlannedItemForRuntime } from '../lib/planningSnapshotV2';
+import { resolvePlannedRecipeItem } from '../lib/plannedRecipeResolution';
 import { resolvePersistedTargetYield } from '../lib/recipe-v2/resolvePersistedTargetYield';
 import { buildCookingPresentationV2 } from '../lib/presentation/buildCookingPresentationV2';
 import { buildCompoundCookingPresentationV2 } from '../lib/presentation/buildCompoundCookingPresentationV2';
@@ -394,6 +395,18 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     () => new Map(publicRecipes.map((recipe) => [recipe.id, recipe])),
     [publicRecipes],
   );
+  const runtimeRecipesById = useMemo(() => {
+    const map = new Map<string, Recipe>();
+    for (const recipe of uniqueAvailableRecipes) {
+      map.set(recipe.id, recipe);
+    }
+    for (const recipe of publicLocalV2LibraryRecipes) {
+      if (!map.has(recipe.id)) {
+        map.set(recipe.id, recipe);
+      }
+    }
+    return map;
+  }, [publicLocalV2LibraryRecipes, uniqueAvailableRecipes]);
   const globalCategories = useMemo(
     () => [
       {
@@ -1387,11 +1400,20 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   };
 
   const applyPlannedRecipeSnapshot = (item: WeeklyPlanItem, targetScreen: 'recipe-setup' | 'cooking') => {
-    const recipe = item.recipeId ? recipeSelection.availableRecipes.find((candidate) => candidate.id === item.recipeId) ?? null : null;
+    const { recipe } = resolvePlannedRecipeItem(item, runtimeRecipesById);
     if (!recipe) return;
     const content = recipeSelection.recipeContentById[recipe.id] ?? null;
     const recipeV2 = recipeSelection.recipeV2ById[recipe.id] ?? null;
     if (!content && !recipeV2) return;
+    const setupPath = `/recetas/${encodeURIComponent(recipe.id)}/configurar`;
+    const cookingPath = `/recetas/${encodeURIComponent(recipe.id)}/cocinar`;
+    const normalizedLocationPath = location.pathname.replace(/\/+$/, '') || '/';
+    const hostPath = resolveRecipeOverlayHostPath({
+      screen,
+      selectedCategory: recipeSelection.selectedCategory,
+      currentLocationPath: normalizedLocationPath,
+    });
+    const presentationMode = resolveRecipePresentationMode(isUnifiedJourneyEnabled(recipe.id));
     const { snapshot, ingredientSelection: hydratedSelection } = hydratePlannedItemForRuntime({
       item,
       recipe,
@@ -1428,8 +1450,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       cookingProgress.setTimingAdjustedLabel('Tiempo resuelto por V2');
     }
     setActivePlannedRecipeItemId(item.id);
+    routeSyncRef.current = false;
+    setRecipeOverlayHostScreen(resolveRecipeOverlayHostScreen(screen, recipeOverlayHostScreen));
+    setRecipeOverlayHostPath(hostPath);
 
     if (targetScreen === 'cooking') {
+      setRecipeOverlayPinnedPath(null);
       enterRecipeCookingRuntime({
         recipe,
         recipeV2,
@@ -1447,11 +1473,17 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             : `Tiempo ajustado x${snapshot.scaleFactor.toFixed(2)}`,
         },
       });
+      navigate(cookingPath);
       return;
     }
 
-    setRecipeOverlayPinnedPath(null);
-    openRecipeSetupSheet();
+    setRecipeOverlayPinnedPath(presentationMode === 'journey-page' ? null : setupPath);
+    if (presentationMode === 'journey-page') {
+      clearRecipeOverlaySheets();
+    } else {
+      openRecipeSetupSheet();
+    }
+    navigate(setupPath);
   };
 
   const handleRecipeOpen = (recipe: Recipe) => {
@@ -2008,7 +2040,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             currentUserEmail={auth.user?.email ?? null}
             plan={weeklyPlan.plan}
             items={weeklyPlan.items}
-            recipesById={Object.fromEntries(recipeSelection.availableRecipes.map((recipe) => [recipe.id, recipe]))}
+            recipesById={Object.fromEntries(runtimeRecipesById)}
             isLoading={weeklyPlan.isLoading}
             error={weeklyPlan.error}
             onGoHome={() => recipeSelection.setScreen('category-select')}
@@ -2021,8 +2053,11 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
             onGoSettings={() => recipeSelection.setScreen('ai-settings')}
             onSignOut={() => void auth.signOut()}
             onEditPlanItem={(item) => {
-              const recipe = item.recipeId ? recipeSelection.availableRecipes.find((candidate) => candidate.id === item.recipeId) ?? null : null;
-              if (!recipe) return;
+              const { recipe } = resolvePlannedRecipeItem(item, runtimeRecipesById);
+              if (!recipe) {
+                window.alert('Esta receta ya no esta disponible en el catalogo actual. Puedes quitarla del plan o volver a publicarla para reabrirla.');
+                return;
+              }
               openPlanSheetForRecipe(recipe, item);
             }}
             onRemovePlanItem={(itemId) => void weeklyPlan.removeItem(itemId)}

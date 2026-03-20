@@ -43,6 +43,13 @@ PLAYWRIGHT_STORAGE_STATE=playwright/.auth/user.json \
 npm run test:e2e:prod:smoke
 ```
 
+Smoke ampliado por capacidades:
+
+```bash
+PLAYWRIGHT_STORAGE_STATE=playwright/.auth/user.json \
+npm run test:e2e:capabilities
+```
+
 ## Auth opcional por storageState
 
 Si quieres reutilizar una sesión autenticada ya guardada, pasa la ruta del archivo por variable de entorno:
@@ -90,7 +97,14 @@ PLAYWRIGHT_BASE_URL=https://tu-deploy-real npm run test:e2e:auth:generate
 - `e2e/helpers/environment.ts`: resolución del target local vs productivo
 - `e2e/helpers/selectors.ts`: selectores reutilizables
 - `e2e/helpers/auth.ts`: utilidades opcionales para `storageState`
+- `e2e/helpers/recipeSmoke.ts`: matriz canónica de recetas y flujos comunes del smoke
 - `e2e/specs/`: carpeta reservada para futuras specs
+
+## Niveles de smoke
+
+- `e2e/specs/product-production-smoke.spec.ts`: smoke corto de release para deploy autenticado
+- `e2e/specs/recipe-capability-smoke.spec.ts`: cobertura ampliada por capacidad de receta
+- `global-library-smoke.spec.ts` y `recipe-journey-resilience.spec.ts`: regresiones finas y resiliencia, fuera del smoke corto
 
 ## Notas
 
