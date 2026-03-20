@@ -7,7 +7,10 @@
   - `/Users/trabajo/bot/AsistenteCocina/src/app/data/recipes.ts`
   - `/Users/trabajo/bot/AsistenteCocina/src/app/data/recipes.v2.ts`
 - `.env` con claves válidas para entorno objetivo (staging o producción).
-- Aplicar antes cualquier migración pendiente del catálogo, incluyendo `/Users/trabajo/bot/AsistenteCocina/supabase/migrations/20260320_v19_recipe_v2_catalog_columns.sql` cuando el entorno aún no tenga columnas V2 en `public.recipes`.
+- Aplicar antes cualquier migración pendiente del entorno objetivo, incluyendo:
+  - `/Users/trabajo/bot/AsistenteCocina/supabase/migrations/20260319_v18_target_yield_v2_contract.sql`
+  - `/Users/trabajo/bot/AsistenteCocina/supabase/migrations/20260320_v19_recipe_v2_catalog_columns.sql`
+- Si falta `weekly_plan_items.target_yield` o columnas V2 de `public.recipes`, el smoke productivo de planning/shopping no será concluyente.
 
 ## 2) Validación local de catálogo
 
