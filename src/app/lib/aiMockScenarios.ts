@@ -2,7 +2,7 @@ import type { AIRecipeContextDraft } from '../../types';
 import type { AIClarificationResult, GeneratedRecipe } from './recipeAI';
 import { normalizeText } from '../utils/recipeHelpers';
 
-export type AIMockScenarioId = 'milanesa' | 'arroz-pollo';
+export type AIMockScenarioId = 'milanesa' | 'arroz-pollo' | 'tallarines-rojos';
 
 export interface AIMockScenario {
   id: AIMockScenarioId;
@@ -166,7 +166,75 @@ const arrozPolloScenario: AIMockScenario = {
   },
 };
 
-const SCENARIOS: AIMockScenario[] = [milanesaScenario, arrozPolloScenario];
+const tallarinesRojosScenario: AIMockScenario = {
+  id: 'tallarines-rojos',
+  label: 'Tallarines rojos',
+  triggerKeywords: ['tallarines rojos', 'tallarines rojos compuestos', 'tallarines con salsa'],
+  contextDraft: {
+    prompt: 'Quiero tallarines rojos con salsa y pasta en paralelo.',
+    servings: 4,
+    availableIngredients: [
+      { id: 'avail-pasta', value: 'Tallarines' },
+      { id: 'avail-tomate', value: 'Tomate' },
+      { id: 'avail-queso', value: 'Queso rallado' },
+    ],
+    avoidIngredients: [],
+  },
+  clarification: {
+    needsClarification: false,
+    suggestedTitle: 'Tallarines rojos compuestos',
+    tip: 'Coordina la reducción de la salsa mientras hierve la pasta para cerrar ambos frentes casi al mismo tiempo.',
+    questions: [],
+  },
+  recipe: {
+    name: 'Tallarines rojos compuestos',
+    icon: '🍝',
+    ingredient: 'tallarines rojos',
+    description: '6 pasos · 40 min aprox.',
+    tip: 'Guarda un poco del agua de la pasta para ajustar la salsa al final.',
+    experience: 'compound',
+    compoundMeta: {
+      components: [
+        { id: 'salsa', name: 'Salsa', icon: '🍅', summary: 'Base roja y reducción' },
+        { id: 'pasta', name: 'Pasta', icon: '🍝', summary: 'Agua, cocción y escurrido' },
+      ],
+      timeline: [
+        { id: 'tr-salsa-sofrito', componentId: 'salsa', stepIndex: 0, subStepIndex: 0 },
+        { id: 'tr-salsa-reducir', componentId: 'salsa', stepIndex: 0, subStepIndex: 1, timerLabel: 'Reducción de salsa', autoAdvanceOnStart: true, backgroundHint: 'La salsa ya está reduciendo. Continúa con la pasta.', completionMessage: 'La reducción de salsa ya quedó lista.' },
+        { id: 'tr-pasta-hervir', componentId: 'pasta', stepIndex: 1, subStepIndex: 0, timerLabel: 'Agua para pasta', autoAdvanceOnStart: true, backgroundHint: 'El agua está calentando. Ve preparando el siguiente frente.', completionMessage: 'El agua ya está lista para la pasta.' },
+        { id: 'tr-pasta-escurrir', componentId: 'pasta', stepIndex: 1, subStepIndex: 1, completionMessage: 'La pasta ya quedó lista para integrar con la salsa.' },
+      ],
+    },
+    portionLabels: { singular: 'plato', plural: 'platos' },
+    ingredients: [
+      { name: 'Tallarines', emoji: '🍝', indispensable: true, portions: { 1: '100 g', 2: '200 g', 4: '400 g' } },
+      { name: 'Tomate', emoji: '🍅', indispensable: true, portions: { 1: '2 unidades', 2: '4 unidades', 4: '8 unidades' } },
+      { name: 'Queso rallado', emoji: '🧀', indispensable: false, portions: { 1: 'Al gusto', 2: 'Al gusto', 4: 'Al gusto' } },
+    ],
+    steps: [
+      {
+        stepNumber: 1,
+        stepName: 'Preparar salsa',
+        fireLevel: 'medium',
+        subSteps: [
+          { subStepName: 'Sofríe cebolla para la salsa', notes: 'Reserva por separado.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+          { subStepName: 'Reducir salsa de tomate', notes: 'Mientras tanto avanza con la pasta.', portions: { 1: 480, 2: 540, 4: 600 }, isTimer: true },
+        ],
+      },
+      {
+        stepNumber: 2,
+        stepName: 'Cocer pasta',
+        fireLevel: 'high',
+        subSteps: [
+          { subStepName: 'Hervir agua para pasta', notes: 'En otra olla.', portions: { 1: 420, 2: 480, 4: 540 }, isTimer: true },
+          { subStepName: 'Escurrir tallarines', notes: 'Reserva un poco del agua e integra al final.', portions: { 1: 'Continuar', 2: 'Continuar', 4: 'Continuar' }, isTimer: false },
+        ],
+      },
+    ],
+  },
+};
+
+const SCENARIOS: AIMockScenario[] = [milanesaScenario, arrozPolloScenario, tallarinesRojosScenario];
 
 export function isAIMockModeEnabled(): boolean {
   return import.meta.env.DEV || (import.meta.env.VITE_AI_MOCK_MODE ?? 'false').trim().toLowerCase() === 'true';

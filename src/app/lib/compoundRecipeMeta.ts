@@ -177,11 +177,12 @@ export function coercePersistedCompoundRecipe(args: {
   compoundMeta?: CompoundRecipeMeta;
 } {
   const nextExperience = args.experience === 'compound' ? 'compound' : undefined;
-  if (!nextExperience || !validateCompoundMeta(args.content, args.compoundMeta as CompoundRecipeMeta | undefined)) {
-    return {};
+  if (nextExperience && validateCompoundMeta(args.content, args.compoundMeta as CompoundRecipeMeta | undefined)) {
+    return {
+      experience: 'compound',
+      compoundMeta: args.compoundMeta as CompoundRecipeMeta,
+    };
   }
-  return {
-    experience: 'compound',
-    compoundMeta: args.compoundMeta as CompoundRecipeMeta,
-  };
+
+  return resolveCompoundExperience(args.content);
 }
