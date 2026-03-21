@@ -72,7 +72,10 @@ export function useCompoundCookingSessionV2({
 
   useEffect(() => {
     const recipeId = selectedRecipe?.id ?? null;
-    const isCompound = selectedRecipe?.experience === 'compound' && Boolean(scaledRecipe?.compoundMeta);
+    const isCompound = (
+      selectedRecipe?.experience === 'compound'
+      || scaledRecipe?.experience === 'compound'
+    ) && Boolean(scaledRecipe?.compoundMeta);
 
     if (!recipeId || !isCompound) {
       hydratedRecipeIdRef.current = null;
@@ -112,11 +115,14 @@ export function useCompoundCookingSessionV2({
       setIsRecipeComplete(false);
       setInlineMessage(null);
     }
-  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe, configSignature]);
+  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe, scaledRecipe?.experience, configSignature]);
 
   useEffect(() => {
     const recipeId = selectedRecipe?.id;
-    const isCompound = selectedRecipe?.experience === 'compound' && Boolean(scaledRecipe?.compoundMeta);
+    const isCompound = (
+      selectedRecipe?.experience === 'compound'
+      || scaledRecipe?.experience === 'compound'
+    ) && Boolean(scaledRecipe?.compoundMeta);
     if (!recipeId || !isCompound) return;
 
     const snapshot: CompoundSnapshot = {
@@ -127,7 +133,7 @@ export function useCompoundCookingSessionV2({
     };
 
     localStorage.setItem(getStorageKey(recipeId, configSignature), JSON.stringify(snapshot));
-  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe?.compoundMeta, currentTimelineIndex, focusedComponentId, activeTimers, isRecipeComplete, configSignature]);
+  }, [selectedRecipe?.id, selectedRecipe?.experience, scaledRecipe?.compoundMeta, scaledRecipe?.experience, currentTimelineIndex, focusedComponentId, activeTimers, isRecipeComplete, configSignature]);
 
   useEffect(() => {
     if (screen !== 'cooking') return;

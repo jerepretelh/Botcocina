@@ -17,12 +17,9 @@ import {
     AIWizardStep,
     ClarificationNumberMode,
     ClarificationQuantityUnit,
-    Portion,
     Recipe,
     RecipeContent,
     RecipeSeed,
-    SavedRecipeContextSummary,
-    Screen,
 } from '../../types';
 import {
     normalizeText,
@@ -30,20 +27,14 @@ import {
     inferPeopleCountFromClarifications,
     inferSizingFromClarifications,
     inferClarificationNumberIntent,
-    buildInitialIngredientSelection,
-    buildRecipeId,
-    ensureRecipeShape,
-    getIngredientKey,
-    mapCountToPortion,
-    clampNumber,
 } from '../utils/recipeHelpers';
 import { useAIClarifications } from './useAIClarifications';
 import { isSupabaseEnabled, supabaseClient } from '../lib/supabaseClient';
 import { canUseCompoundRecipes, canUseUserRecipeConfigs, disableCompoundRecipesForSession, disableUserRecipeConfigsForSession } from '../lib/supabaseOptionalFeatures';
 import { trackProductEvent } from '../lib/productEvents';
 import { buildCookingSessionState } from '../lib/cookingSession';
-import { resolveCompoundExperience } from '../lib/compoundRecipeMeta';
 import {
+    type AIMockScenario,
     findAIMockScenarioForPrompt,
     getAIMockScenario,
     getDefaultAIMockScenario,
@@ -52,10 +43,14 @@ import {
 } from '../lib/aiMockScenarios';
 import { supportsIngredientBaseFromText } from '../lib/recipeSetupBehavior';
 import { saveAIRecipeExactCache } from '../lib/aiRecipeExactCache';
-import { buildRecipeV2PersistenceShape, deriveTargetYieldFromLegacy, normalizeLegacyRecipeToV2 } from '../lib/recipeV2';
-import { normalizeAIRecipeToV2 } from '../lib/recipe-v2/normalizeAIRecipeToV2';
+import { normalizeLegacyRecipeToV2 } from '../lib/recipeV2';
 import type { CanonicalRecipeV2 } from '../lib/recipe-v2/canonicalRecipeV2';
-import type { RecipeYieldV2 } from '../types/recipe-v2';
+import {
+    assertGeneratedRecipePayload,
+    formatGenerationFailureMessage,
+    prepareGeneratedAIRecipeArtifacts,
+    persistPreparedAIRecipeWithFallback,
+} from '../lib/aiRecipeGenerationFlow';
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface UseAIRecipeGenerationDeps {
@@ -74,6 +69,8 @@ interface UseAIRecipeGenerationDeps {
     setAvailableCount: (action: any) => void;
     setPortion: (action: any) => void;
     setPeopleCount: (action: any) => void;
+    setTargetYield: (action: any) => void;
+    setCookingContext: (action: any) => void;
     setTimerScaleFactor: (action: any) => void;
     setTimingAdjustedLabel: (action: any) => void;
     setCurrentStepIndex: (action: any) => void;
@@ -98,23 +95,6 @@ const INITIAL_AI_CONTEXT_DRAFT: AIRecipeContextDraft = {
     availableIngredients: [],
     avoidIngredients: [],
 };
-
-function buildRecipeEquivalenceSignature(
-    recipe: Pick<Recipe, 'name' | 'ingredient'>,
-    content: Pick<RecipeContent, 'ingredients' | 'steps' | 'baseServings'>,
-): string {
-    const ingredientSignature = content.ingredients
-        .map((ingredient) => getIngredientKey(ingredient.name))
-        .filter(Boolean)
-        .sort()
-        .join('|');
-    const stepSignature = content.steps
-        .map((step) => normalizeText(`${step.stepName} ${step.subSteps.map((subStep) => subStep.subStepName).join(' ')}`))
-        .filter(Boolean)
-        .join('|');
-
-    return [normalizeText(recipe.name || ''), normalizeText(recipe.ingredient || ''), String(content.baseServings ?? ''), ingredientSignature, stepSignature].join('::');
-}
 
 // ─── Clarification Helpers (pure functions) ──────────────────────────
 
@@ -265,44 +245,6 @@ function buildPromptWithContext(context: AIRecipeContextDraft): string {
     return lines.join('\n');
 }
 
-function buildContextSummary(context: AIRecipeContextDraft, options: {
-    quantityMode: 'people' | 'have';
-    peopleCount: number | null;
-    amountUnit: 'units' | 'grams' | null;
-    availableCount: number | null;
-    targetYield?: RecipeYieldV2 | null;
-    selectedSeed?: RecipeSeed | null;
-}): SavedRecipeContextSummary | null {
-    const availableIngredients = context.availableIngredients.map((item) => item.value.trim()).filter(Boolean);
-    const avoidIngredients = context.avoidIngredients.map((item) => item.value.trim()).filter(Boolean);
-    const prompt = context.prompt.trim();
-    if (!prompt && !context.servings && availableIngredients.length === 0 && avoidIngredients.length === 0 && !options.selectedSeed) {
-        return null;
-    }
-
-    const summaryLabel =
-        options.quantityMode === 'have' && options.availableCount
-            ? `Basada en ${options.availableCount}${options.amountUnit === 'grams' ? ' g' : ' unid.'}`
-            : options.peopleCount
-                ? `Creada para ${options.peopleCount} persona${options.peopleCount === 1 ? '' : 's'}`
-                : null;
-
-    return {
-        prompt: prompt || null,
-        servings: context.servings,
-        quantityMode: options.quantityMode,
-        amountUnit: options.amountUnit,
-        availableCount: options.availableCount,
-        targetYield: options.targetYield ?? null,
-        availableIngredients,
-        avoidIngredients,
-        summaryLabel,
-        seedId: options.selectedSeed?.id ?? null,
-        seedName: options.selectedSeed?.name ?? null,
-        seedCategoryId: options.selectedSeed?.categoryId ?? null,
-    };
-}
-
 function isQuestionSatisfiedByContext(question: AIClarificationQuestion, context: AIRecipeContextDraft): boolean {
     const text = normalizeText(`${question.id} ${question.question}`);
 
@@ -343,63 +285,6 @@ function isQuestionSatisfiedByContext(question: AIClarificationQuestion, context
     return false;
 }
 
-function formatGenerationFailureMessage(error: unknown): string {
-    const detail = error instanceof Error ? error.message.trim() : '';
-    const generic = 'No se pudo completar la generación de la receta. La receta no se guardó. Puedes reintentar sin volver a responder todo.';
-
-    if (!detail) {
-        return generic;
-    }
-
-    if (
-        detail.includes('respuesta inválida') ||
-        detail.includes('receta incompleta') ||
-        detail.includes('No se pudo interpretar') ||
-        detail.includes('Google AI') ||
-        detail.includes('OpenAI') ||
-        detail.includes('No se pudo guardar')
-    ) {
-        return `${generic} Detalle: ${detail}`;
-    }
-
-    return generic;
-}
-
-function assertGeneratedRecipePayload(
-    generatedResult: unknown,
-): { recipe: GeneratedRecipe; usage?: { totalTokens: number } | undefined; mock?: boolean } {
-    if (!generatedResult || typeof generatedResult !== 'object' || !('recipe' in generatedResult)) {
-        throw new Error('La IA devolvió una respuesta inválida.');
-    }
-
-    const recipe = (generatedResult as { recipe?: unknown }).recipe;
-    if (!recipe || typeof recipe !== 'object') {
-        throw new Error('La IA devolvió una receta inválida.');
-    }
-
-    return generatedResult as { recipe: GeneratedRecipe; usage?: { totalTokens: number } | undefined; mock?: boolean };
-}
-
-function isMissingCompoundColumnError(error: { message?: string | null; details?: string | null; code?: string | null } | null | undefined): boolean {
-  if (!error) return false;
-  const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
-  return error.code === '42703' || (message.includes('column') && (message.includes('experience') || message.includes('compound_meta')));
-}
-
-function isMissingRecipeV2ColumnError(error: { message?: string | null; details?: string | null; code?: string | null } | null | undefined): boolean {
-    if (!error) return false;
-    const message = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase();
-    return error.code === '42703' || (
-        message.includes('column') && (
-            message.includes('base_yield_')
-            || message.includes('ingredients_json')
-            || message.includes('steps_json')
-            || message.includes('time_summary_json')
-            || message.includes('target_yield')
-        )
-    );
-}
-
 // ─── Main Hook ───────────────────────────────────────────────────────
 
 export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
@@ -419,6 +304,8 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setAvailableCount,
         setPortion,
         setPeopleCount,
+        setTargetYield,
+        setCookingContext,
         setTimerScaleFactor,
         setTimingAdjustedLabel,
         setCurrentStepIndex,
@@ -436,238 +323,6 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         addRecipeToDefaultList,
         setRecipeV2ById,
     } = deps;
-
-    const persistAiRecipeToSupabase = useCallback(
-        async (
-            recipe: Recipe,
-            content: RecipeContent,
-            prompt: string,
-            options?: {
-                source?: 'real' | 'mock';
-                initialConfig?: {
-                    quantityMode: 'people' | 'have';
-                    peopleCount: number | null;
-                    amountUnit: 'units' | 'grams' | null;
-                    availableCount: number | null;
-                    targetYield?: RecipeYieldV2 | null;
-                    selectedOptionalIngredients: string[];
-                    sourceContextSummary: SavedRecipeContextSummary | null;
-                };
-                recipeV2: CanonicalRecipeV2;
-            },
-        ) => {
-            if (!isSupabaseEnabled || !supabaseClient || !aiUserId) return;
-            const shouldLogGeneration = options?.source !== 'mock';
-            const createdRun = shouldLogGeneration
-                ? await supabaseClient
-                    .from('ai_recipe_generations')
-                    .insert({
-                        user_id: aiUserId,
-                        prompt,
-                        mode: 'generate',
-                        status: 'created',
-                    })
-                    .select('id')
-                    .single()
-                : { data: null };
-
-            const generationId = createdRun.data?.id as string | undefined;
-
-            const updateGeneration = async (status: 'approved' | 'failed', fields?: Record<string, unknown>) => {
-                if (!generationId) return;
-                await supabaseClient
-                    .from('ai_recipe_generations')
-                    .update({
-                        status,
-                        updated_at: new Date().toISOString(),
-                        ...fields,
-                    })
-                    .eq('id', generationId);
-            };
-
-            try {
-                const recipeV2 = options?.recipeV2;
-                if (!recipeV2) {
-                    throw new Error('La receta IA no generó un RecipeV2 canónico.');
-                }
-                const recipePayload = {
-                    id: recipe.id,
-                    category_id: recipe.categoryId,
-                    name: recipe.name,
-                    icon: recipe.icon,
-                    emoji: recipe.emoji ?? recipe.icon,
-                    ingredient: recipe.ingredient,
-                    description: recipe.description,
-                    equipment: recipe.equipment ?? null,
-                    tip: content.tip,
-                    portion_label_singular: content.portionLabels.singular,
-                    portion_label_plural: content.portionLabels.plural,
-                    source: 'ai',
-                    owner_user_id: aiUserId,
-                    visibility: 'private',
-                    is_published: false,
-                    ...buildRecipeV2PersistenceShape(recipeV2),
-                    ...(canUseCompoundRecipes()
-                        ? {
-                            experience: recipe.experience ?? 'standard',
-                            compound_meta: content.compoundMeta ?? null,
-                        }
-                        : {}),
-                    updated_at: new Date().toISOString(),
-                };
-                const recipeUpsert = await supabaseClient.from('recipes').upsert(
-                    recipePayload,
-                    { onConflict: 'id' },
-                );
-                if (recipeUpsert.error && isMissingRecipeV2ColumnError(recipeUpsert.error)) {
-                    const legacyRecipePayload = {
-                        id: recipe.id,
-                        category_id: recipe.categoryId,
-                        name: recipe.name,
-                        icon: recipe.icon,
-                        emoji: recipe.emoji ?? recipe.icon,
-                        ingredient: recipe.ingredient,
-                        description: recipe.description,
-                        equipment: recipe.equipment ?? null,
-                        tip: content.tip,
-                        portion_label_singular: content.portionLabels.singular,
-                        portion_label_plural: content.portionLabels.plural,
-                        source: 'ai',
-                        owner_user_id: aiUserId,
-                        visibility: 'private',
-                        is_published: false,
-                        ...(canUseCompoundRecipes()
-                            ? {
-                                experience: recipe.experience ?? 'standard',
-                                compound_meta: content.compoundMeta ?? null,
-                            }
-                            : {}),
-                        updated_at: new Date().toISOString(),
-                    };
-                    const legacyRecipeUpsert = await supabaseClient.from('recipes').upsert(
-                        legacyRecipePayload,
-                        { onConflict: 'id' },
-                    );
-                    if (legacyRecipeUpsert.error) {
-                        throw legacyRecipeUpsert.error;
-                    }
-                } else if (recipeUpsert.error) {
-                    throw recipeUpsert.error;
-                }
-
-                await supabaseClient.from('recipe_ingredients').delete().eq('recipe_id', recipe.id);
-                await supabaseClient.from('recipe_substeps').delete().eq('recipe_id', recipe.id);
-
-                const ingredientsPayload = content.ingredients.map((ingredient, index) => ({
-                    recipe_id: recipe.id,
-                    sort_order: index + 1,
-                    name: ingredient.name,
-                    emoji: ingredient.emoji || '🍽️',
-                    indispensable: Boolean(ingredient.indispensable),
-                    p1: ingredient.portions[1] || 'Al gusto',
-                    p2: ingredient.portions[2] || ingredient.portions[1] || 'Al gusto',
-                    p4: ingredient.portions[4] || ingredient.portions[2] || ingredient.portions[1] || 'Al gusto',
-                }));
-                if (ingredientsPayload.length > 0) {
-                    await supabaseClient.from('recipe_ingredients').insert(ingredientsPayload);
-                }
-
-                const substepsPayload = content.steps.flatMap((step) =>
-                    step.subSteps.map((subStep, index) => {
-                        const p1 = subStep.portions[1];
-                        const p2 = subStep.portions[2];
-                        const p4 = subStep.portions[4];
-                        return {
-                            recipe_id: recipe.id,
-                            substep_order: step.stepNumber * 100 + index + 1,
-                            step_number: step.stepNumber,
-                            step_name: step.stepName,
-                            substep_name: subStep.subStepName,
-                            notes: subStep.notes || '',
-                            is_timer: subStep.isTimer,
-                            p1: String(p1 ?? (subStep.isTimer ? 30 : 'Continuar')),
-                            p2: String(p2 ?? p1 ?? (subStep.isTimer ? 45 : 'Continuar')),
-                            p4: String(p4 ?? p2 ?? p1 ?? (subStep.isTimer ? 60 : 'Continuar')),
-                            fire_level: step.fireLevel ?? null,
-                            equipment: step.equipment ?? null,
-                            updated_at: new Date().toISOString(),
-                        };
-                    }),
-                );
-                if (substepsPayload.length > 0) {
-                    await supabaseClient.from('recipe_substeps').insert(substepsPayload);
-                }
-
-                if (options?.initialConfig && canUseUserRecipeConfigs()) {
-                    const { error: configError } = await supabaseClient.from('user_recipe_cooking_configs').upsert(
-                        {
-                            user_id: aiUserId,
-                            recipe_id: recipe.id,
-                            quantity_mode: options.initialConfig.quantityMode,
-                            people_count: options.initialConfig.peopleCount,
-                            amount_unit: options.initialConfig.amountUnit,
-                            available_count: options.initialConfig.availableCount,
-                            target_yield: options.initialConfig.targetYield ?? null,
-                            selected_optional_ingredients: options.initialConfig.selectedOptionalIngredients,
-                            source_context_summary: options.initialConfig.sourceContextSummary,
-                            last_used_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString(),
-                        },
-                        { onConflict: 'user_id,recipe_id' },
-                    );
-                    if (configError) {
-                        if (isMissingRecipeV2ColumnError(configError)) {
-                            const legacyConfig = await supabaseClient.from('user_recipe_cooking_configs').upsert(
-                                {
-                                    user_id: aiUserId,
-                                    recipe_id: recipe.id,
-                                    quantity_mode: options.initialConfig.quantityMode,
-                                    people_count: options.initialConfig.peopleCount,
-                                    amount_unit: options.initialConfig.amountUnit,
-                                    available_count: options.initialConfig.availableCount,
-                                    selected_optional_ingredients: options.initialConfig.selectedOptionalIngredients,
-                                    source_context_summary: options.initialConfig.sourceContextSummary,
-                                    last_used_at: new Date().toISOString(),
-                                    updated_at: new Date().toISOString(),
-                                },
-                                { onConflict: 'user_id,recipe_id' },
-                            );
-                            if (legacyConfig.error) {
-                                throw legacyConfig.error;
-                            }
-                        } else {
-                            const configMessage = `${configError.message ?? ''} ${configError.details ?? ''}`.toLowerCase();
-                            if (configError.code === 'PGRST205' || configMessage.includes('could not find the table') || (configMessage.includes('relation') && configMessage.includes('does not exist'))) {
-                                disableUserRecipeConfigsForSession();
-                            } else {
-                                throw configError;
-                            }
-                        }
-                    }
-                }
-
-                await updateGeneration('approved', {
-                    recipe_id: recipe.id,
-                    raw_response: content,
-                });
-                if (addRecipeToDefaultList) {
-                    await addRecipeToDefaultList(recipe.id);
-                }
-                if (options?.source !== 'mock') {
-                    await trackProductEvent(aiUserId, 'ai_recipe_created_private', { recipeId: recipe.id }).catch(() => {});
-                }
-            } catch (error) {
-                await updateGeneration('failed', {
-                    error_message: error instanceof Error ? error.message : 'failed-to-persist-ai-recipe',
-                });
-                if (isMissingCompoundColumnError(error as { message?: string | null; details?: string | null; code?: string | null })) {
-                    throw error;
-                }
-                throw new Error('No se pudo guardar la receta generada en tu biblioteca.');
-            }
-        },
-        [aiUserId, addRecipeToDefaultList, setRecipeV2ById],
-    );
 
     const ai = useAIClarifications();
 
@@ -890,7 +545,10 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setScreen('category-select');
     }, [ai, setScreen]);
 
-    const finalizeRecipeGeneration = useCallback(async () => {
+    const finalizeRecipeGeneration = useCallback(async (options?: {
+        overrideMockScenario?: AIMockScenario | null;
+        overrideRequestSource?: 'real' | 'mock';
+    }) => {
         const finalPrompt = buildFinalPrompt();
         if (!finalPrompt) {
             ai.setAiError('Escribe una idea de receta antes de generar.');
@@ -914,11 +572,14 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 ai.aiClarificationAnswers,
                 ai.aiClarificationNumberModes,
             );
+            const requestSource = options?.overrideRequestSource ?? ai.aiRequestSource;
             const contextualPeopleCount = ai.aiContextDraft.servings ?? null;
             const resolvedPeopleCount = clarifiedPeopleCount || contextualPeopleCount || null;
             const inferredPortion = inferPortionFromPrompt(finalPrompt);
             const activeMockScenario =
-                ai.aiRequestSource === 'mock' && ai.aiMockScenarioId
+                options?.overrideMockScenario
+                    ? options.overrideMockScenario
+                    : requestSource === 'mock' && ai.aiMockScenarioId
                     ? getAIMockScenario(ai.aiMockScenarioId as AIMockScenarioId) ?? null
                     : null;
             const generatedResult:
@@ -928,204 +589,97 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     ? { recipe: activeMockScenario.recipe, mock: true }
                     : await generateRecipeWithAI(finalPrompt);
             const validatedResult = assertGeneratedRecipePayload(generatedResult);
-            const generated = ensureRecipeShape(validatedResult.recipe);
-            const generatedV2 = normalizeAIRecipeToV2({
-                ...validatedResult.recipe,
-                id: generated.id ?? undefined,
-                name: generated.name,
-                icon: generated.icon,
-                ingredient: generated.ingredient,
-                description: generated.description,
-                tip: generated.tip,
-                baseYield: validatedResult.recipe.baseYield ?? {
-                    type: 'servings',
-                    value: generated.baseServings ?? resolvedPeopleCount ?? inferredPortion ?? 2,
-                    unit: generated.portionLabels?.plural ?? 'porciones',
-                    label: generated.portionLabels?.plural ?? 'porciones',
-                },
-                ingredients: generated.ingredients,
-                steps: generated.steps,
-                timeSummary: validatedResult.recipe.timeSummary ?? null,
-                experience: validatedResult.recipe.experience,
-                compoundMeta: validatedResult.recipe.compoundMeta as RecipeContent['compoundMeta'],
+            let prepared = prepareGeneratedAIRecipeArtifacts({
+                generatedRecipe: validatedResult.recipe,
+                availableRecipes,
+                recipeContentById,
+                aiUserId,
+                contextDraft: ai.aiContextDraft,
+                selectedSeed: ai.selectedRecipeSeed,
+                suggestedTitle: ai.aiClarificationSuggestedTitle,
+                clarifiedSizing,
+                clarifiedPeopleCount,
+                canUseCompoundRecipes: canUseCompoundRecipes(),
             });
-
-            if (generated.ingredients.length === 0 || generated.steps.length === 0) {
-                throw new Error('La IA devolvió una receta incompleta. Intenta nuevamente.');
+            if (prepared.recipeV2.experience === 'compound' && prepared.recipeV2.compoundMeta) {
+                prepared = {
+                    ...prepared,
+                    recipe: {
+                        ...prepared.recipe,
+                        experience: 'compound',
+                    },
+                    content: {
+                        ...prepared.content,
+                        compoundMeta: prepared.recipeV2.compoundMeta as RecipeContent['compoundMeta'],
+                    },
+                    nextRuntime: {
+                        ...prepared.nextRuntime,
+                        isCompound: true,
+                    },
+                };
             }
 
-            const baseContent: RecipeContent = {
-                ingredients: generated.ingredients,
-                steps: generated.steps,
-                tip: generated.tip,
-                baseServings: generated.baseServings ?? resolvedPeopleCount ?? inferredPortion ?? 2,
-                aiComplexity: generated.complexity === 'complex' ? 'complex' : 'simple',
-                portionLabels: {
-                    singular: generated.portionLabels?.singular || 'porción',
-                    plural: generated.portionLabels?.plural || 'porciones',
-                },
-            };
-            const compoundExperience = canUseCompoundRecipes() ? resolveCompoundExperience(baseContent) : {};
-            const newContent: RecipeContent = {
-                ...baseContent,
-                compoundMeta: compoundExperience.compoundMeta,
-            };
-
-            const recipeName = generated.name || ai.aiClarificationSuggestedTitle || 'Nueva receta';
-            const recipeSignature = buildRecipeEquivalenceSignature(
-                {
-                    name: recipeName,
-                    ingredient: generated.ingredient,
-                },
-                newContent,
-            );
-            const existingEquivalentRecipe = availableRecipes.find((recipe) => {
-                if (recipe.ownerUserId !== (aiUserId ?? null) || (recipe.visibility ?? 'public') !== 'private') {
-                    return false;
-                }
-                const existingContent = recipeContentById[recipe.id];
-                if (!existingContent) return false;
-                return buildRecipeEquivalenceSignature(recipe, existingContent) === recipeSignature;
-            });
-            const recipeId =
-                existingEquivalentRecipe?.id ??
-                `${buildRecipeId(generated.id || recipeName)}-${aiUserId?.slice(0, 8) ?? 'anon'}-${Date.now()}`;
-
-            const newRecipe: Recipe = {
-                id: recipeId,
-                categoryId: 'personalizadas',
-                name: recipeName,
-                icon: generated.icon,
-                ingredient: generated.ingredient,
-                description: generated.description,
-                basePortions: generated.baseServings ?? resolvedPeopleCount ?? inferredPortion ?? 2,
-                experience: compoundExperience.experience,
-                ownerUserId: aiUserId ?? null,
-                visibility: 'private',
-                createdAt: existingEquivalentRecipe?.createdAt ?? new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            };
-
-            let persistedRecipe = newRecipe;
-            let persistedContent = newContent;
-            const persistedRecipeV2: CanonicalRecipeV2 = generatedV2.id === recipeId
-                ? generatedV2
-                : {
-                    ...generatedV2,
-                    id: recipeId,
-                    sourceRecipe: newRecipe,
-                };
+            let persistedRecipe = prepared.recipe;
+            let persistedContent = prepared.content;
 
             setAvailableRecipes((prev: Recipe[]) => {
-                if (!existingEquivalentRecipe) {
+                if (!prepared.existingEquivalentRecipe) {
                     return [...prev, persistedRecipe];
                 }
-                return prev.map((recipe) => (recipe.id === existingEquivalentRecipe.id ? persistedRecipe : recipe));
+                return prev.map((recipe) => (recipe.id === prepared.existingEquivalentRecipe.id ? persistedRecipe : recipe));
             });
-            setRecipeContentById((prev: Record<string, RecipeContent>) => ({ ...prev, [newRecipe.id]: persistedContent }));
-            const nextIngredientSelection = buildInitialIngredientSelection(persistedContent.ingredients);
+            setRecipeContentById((prev: Record<string, RecipeContent>) => ({ ...prev, [prepared.recipe.id]: persistedContent }));
+            const nextIngredientSelection = prepared.nextIngredientSelection;
             setIngredientSelectionByRecipe((prev: Record<string, Record<string, boolean>>) => ({
                 ...prev,
-                [newRecipe.id]: nextIngredientSelection,
+                [prepared.recipe.id]: nextIngredientSelection,
             }));
-            saveAIRecipeExactCache(newRecipe, newContent);
-            const initialConfig = {
-                quantityMode: clarifiedSizing?.quantityMode === 'have' ? 'have' as const : 'people' as const,
-                peopleCount: clarifiedSizing?.quantityMode === 'have' ? resolvedPeopleCount : (resolvedPeopleCount ?? generated.baseServings ?? inferredPortion ?? 2),
-                amountUnit: clarifiedSizing?.quantityMode === 'have' ? (clarifiedSizing.amountUnit === 'grams' ? 'grams' : 'units') : null,
-                availableCount: clarifiedSizing?.quantityMode === 'have' ? clarifiedSizing.count : null,
-                targetYield: deriveTargetYieldFromLegacy({
-                    quantityMode: clarifiedSizing?.quantityMode === 'have' ? 'have' : 'people',
-                    peopleCount: clarifiedSizing?.quantityMode === 'have' ? resolvedPeopleCount : (resolvedPeopleCount ?? generated.baseServings ?? inferredPortion ?? 2),
-                    amountUnit: clarifiedSizing?.quantityMode === 'have' ? (clarifiedSizing.amountUnit === 'grams' ? 'grams' : 'units') : null,
-                    availableCount: clarifiedSizing?.quantityMode === 'have' ? clarifiedSizing.count : null,
-                    recipe: newRecipe,
-                    content: newContent,
-                }),
-                selectedOptionalIngredients: newContent.ingredients
-                    .filter((ingredient) => !ingredient.indispensable)
-                    .map((ingredient) => ingredient.name.toLowerCase().replace(/\s+/g, '_')),
-                sourceContextSummary: buildContextSummary(ai.aiContextDraft, {
-                    quantityMode: clarifiedSizing?.quantityMode === 'have' ? 'have' : 'people',
-                    peopleCount: clarifiedSizing?.quantityMode === 'have' ? resolvedPeopleCount : (resolvedPeopleCount ?? generated.baseServings ?? inferredPortion ?? 2),
-                    amountUnit: clarifiedSizing?.quantityMode === 'have' ? (clarifiedSizing.amountUnit === 'grams' ? 'grams' : 'units') : null,
-                    availableCount: clarifiedSizing?.quantityMode === 'have' ? clarifiedSizing.count : null,
-                    targetYield: initialConfig.targetYield,
-                    selectedSeed: ai.selectedRecipeSeed,
-                }),
-            };
-            try {
-                await persistAiRecipeToSupabase(newRecipe, newContent, finalPrompt, {
-                    source: ai.aiRequestSource,
-                    initialConfig,
-                    recipeV2: persistedRecipeV2,
-                });
-            } catch (error) {
-                if (canUseCompoundRecipes() && error instanceof Error && isMissingCompoundColumnError({ message: error.message })) {
-                    disableCompoundRecipesForSession();
-                    persistedRecipe = { ...newRecipe, experience: undefined };
-                    persistedContent = { ...newContent, compoundMeta: undefined };
-                    setAvailableRecipes((prev: Recipe[]) =>
-                        prev.map((recipe) => (recipe.id === newRecipe.id ? persistedRecipe : recipe)),
-                    );
-                    setRecipeContentById((prev: Record<string, RecipeContent>) => ({ ...prev, [newRecipe.id]: persistedContent }));
-                    saveAIRecipeExactCache(persistedRecipe, persistedContent);
-                    await persistAiRecipeToSupabase(persistedRecipe, persistedContent, finalPrompt, {
-                        source: ai.aiRequestSource,
-                        initialConfig,
-                        recipeV2: persistedRecipeV2,
-                    });
-                } else {
-                    throw error;
-                }
+            if (setRecipeV2ById) {
+                setRecipeV2ById(prepared.recipe.id, prepared.recipeV2);
+            }
+            saveAIRecipeExactCache(prepared.recipe, prepared.content);
+
+            const persisted = await persistPreparedAIRecipeWithFallback({
+                prepared,
+                prompt: finalPrompt,
+                source: requestSource,
+                aiUserId,
+                isSupabaseEnabled,
+                supabaseClient: supabaseClient as any,
+                canUseCompoundRecipes: canUseCompoundRecipes(),
+                canUseUserRecipeConfigs: canUseUserRecipeConfigs(),
+                disableUserRecipeConfigsForSession,
+                disableCompoundRecipesForSession,
+                addRecipeToDefaultList,
+                trackProductEvent,
+            });
+            if (persisted.recipe.experience !== persistedRecipe.experience || Boolean(persisted.content.compoundMeta) !== Boolean(persistedContent.compoundMeta)) {
+                persistedRecipe = persisted.recipe;
+                persistedContent = persisted.content;
+                setAvailableRecipes((prev: Recipe[]) =>
+                    prev.map((recipe) => (recipe.id === prepared.recipe.id ? persistedRecipe : recipe)),
+                );
+                setRecipeContentById((prev: Record<string, RecipeContent>) => ({ ...prev, [prepared.recipe.id]: persistedContent }));
+                saveAIRecipeExactCache(persistedRecipe, persistedContent);
             }
             if (setRecipeV2ById) {
                 setRecipeV2ById(persistedRecipe.id, {
-                    ...persistedRecipeV2,
+                    ...prepared.recipeV2,
                     id: persistedRecipe.id,
                 });
             }
             setCookingSteps(null);
             setSelectedCategory('personalizadas');
             setSelectedRecipe(persistedRecipe);
-            let nextQuantityMode: 'people' | 'have' = 'people';
-            let nextAmountUnit: 'units' | 'grams' = 'units';
-            let nextAvailableCount = 1;
-            let nextPeopleCount = resolvedPeopleCount ?? generated.baseServings ?? inferredPortion ?? 2;
-            let nextPortion: Portion = inferredPortion ?? mapCountToPortion(nextPeopleCount);
-            let nextTimerScaleFactor = 1;
-            let nextTimingAdjustedLabel = 'Tiempo estándar';
-
-            if (clarifiedSizing?.quantityMode === 'have') {
-                nextQuantityMode = 'have';
-                nextAmountUnit = clarifiedSizing.amountUnit === 'grams' ? 'grams' : 'units';
-                nextAvailableCount = clarifiedSizing.count;
-                nextPortion = mapCountToPortion(clarifiedSizing.count);
-            } else if (clarifiedPeopleCount) {
-                nextPeopleCount = clarifiedPeopleCount;
-                nextPortion = mapCountToPortion(clarifiedPeopleCount);
-            } else if (contextualPeopleCount) {
-                nextPeopleCount = contextualPeopleCount;
-                nextPortion = mapCountToPortion(contextualPeopleCount);
-            } else if (inferredPortion) {
-                nextPeopleCount = inferredPortion;
-                nextPortion = inferredPortion;
-            }
-            if (clarifiedSizing) {
-                nextTimerScaleFactor = clampNumber(clarifiedSizing.count / 2, 0.8, 2);
-                nextTimingAdjustedLabel =
-                    Math.abs(nextTimerScaleFactor - 1) < 0.01
-                        ? 'Tiempo estándar'
-                        : `Tiempo ajustado x${nextTimerScaleFactor.toFixed(2)}`;
-            }
-
-            setQuantityMode(nextQuantityMode);
-            setAmountUnit(nextAmountUnit);
-            setAvailableCount(nextAvailableCount);
-            setPeopleCount(nextPeopleCount);
-            setPortion(nextPortion);
-            setTimerScaleFactor(nextTimerScaleFactor);
-            setTimingAdjustedLabel(nextTimingAdjustedLabel);
+            setQuantityMode(prepared.nextRuntime.quantityMode);
+            setAmountUnit(prepared.nextRuntime.amountUnit);
+            setAvailableCount(prepared.nextRuntime.availableCount);
+            setPeopleCount(prepared.nextRuntime.peopleCount);
+            setPortion(prepared.nextRuntime.portion);
+            setTargetYield(prepared.initialConfig.targetYield);
+            setCookingContext(null);
+            setTimerScaleFactor(prepared.nextRuntime.timerScaleFactor);
+            setTimingAdjustedLabel(prepared.nextRuntime.timingAdjustedLabel);
 
             if (persistedRecipe.experience === 'compound' && persistedContent.compoundMeta) {
                 setCookingSteps(null);
@@ -1136,12 +690,12 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     activeRecipeContentSteps: persistedContent.steps,
                     currentIngredients: persistedContent.ingredients,
                     activeIngredientSelection: nextIngredientSelection,
-                    quantityMode: nextQuantityMode,
-                    amountUnit: nextAmountUnit,
-                    availableCount: nextAvailableCount,
-                    peopleCount: nextPeopleCount,
-                    portion: nextPortion,
-                    timerScaleFactor: nextTimerScaleFactor,
+                    quantityMode: prepared.nextRuntime.quantityMode,
+                    amountUnit: prepared.nextRuntime.amountUnit,
+                    availableCount: prepared.nextRuntime.availableCount,
+                    peopleCount: prepared.nextRuntime.peopleCount,
+                    portion: prepared.nextRuntime.portion,
+                    timerScaleFactor: prepared.nextRuntime.timerScaleFactor,
                 });
 
                 setCookingSteps(session.steps);
@@ -1167,10 +721,13 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                     : clarifiedPeopleCount || contextualPeopleCount
                         ? `Receta "${persistedRecipe.name}" guardada en Mis recetas. Base exacta: ${clarifiedPeopleCount || contextualPeopleCount} personas.`
                         : inferredPortion
-                            ? `Receta "${persistedRecipe.name}" guardada en Mis recetas. Base exacta: ${generated.baseServings ?? inferredPortion} porciones.`
+                            ? `Receta "${persistedRecipe.name}" guardada en Mis recetas. Base exacta: ${prepared.content.baseServings ?? inferredPortion} porciones.`
                             : `Receta "${persistedRecipe.name}" guardada en Mis recetas.`,
             );
         } catch (error) {
+            if (import.meta.env.DEV) {
+                console.error('[ai-recipe-generation] finalizeRecipeGeneration failed', error);
+            }
             ai.setAiWizardStep(ai.aiClarificationQuestions.length > 0 ? 'refinement' : 'context');
             ai.setAiError(formatGenerationFailureMessage(error));
         } finally {
@@ -1182,7 +739,6 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         aiUserId,
         availableRecipes,
         buildFinalPrompt,
-        persistAiRecipeToSupabase,
         recipeContentById,
         resetAiWizardState,
         setActiveStepLoop,
@@ -1190,6 +746,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setAvailableCount,
         setAvailableRecipes,
         setAwaitingNextUnitConfirmation,
+        setCookingContext,
         setCookingSteps,
         setCurrentStepIndex,
         setCurrentSubStepIndex,
@@ -1203,6 +760,7 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         setPendingStirAdvance,
         setPortion,
         setQuantityMode,
+        setTargetYield,
         setRecipeContentById,
         setScreen,
         setSelectedCategory,
@@ -1225,7 +783,10 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
         ai.setAiClarificationQuantityUnits({});
         ai.setAiClarificationSuggestedTitle(scenario.clarification.suggestedTitle ?? null);
         ai.setAiClarificationTip(scenario.clarification.tip ?? null);
-        await finalizeRecipeGeneration();
+        await finalizeRecipeGeneration({
+            overrideMockScenario: scenario,
+            overrideRequestSource: 'mock',
+        });
     }, [ai, applyMockScenarioToContext, finalizeRecipeGeneration]);
 
     const handleAiContextContinue = useCallback(async () => {
@@ -1249,7 +810,10 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
                 const movedToRefinement = applyClarificationResult(prompt, activeMockScenario.clarification);
                 ai.setAiSuccess('Usando escenario de prueba. No se consumirán créditos de IA.');
                 if (movedToRefinement) return;
-                await finalizeRecipeGeneration();
+                await finalizeRecipeGeneration({
+                    overrideMockScenario: activeMockScenario,
+                    overrideRequestSource: 'mock',
+                });
                 return;
             }
 

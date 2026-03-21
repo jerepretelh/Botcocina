@@ -27,6 +27,30 @@ function normalizeAIVolumeYieldFallback(baseYield: NonNullable<GeneratedRecipe['
   return baseYield;
 }
 
+function buildLegacyAIFallbackAmount(value: string | number | null | undefined) {
+  const text = value == null ? null : String(value);
+  const inferredUnit = typeof value === 'string'
+    ? value
+      .trim()
+      .toLowerCase()
+      .match(/(?:\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)\s*([a-záéíóúñ]+)/)?.[1] ?? null
+    : null;
+  const parsedValue = typeof value === 'number'
+    ? value
+    : (typeof value === 'string' ? Number.parseFloat(value.replace(',', '.')) : null);
+  const hasNumericValue = typeof parsedValue === 'number' && Number.isFinite(parsedValue);
+
+  return normalizeStructuredAmount({
+    value: hasNumericValue ? parsedValue : null,
+    unit: hasNumericValue ? (inferredUnit ?? 'unidad') : null,
+    text,
+    scalable: hasNumericValue,
+    scalingPolicy: hasNumericValue ? 'linear' : 'non_scalable',
+    family: hasNumericValue ? undefined : 'custom',
+    canonicalUnit: hasNumericValue ? undefined : null,
+  });
+}
+
 export function normalizeAIRecipeToV2(recipe: GeneratedRecipe): CanonicalRecipeV2 {
   const baseYieldInput = recipe.baseYield ?? null;
   const normalizedBaseYield = baseYieldInput
@@ -62,11 +86,7 @@ export function normalizeAIRecipeToV2(recipe: GeneratedRecipe): CanonicalRecipeV
       emoji: ingredient.emoji,
       indispensable: ingredient.indispensable,
       amount: normalizeStructuredAmount(ingredient.amount ?? {
-        value: ingredient.baseValue ? Number.parseFloat(String(ingredient.baseValue)) || null : null,
-        unit: null,
-        text: ingredient.baseValue ?? ingredient.portions?.[2] ?? null,
-        scalable: true,
-        scalingPolicy: 'linear',
+        ...buildLegacyAIFallbackAmount(ingredient.baseValue ?? ingredient.portions?.[2] ?? null),
       }),
       notes: ingredient.notes,
     })),
@@ -80,11 +100,7 @@ export function normalizeAIRecipeToV2(recipe: GeneratedRecipe): CanonicalRecipeV
         text: subStep.text ?? subStep.subStepName ?? 'Continuar',
         notes: subStep.notes ?? null,
         amount: subStep.amount ? normalizeStructuredAmount(subStep.amount) : (subStep.isTimer ? null : normalizeStructuredAmount({
-          value: typeof subStep.baseValue === 'number' ? subStep.baseValue : null,
-          unit: null,
-          text: typeof subStep.baseValue === 'string' ? subStep.baseValue : null,
-          scalable: true,
-          scalingPolicy: 'linear',
+          ...buildLegacyAIFallbackAmount(subStep.baseValue ?? subStep.portions?.[2] ?? null),
         })),
         timer: subStep.timer ?? (subStep.isTimer ? {
           durationSeconds: typeof subStep.baseValue === 'number' ? subStep.baseValue : null,

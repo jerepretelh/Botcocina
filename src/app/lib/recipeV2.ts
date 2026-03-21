@@ -104,6 +104,7 @@ function computeTimeSummaryFromSteps(steps: RecipeStepV2[]): RecipeTimeSummaryV2
 }
 
 export function normalizeLegacyRecipeToV2(recipe: Recipe, content: RecipeContent): RecipeV2 {
+  const resolvedExperience = recipe.experience === 'compound' || content.compoundMeta ? 'compound' : recipe.experience;
   const baseYield = inferBaseYieldFromLegacy(recipe, content);
   const baseServingKey = Math.max(1, Math.min(4, Math.round(baseYield.value ?? 2))) as 1 | 2 | 4;
 
@@ -154,7 +155,7 @@ export function normalizeLegacyRecipeToV2(recipe: Recipe, content: RecipeContent
     ingredients,
     steps,
     timeSummary: computeTimeSummaryFromSteps(steps),
-    experience: recipe.experience,
+    experience: resolvedExperience,
     compoundMeta: content.compoundMeta,
     sourceRecipe: recipe,
     sourceContent: content,

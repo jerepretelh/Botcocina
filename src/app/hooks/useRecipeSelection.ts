@@ -21,6 +21,16 @@ import type { CanonicalRecipeV2 } from '../lib/recipe-v2/canonicalRecipeV2';
 import { deriveTargetYieldFromLegacy } from '../lib/recipeV2';
 import { normalizeLegacyRecipeToV2 } from '../lib/recipe-v2/normalizeLegacyRecipeToV2';
 
+const DEFAULT_ACTIVE_RECIPE_CONTENT: RecipeContent = {
+    tip: 'Selecciona una receta para ver sus ingredientes y pasos.',
+    ingredients: [],
+    steps: [],
+    portionLabels: {
+        singular: 'porción',
+        plural: 'porciones',
+    },
+};
+
 export function useRecipeSelection() {
     const [screen, setScreenState] = useState<Screen>('category-select');
     const [screenHistory, setScreenHistory] = useState<Screen[]>([]);
@@ -55,18 +65,9 @@ export function useRecipeSelection() {
         label: 'porciones',
     });
     const [cookingContext, setCookingContext] = useState<CookingContextV2 | null>(null);
-    const defaultActiveRecipeContent: RecipeContent = {
-        tip: 'Selecciona una receta para ver sus ingredientes y pasos.',
-        ingredients: [],
-        steps: [],
-        portionLabels: {
-            singular: 'porción',
-            plural: 'porciones',
-        },
-    };
 
     const activeRecipeId = selectedRecipe?.id ?? 'arroz';
-    const activeRecipeContent = recipeContentById[activeRecipeId] ?? defaultActiveRecipeContent;
+    const activeRecipeContent = recipeContentById[activeRecipeId] ?? DEFAULT_ACTIVE_RECIPE_CONTENT;
     const currentIngredients = activeRecipeContent.ingredients;
     const currentTip = activeRecipeContent.tip;
     const recipeV2ById = useMemo(() => {

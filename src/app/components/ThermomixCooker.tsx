@@ -44,6 +44,7 @@ import { resolvePersistedTargetYield } from '../lib/recipe-v2/resolvePersistedTa
 import { buildCookingPresentationV2 } from '../lib/presentation/buildCookingPresentationV2';
 import { buildCompoundCookingPresentationV2 } from '../lib/presentation/buildCompoundCookingPresentationV2';
 import { isCanonicalRecipeV2 } from '../lib/recipe-v2/canonicalRecipeV2';
+import type { RecipeYieldV2 } from '../types/recipe-v2';
 
 import { useThermomixVoice } from '../hooks/useThermomixVoice';
 import { useThermomixTimer } from '../hooks/useThermomixTimer';
@@ -192,6 +193,26 @@ function dedupeRecipesBySignature(
   return [...bySignature.values()];
 }
 
+function areRecipeYieldsEqual(
+  left: RecipeYieldV2 | null | undefined,
+  right: RecipeYieldV2 | null | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+
+  return (
+    left.type === right.type &&
+    left.value === right.value &&
+    (left.unit ?? null) === (right.unit ?? null) &&
+    (left.label ?? null) === (right.label ?? null) &&
+    (left.visibleUnit ?? null) === (right.visibleUnit ?? null) &&
+    (left.canonicalUnit ?? null) === (right.canonicalUnit ?? null) &&
+    (left.containerKey ?? null) === (right.containerKey ?? null) &&
+    (left.containerMeta?.capacityMl ?? null) === (right.containerMeta?.capacityMl ?? null) &&
+    (left.containerMeta?.diameterCm ?? null) === (right.containerMeta?.diameterCm ?? null) &&
+    (left.containerMeta?.sizeLabel ?? null) === (right.containerMeta?.sizeLabel ?? null)
+  );
+}
+
 export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -266,6 +287,8 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     setAvailableCount: recipeSelection.setAvailableCount,
     setPortion: recipeSelection.setPortion,
     setPeopleCount: recipeSelection.setPeopleCount,
+    setTargetYield: recipeSelection.setTargetYield,
+    setCookingContext: recipeSelection.setCookingContext,
     setTimerScaleFactor: cookingProgress.setTimerScaleFactor,
     setTimingAdjustedLabel: cookingProgress.setTimingAdjustedLabel,
     setCurrentStepIndex: cookingProgress.setCurrentStepIndex,
@@ -299,8 +322,12 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     currentStep,
     isRecipeFinished,
   } = { ...recipeSelection, ...cookingProgress, ...aiRecipeGen };
-  const isCompoundRecipe = recipeSelection.selectedRecipe?.experience === 'compound' && Boolean(recipeSelection.activeRecipeContent.compoundMeta);
   const currentRecipeV2 = recipeSelection.selectedRecipeV2;
+  const compoundMeta = recipeSelection.activeRecipeContent.compoundMeta ?? currentRecipeV2?.compoundMeta ?? null;
+  const isCompoundRecipe = (
+    recipeSelection.selectedRecipe?.experience === 'compound'
+    || currentRecipeV2?.experience === 'compound'
+  ) && Boolean(compoundMeta);
   const canonicalRecipeV2 = currentRecipeV2 && isCanonicalRecipeV2(currentRecipeV2) ? currentRecipeV2 : null;
   // Boundary note:
   // - unified journey: preferred path for recipes explicitly migrated to the new contract
@@ -322,6 +349,10 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
         ? recipeSelection.targetYield
         : setupRecipeV2?.baseYield ?? null,
   });
+  const compoundTargetYield = useMemo(() => {
+    if (!compoundRecipeV2) return null;
+    return resolvePersistedTargetYield(compoundRecipeV2, recipeSelection.targetYield);
+  }, [compoundRecipeV2, recipeSelection.targetYield]);
   const scaledStandardRecipe = useScaledRecipe({
     recipe: canonicalRecipeV2,
     targetYield: standardYield.selectedYield,
@@ -333,8 +364,13 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
     targetYield: standardYield.selectedYield,
     cookingContext: recipeSelection.cookingContext,
   });
+  const scaledCompoundRecipe = useScaledRecipe({
+    recipe: compoundRecipeV2,
+    targetYield: compoundTargetYield,
+    cookingContext: recipeSelection.cookingContext,
+    requireCanonical: true,
+  });
   const isStandardRecipeV2 = Boolean(canonicalRecipeV2 && scaledStandardRecipe);
-  const scaledCompoundRecipe = compoundRecipeV2 ? scaledStandardRecipe : null;
   const standardCooking = useCookingProgressV2({
     recipe: scaledStandardRecipe,
   });
@@ -479,8 +515,9 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
 
   useEffect(() => {
     if (!standardYield.selectedYield) return;
+    if (areRecipeYieldsEqual(recipeSelection.targetYield, standardYield.selectedYield)) return;
     recipeSelection.setTargetYield(standardYield.selectedYield);
-  }, [recipeSelection.setTargetYield, standardYield.selectedYield]);
+  }, [recipeSelection.setTargetYield, recipeSelection.targetYield, standardYield.selectedYield]);
 
   const clearRecipeOverlaySheets = () => {
     setIsRecipeSetupSheetOpen(false);
@@ -592,9 +629,13 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
   const hydrateRecipeSelection = (recipe: Recipe) => {
     const content = recipeSelection.recipeContentById[recipe.id] ?? null;
     const recipeV2 = recipeSelection.recipeV2ById[recipe.id] ?? null;
+    const hydratedRecipe =
+      recipe.experience === 'compound' || recipeV2?.experience === 'compound' || Boolean(content?.compoundMeta)
+        ? { ...recipe, experience: 'compound' as const }
+        : recipe;
     const savedConfig = userRecipeConfigs.configsByRecipeId[recipe.id] ?? null;
-    const setupBehavior = deriveRecipeSetupBehavior(recipe, content, savedConfig);
-    const resolvedCategoryId = resolveRoutableCategoryId(recipe.categoryId);
+    const setupBehavior = deriveRecipeSetupBehavior(hydratedRecipe, content, savedConfig);
+    const resolvedCategoryId = resolveRoutableCategoryId(hydratedRecipe.categoryId);
 
     if (content && !recipeSelection.ingredientSelectionByRecipe[recipe.id]) {
       const baseSelection = buildInitialIngredientSelection(content.ingredients);
@@ -614,7 +655,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       }));
     }
 
-    recipeSelection.setSelectedRecipe(recipe);
+    recipeSelection.setSelectedRecipe(hydratedRecipe);
     recipeSelection.setSelectedCategory(resolvedCategoryId);
     if (recipeV2) {
       recipeSelection.setTargetYield(
@@ -639,7 +680,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       savedConfig && (setupBehavior === 'saved_config_first' || setupBehavior === 'servings_or_quantity')
         ? (setupBehavior !== 'servings_only' && savedConfig.quantityMode === 'have' ? 'have' : 'people')
         : 'people';
-    const resolvedPeopleCount = savedConfig?.peopleCount ?? recipe.basePortions ?? 2;
+    const resolvedPeopleCount = savedConfig?.peopleCount ?? hydratedRecipe.basePortions ?? 2;
     const resolvedAvailableCount = savedConfig?.availableCount ?? 2;
     const resolvedAmountUnit = savedConfig?.amountUnit ?? 'units';
 
@@ -650,7 +691,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       recipeSelection.setAmountUnit(resolvedAmountUnit);
     } else {
       recipeSelection.setQuantityMode('people');
-      recipeSelection.setPeopleCount(recipe.basePortions ?? 2);
+      recipeSelection.setPeopleCount(hydratedRecipe.basePortions ?? 2);
       recipeSelection.setAvailableCount(2);
       recipeSelection.setAmountUnit('units');
     }
@@ -675,6 +716,7 @@ export function ThermomixCooker({ auth }: ThermomixCookerProps) {
       availableCount: resolvedAvailableCount,
       portion: resolvedPortion,
       recipeV2,
+      recipe: hydratedRecipe,
     };
   };
 
