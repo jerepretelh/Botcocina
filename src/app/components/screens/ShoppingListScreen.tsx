@@ -24,14 +24,8 @@ interface ShoppingListScreenProps {
   variance: ShoppingVarianceSummary;
   isLoading: boolean;
   error: string | null;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
   onGoShoppingList: () => void;
   onGoWeeklyPlan: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onSignOut: () => void;
   onRegenerateShopping: () => void;
   onToggleShoppingItem: (itemId: string, nextChecked: boolean) => void;
@@ -321,14 +315,8 @@ export function ShoppingListScreen({
   variance,
   isLoading,
   error,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
   onGoShoppingList,
   onGoWeeklyPlan,
-  onGoCompoundLab,
-  onGoSettings,
   onSignOut,
   onRegenerateShopping,
   onToggleShoppingItem,
@@ -393,14 +381,6 @@ export function ShoppingListScreen({
     <MainShellLayout
       activeItem="shopping-list"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage>

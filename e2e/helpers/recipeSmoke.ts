@@ -173,6 +173,23 @@ export async function startCooking(page: Page, recipe: SmokeRecipeCase): Promise
   await expectHashPath(page, recipeCookingPath(recipe.recipeId));
 }
 
+export async function expectCookingStepAdvance(page: Page, args: {
+  recipe: SmokeRecipeCase;
+  beforeLabel: string;
+  afterLabel: string;
+  beforeTitle: string;
+  afterTitle: string;
+}): Promise<void> {
+  await expect(page.getByText(args.beforeLabel, { exact: true })).toBeVisible();
+  await expect(page.getByText(args.beforeTitle, { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: /^(Continuar receta|Siguiente)$/ }).click();
+
+  await expectHashPath(page, recipeCookingPath(args.recipe.recipeId));
+  await expect(page.getByText(args.afterLabel, { exact: true })).toBeVisible();
+  await expect(page.getByText(args.afterTitle, { exact: true })).toBeVisible();
+}
+
 export async function reopenSetupFromCooking(page: Page, recipe: SmokeRecipeCase): Promise<void> {
   await page.getByRole('button', { name: 'Ajustar', exact: true }).click();
   await expectHashPath(page, recipeSetupPath(recipe.recipeId));
@@ -184,7 +201,7 @@ export async function reopenIngredientsFromCooking(page: Page, recipe: SmokeReci
 }
 
 export async function closeRecipeAndExpectReturn(page: Page, expectedPath: string): Promise<void> {
-  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: /^(Close|Salir)$/ }).click();
   await waitForAppReady(page);
   await expectHashPath(page, expectedPath);
 }

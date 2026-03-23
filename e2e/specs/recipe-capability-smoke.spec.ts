@@ -4,6 +4,7 @@ import {
   assertAppSessionReady,
   capabilitySmokeRecipes,
   closeRecipeAndExpectReturn,
+  expectCookingStepAdvance,
   expectedReturnPathForEntry,
   incrementSetupYield,
   openRecipeEntryPoint,
@@ -74,6 +75,22 @@ test.describe('Recipe capability smoke', () => {
     await startCooking(page, recipe);
     await reopenSetupFromCooking(page, recipe);
     await expect(page.getByRole('button', { name: 'Empezar receta', exact: true })).toBeVisible();
+
+    await closeRecipeAndExpectReturn(page, expectedReturnPathForEntry(recipe.entryPoint));
+  });
+
+  test('standard recipe advances beyond the first cooking screen instead of staying stuck on step one', async ({ page }) => {
+    const recipe = capabilitySmokeRecipes[4];
+    await openRecipeEntryPoint(page, recipe);
+
+    await startCooking(page, recipe);
+    await expectCookingStepAdvance(page, {
+      recipe,
+      beforeLabel: 'SUBPASO 1 DE 5',
+      afterLabel: 'SUBPASO 2 DE 5',
+      beforeTitle: 'Coloca agua suficiente para cubrir los huevos.',
+      afterTitle: 'Hierve el agua antes de ingresar los huevos.',
+    });
 
     await closeRecipeAndExpectReturn(page, expectedReturnPathForEntry(recipe.entryPoint));
   });

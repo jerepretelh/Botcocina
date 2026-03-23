@@ -16,14 +16,7 @@ interface WeeklyPlanScreenProps {
   recipesById: Record<string, Recipe>;
   isLoading: boolean;
   error: string | null;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
   onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onSignOut: () => void;
   onEditPlanItem: (item: WeeklyPlanItem) => void;
   onRemovePlanItem: (itemId: string) => void;
@@ -52,14 +45,7 @@ export function WeeklyPlanScreen({
   recipesById,
   isLoading,
   error,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
   onGoShoppingList,
-  onGoCompoundLab,
-  onGoSettings,
   onSignOut,
   onEditPlanItem,
   onRemovePlanItem,
@@ -98,14 +84,6 @@ export function WeeklyPlanScreen({
     <MainShellLayout
       activeItem="weekly-plan"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage>

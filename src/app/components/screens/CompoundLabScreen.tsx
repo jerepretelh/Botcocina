@@ -7,14 +7,6 @@ interface CompoundLabScreenProps {
   recipes: Recipe[];
   onOpenRecipe: (recipe: Recipe) => void;
   onQuickCook: (recipe: Recipe) => void;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onSignOut: () => void;
 }
 
@@ -23,28 +15,12 @@ export function CompoundLabScreen({
   recipes,
   onOpenRecipe,
   onQuickCook,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
-  onGoSettings,
   onSignOut,
 }: CompoundLabScreenProps) {
   return (
     <MainShellLayout
       activeItem="compound-lab"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-10 lg:py-10">

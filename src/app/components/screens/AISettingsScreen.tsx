@@ -22,14 +22,6 @@ import { ProductContainer, ProductHeader, ProductPage } from '../ui/product-syst
 
 interface AISettingsScreenProps {
   currentUserEmail: string | null;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onOpenReleases: () => void;
   onOpenBacklog: () => void;
   onSignOut: () => void;
@@ -99,14 +91,6 @@ function formatDate(value: string | null): string {
 
 export function AISettingsScreen({
   currentUserEmail,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
-  onGoSettings,
   onOpenReleases,
   onOpenBacklog,
   onSignOut,
@@ -237,14 +221,6 @@ export function AISettingsScreen({
       <MainShellLayout
         activeItem="settings"
         currentUserEmail={currentUserEmail}
-        onGoHome={onGoHome}
-        onGoGlobalRecipes={onGoGlobalRecipes}
-        onGoMyRecipes={onGoMyRecipes}
-        onGoFavorites={onGoFavorites}
-        onGoWeeklyPlan={onGoWeeklyPlan}
-        onGoShoppingList={onGoShoppingList}
-        onGoCompoundLab={onGoCompoundLab}
-        onGoSettings={onGoSettings}
         onSignOut={onSignOut}
       >
         <ProductPage>
@@ -262,14 +238,6 @@ export function AISettingsScreen({
     <MainShellLayout
       activeItem="settings"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage>

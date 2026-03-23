@@ -23,15 +23,28 @@ test.describe('Mobile menu smoke', () => {
   });
 
   test('navigates to primary destinations from the mobile menu', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: 'Abrir menú' }).click();
-    await page.getByRole('button', { name: 'Favoritos', exact: true }).click();
+    await page.getByRole('link', { name: 'Favoritos', exact: true }).click();
     await expectHashPath(page, '/favoritos');
 
-    await page.getByRole('button', { name: 'Recetas', exact: true }).click();
+    await page.getByRole('link', { name: 'Recetas', exact: true }).click();
     await expectHashPath(page, globalRecipesHomePath);
 
     await page.getByRole('button', { name: 'Abrir menú' }).click();
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('link', { name: 'Ajustes', exact: true }).click();
+    await expectHashPath(page, '/ajustes');
+  });
+
+  test('desktop sidebar navigates across primary modules with real links', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.getByRole('link', { name: 'Recetas globales', exact: true }).click();
+    await expectHashPath(page, globalRecipesHomePath);
+
+    await page.getByRole('link', { name: 'Favoritos', exact: true }).click();
+    await expectHashPath(page, '/favoritos');
+
+    await page.getByRole('link', { name: 'Ajustes', exact: true }).click();
     await expectHashPath(page, '/ajustes');
   });
 });

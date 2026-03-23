@@ -15,7 +15,7 @@ interface CreateCookRuntimeEntryAdapterArgs {
   ) => void;
   enterCompoundCookingRuntime: () => void;
   enterStandardCookingRuntime: () => void;
-  startLegacyCooking: () => void;
+  startCompatCooking: () => void;
   navigateToCookingRoute: (recipeId: string) => void;
 }
 
@@ -28,7 +28,7 @@ export function createCookRuntimeEntryAdapter({
   setIngredientSelectionByRecipe,
   enterCompoundCookingRuntime,
   enterStandardCookingRuntime,
-  startLegacyCooking,
+  startCompatCooking,
   navigateToCookingRoute,
 }: CreateCookRuntimeEntryAdapterArgs) {
   return {
@@ -63,7 +63,7 @@ export function createCookRuntimeEntryAdapter({
       } else if (hasRecipeV2) {
         enterStandardCookingRuntime();
       } else {
-        startLegacyCooking();
+        startCompatCooking();
       }
 
       if (selectedRecipe?.id) {

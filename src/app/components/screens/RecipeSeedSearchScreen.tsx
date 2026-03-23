@@ -12,14 +12,6 @@ interface RecipeSeedSearchScreenProps {
   onSearchTermChange: (value: string) => void;
   onSelectResult: (result: MixedRecipeSearchResult) => void;
   onBack: () => void;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onSignOut: () => void;
 }
 
@@ -32,28 +24,12 @@ export function RecipeSeedSearchScreen({
   onSearchTermChange,
   onSelectResult,
   onBack,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
-  onGoSettings,
   onSignOut,
 }: RecipeSeedSearchScreenProps) {
   return (
     <MainShellLayout
       activeItem="home"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage className="bg-[#ede4dc]">

@@ -24,14 +24,6 @@ interface RecipeSelectScreenProps {
     onToggleFavorite: (recipeId: string) => void;
     onPlanRecipe: (recipe: Recipe) => void;
     currentUserEmail: string | null;
-    onGoHome: () => void;
-    onGoGlobalRecipes: () => void;
-    onGoMyRecipes: () => void;
-    onGoFavorites: () => void;
-    onGoWeeklyPlan: () => void;
-    onGoShoppingList: () => void;
-    onGoCompoundLab: () => void;
-    onGoSettings: () => void;
     onSignOut: () => void;
     onOpenRecipeSearch: () => void;
 }
@@ -53,14 +45,6 @@ export function RecipeSelectScreen({
     onToggleFavorite,
     onPlanRecipe,
     currentUserEmail,
-    onGoHome,
-    onGoGlobalRecipes,
-    onGoMyRecipes,
-    onGoFavorites,
-    onGoWeeklyPlan,
-    onGoShoppingList,
-    onGoCompoundLab,
-    onGoSettings,
     onSignOut,
     onOpenRecipeSearch,
 }: RecipeSelectScreenProps) {
@@ -78,14 +62,6 @@ export function RecipeSelectScreen({
         <MainShellLayout
             activeItem="global-recipes"
             currentUserEmail={currentUserEmail}
-            onGoHome={onGoHome}
-            onGoGlobalRecipes={onGoGlobalRecipes}
-            onGoMyRecipes={onGoMyRecipes}
-            onGoFavorites={onGoFavorites}
-            onGoWeeklyPlan={onGoWeeklyPlan}
-            onGoShoppingList={onGoShoppingList}
-            onGoCompoundLab={onGoCompoundLab}
-            onGoSettings={onGoSettings}
             onSignOut={onSignOut}
         >
             <ProductPage>

@@ -6,13 +6,6 @@ import { buildBacklogSections, summarizeBacklog } from '../../lib/backlogView';
 
 interface BacklogScreenProps {
   currentUserEmail: string | null;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
 }
@@ -39,13 +32,6 @@ function statusTone(status: 'pending' | 'in_progress' | 'done'): string {
 
 export function BacklogScreen({
   currentUserEmail,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
   onGoSettings,
   onSignOut,
 }: BacklogScreenProps) {
@@ -56,14 +42,6 @@ export function BacklogScreen({
     <MainShellLayout
       activeItem="settings"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage>

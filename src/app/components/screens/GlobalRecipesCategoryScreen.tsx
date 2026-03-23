@@ -34,14 +34,6 @@ interface GlobalRecipesCategoryScreenProps {
   onOpenRecipe: (recipe: Recipe) => void;
   onPlanRecipe: (recipe: Recipe) => void;
   onToggleFavorite: (recipeId: string) => void;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
-  onGoSettings: () => void;
   onSignOut: () => void;
 }
 
@@ -54,28 +46,12 @@ export function GlobalRecipesCategoryScreen({
   onOpenRecipe,
   onPlanRecipe,
   onToggleFavorite,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
-  onGoSettings,
   onSignOut,
 }: GlobalRecipesCategoryScreenProps) {
   return (
     <MainShellLayout
       activeItem="global-recipes"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <div className="min-h-screen bg-[#ede4dc] px-4 py-6 md:px-8 md:py-8">

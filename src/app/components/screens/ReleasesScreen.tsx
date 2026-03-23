@@ -6,13 +6,6 @@ import { appReleases } from '../../data/releases';
 
 interface ReleasesScreenProps {
   currentUserEmail: string | null;
-  onGoHome: () => void;
-  onGoGlobalRecipes: () => void;
-  onGoMyRecipes: () => void;
-  onGoFavorites: () => void;
-  onGoWeeklyPlan: () => void;
-  onGoShoppingList: () => void;
-  onGoCompoundLab: () => void;
   onGoSettings: () => void;
   onSignOut: () => void;
 }
@@ -27,13 +20,6 @@ function formatReleaseDate(value: string): string {
 
 export function ReleasesScreen({
   currentUserEmail,
-  onGoHome,
-  onGoGlobalRecipes,
-  onGoMyRecipes,
-  onGoFavorites,
-  onGoWeeklyPlan,
-  onGoShoppingList,
-  onGoCompoundLab,
   onGoSettings,
   onSignOut,
 }: ReleasesScreenProps) {
@@ -41,14 +27,6 @@ export function ReleasesScreen({
     <MainShellLayout
       activeItem="settings"
       currentUserEmail={currentUserEmail}
-      onGoHome={onGoHome}
-      onGoGlobalRecipes={onGoGlobalRecipes}
-      onGoMyRecipes={onGoMyRecipes}
-      onGoFavorites={onGoFavorites}
-      onGoWeeklyPlan={onGoWeeklyPlan}
-      onGoShoppingList={onGoShoppingList}
-      onGoCompoundLab={onGoCompoundLab}
-      onGoSettings={onGoSettings}
       onSignOut={onSignOut}
     >
       <ProductPage>

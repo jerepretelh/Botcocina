@@ -67,14 +67,6 @@ export function CategorySelectScreen({
     <MainShellLayout
       activeItem="home"
       currentUserEmail={currentUserEmail}
-      onGoHome={() => undefined}
-      onGoGlobalRecipes={onOpenGlobalRecipes}
-      onGoMyRecipes={onOpenMyRecipes}
-      onGoFavorites={onOpenFavorites}
-      onGoWeeklyPlan={onOpenWeeklyPlan}
-      onGoShoppingList={onOpenShoppingList}
-      onGoCompoundLab={onOpenCompoundLab}
-      onGoSettings={onOpenAISettings}
       onSignOut={onSignOut}
     >
       <div className="min-h-[100dvh] bg-[#ede4dc] px-3 py-4 sm:px-5 md:px-8 md:py-8">
