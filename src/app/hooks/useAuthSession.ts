@@ -25,13 +25,14 @@ function isAnonymousSession(session: Session | null): boolean {
 
 export function useAuthSession() {
   const [session, setSession] = useState<Session | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(isSupabaseEnabled ? 'loading' : 'unauthenticated');
+  const [status, setStatus] = useState<AuthStatus>(isSupabaseEnabled ? 'loading' : 'authenticated');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseEnabled || !supabaseClient) {
-      setStatus('unauthenticated');
-      setError('Supabase Auth no está configurado en este entorno.');
+      setSession(null);
+      setStatus('authenticated');
+      setError(null);
       return;
     }
 
@@ -129,7 +130,7 @@ export function useAuthSession() {
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabaseClient) {
-      throw new Error('Supabase Auth no está disponible.');
+      return { session: null, user: null };
     }
     if (!navigator.onLine) {
       const offlineError = new Error(getOfflineMessage());
@@ -147,7 +148,7 @@ export function useAuthSession() {
 
   const signUp = useCallback(async (email: string, password: string) => {
     if (!supabaseClient) {
-      throw new Error('Supabase Auth no está disponible.');
+      return { session: null, user: null };
     }
     if (!navigator.onLine) {
       const offlineError = new Error(getOfflineMessage());

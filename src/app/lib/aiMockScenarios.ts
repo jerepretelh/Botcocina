@@ -1,5 +1,5 @@
 import type { AIRecipeContextDraft } from '../../types';
-import type { AIClarificationResult, GeneratedRecipe } from './recipeAI';
+import type { AIClarificationResult, AIPreRecipe, GeneratedRecipe } from './recipeAI';
 import { normalizeText } from '../utils/recipeHelpers';
 
 export type AIMockScenarioId = 'milanesa' | 'arroz-pollo' | 'tallarines-rojos';
@@ -10,7 +10,68 @@ export interface AIMockScenario {
   triggerKeywords: string[];
   contextDraft: AIRecipeContextDraft;
   clarification: AIClarificationResult;
+  preRecipe: AIPreRecipe;
   recipe: GeneratedRecipe;
+}
+
+function buildPreRecipeFromRecipe(recipe: GeneratedRecipe): AIPreRecipe {
+  const resolveIngredientAmount = (ingredient: GeneratedRecipe['ingredients'][number]) =>
+    ingredient.amount?.text ?? ingredient.baseValue ?? ingredient.portions?.[2] ?? 'Cantidad necesaria';
+
+  const ingredientsLines = recipe.ingredients
+    .map((ingredient) => `${ingredient.emoji ? `${ingredient.emoji} ` : ''}${resolveIngredientAmount(ingredient)} de ${ingredient.name}${ingredient.notes ? ` (${ingredient.notes})` : ''}`)
+    .join('\n');
+  const phasesLines = recipe.steps
+    .map((step, index) => {
+      const title = step.title ?? step.stepName ?? `Paso ${index + 1}`;
+      const actionLines = step.subSteps
+        .map((subStep) => {
+          const text = subStep.text ?? subStep.subStepName ?? 'Continuar';
+          const notes = subStep.notes ? `\n👉 ${subStep.notes}` : '';
+          const timerText =
+            subStep.timer?.durationSeconds != null
+              ? `\n⏱️ ${Math.max(1, Math.round(subStep.timer.durationSeconds / 60))} min aprox.`
+              : typeof subStep.portions?.[2] === 'number'
+                ? `\n⏱️ ${Math.max(1, Math.round(subStep.portions[2] / 60))} min aprox.`
+                : '';
+          return `${text}${notes}${timerText}`;
+        })
+        .join('\n');
+      const phaseSummary = step.notes ? `\n${step.notes}\n` : '';
+      return `🔪 FASE ${index + 1}: ${title}${phaseSummary}\n${actionLines}\n\n👉 Esta fase debe quedar bien encaminada antes de pasar a la siguiente.`;
+    })
+    .join('\n\n');
+  const ingredientNames = recipe.ingredients.slice(0, 4).map((ingredient) => ingredient.name.toLowerCase());
+  const introLine =
+    ingredientNames.length > 0
+      ? `Te propongo una prereceta bien detallada, con ingredientes claros y fases ordenadas para que cocines con mejor flujo usando ${ingredientNames.join(', ')}.`
+      : 'Te propongo una prereceta bien detallada, con ingredientes claros y fases ordenadas para que cocines con mejor flujo.';
+
+  return {
+    name: recipe.name,
+    icon: recipe.icon,
+    description: recipe.description,
+    chatResponse: `${recipe.icon} ${recipe.name}\n\n${introLine}\n\n🛒 Ingredientes\n${ingredientsLines}\n\n${phasesLines}${recipe.tip ? `\n\n💡 Claves importantes\n${recipe.tip}\n👉 Mantén el orden de las fases para que todo salga a tiempo y con buena textura.` : ''}\n\n🍽️ Cuando confirmes esta prereceta, te la convierto en receta guiada con tiempos exactos, pasos más finos y orden de ejecución completo.`,
+    baseYield: recipe.baseYield ?? {
+      type: 'servings',
+      value: 2,
+      unit: 'personas',
+      label: '2 personas',
+    },
+    ingredients: recipe.ingredients.map((ingredient) => ({
+      name: ingredient.name,
+      emoji: ingredient.emoji,
+      amountText: resolveIngredientAmount(ingredient),
+      notes: ingredient.notes ?? null,
+    })),
+    phases: recipe.steps.map((step, index) => ({
+      title: `FASE ${index + 1}: ${step.title ?? step.stepName ?? 'Paso'}`,
+      summary: step.notes ?? null,
+      actions: step.subSteps.map((subStep) => subStep.text ?? subStep.subStepName ?? 'Continuar'),
+    })),
+    tips: recipe.tip ? [recipe.tip] : [],
+    importantNotes: [],
+  };
 }
 
 const milanesaScenario: AIMockScenario = {
@@ -54,6 +115,7 @@ const milanesaScenario: AIMockScenario = {
       },
     ],
   },
+  preRecipe: {} as AIPreRecipe,
   recipe: {
     name: 'Milanesa crocante de pollo',
     icon: '🍗',
@@ -117,6 +179,7 @@ const milanesaScenario: AIMockScenario = {
     ],
   },
 };
+milanesaScenario.preRecipe = buildPreRecipeFromRecipe(milanesaScenario.recipe);
 
 const arrozPolloScenario: AIMockScenario = {
   id: 'arroz-pollo',
@@ -142,6 +205,7 @@ const arrozPolloScenario: AIMockScenario = {
       { id: 'extra_sabor', question: '¿Quieres agregar alguna guarnición o toque final?', type: 'text', required: false },
     ],
   },
+  preRecipe: {} as AIPreRecipe,
   recipe: {
     name: 'Arroz con pollo casero',
     icon: '🍚',
@@ -165,6 +229,7 @@ const arrozPolloScenario: AIMockScenario = {
     ],
   },
 };
+arrozPolloScenario.preRecipe = buildPreRecipeFromRecipe(arrozPolloScenario.recipe);
 
 const tallarinesRojosScenario: AIMockScenario = {
   id: 'tallarines-rojos',
@@ -186,6 +251,7 @@ const tallarinesRojosScenario: AIMockScenario = {
     tip: 'Coordina la reducción de la salsa mientras hierve la pasta para cerrar ambos frentes casi al mismo tiempo.',
     questions: [],
   },
+  preRecipe: {} as AIPreRecipe,
   recipe: {
     name: 'Tallarines rojos compuestos',
     icon: '🍝',
@@ -233,6 +299,7 @@ const tallarinesRojosScenario: AIMockScenario = {
     ],
   },
 };
+tallarinesRojosScenario.preRecipe = buildPreRecipeFromRecipe(tallarinesRojosScenario.recipe);
 
 const SCENARIOS: AIMockScenario[] = [milanesaScenario, arrozPolloScenario, tallarinesRojosScenario];
 

@@ -4,6 +4,13 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { handleRecipesRequest } from './api/recipes/shared'
+import {
+  buildPreviewConversation,
+  buildStructuredUserPrompt,
+  promptConfig,
+  type AIRecipeRequestMode,
+  serializeApprovedPreRecipe,
+} from './api/ai/recipePrompts'
 
 const AI_RECIPE_ROUTE = '/api/ai/recipe'
 const AI_CONFIG_ROUTE = '/api/ai/config'
@@ -11,13 +18,6 @@ const RECIPES_ROUTE = '/api/recipes'
 let localGoogleApiKey = ''
 let localGoogleModel = ''
 let localOpenAIApiKey = ''
-
-type RecipeContextDraft = {
-  prompt?: unknown
-  servings?: unknown
-  availableIngredients?: unknown
-  avoidIngredients?: unknown
-}
 
 async function readRequestBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = []
@@ -31,46 +31,6 @@ function sendJson(res: ServerResponse, statusCode: number, payload: unknown): vo
   res.statusCode = statusCode
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
   res.end(JSON.stringify(payload))
-}
-
-function extractContextTokens(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .map((item) => {
-      if (typeof item === 'string') return item.trim()
-      if (item && typeof item === 'object' && typeof (item as { value?: unknown }).value === 'string') {
-        return ((item as { value: string }).value || '').trim()
-      }
-      return ''
-    })
-    .filter(Boolean)
-}
-
-function buildStructuredUserPrompt(rawPrompt: string, rawContext: RecipeContextDraft | null): string {
-  const prompt = rawPrompt.trim()
-  if (!rawContext || typeof rawContext !== 'object') {
-    return prompt
-  }
-
-  const servings =
-    typeof rawContext.servings === 'number' && Number.isFinite(rawContext.servings) && rawContext.servings > 0
-      ? Math.round(rawContext.servings)
-      : null
-  const availableIngredients = extractContextTokens(rawContext.availableIngredients)
-  const avoidIngredients = extractContextTokens(rawContext.avoidIngredients)
-  const lines = [prompt]
-
-  if (servings !== null) {
-    lines.push(`- Comensales objetivo: ${servings}`)
-  }
-  if (availableIngredients.length > 0) {
-    lines.push(`- Ingredientes disponibles: ${availableIngredients.join(', ')}`)
-  }
-  if (avoidIngredients.length > 0) {
-    lines.push(`- Ingredientes a evitar: ${avoidIngredients.join(', ')}`)
-  }
-
-  return lines.join('\n')
 }
 
 function classifyRecipePromptComplexity(prompt: string): 'simple' | 'complex' {
@@ -100,86 +60,6 @@ function classifyRecipePromptComplexity(prompt: string): 'simple' | 'complex' {
   return hitCount >= 2 ? 'complex' : 'simple'
 }
 
-function buildRecipeSystemPrompt(complexity: 'simple' | 'complex'): string {
-  const baseLines = [
-    'Eres un chef experto. Responde SOLO JSON valido sin markdown.',
-    'Genera una receta en espanol para una app de cocina guiada.',
-    'Usa terminos culinarios de Peru cuando aplique.',
-    'Genera la receta SOLO para la cantidad exacta solicitada. No generes variantes 1/2/4.',
-    'La salida debe seguir un contrato V2 estructurado para rendimiento, ingredientes, pasos y tiempos.',
-    'Formato exacto:',
-    '{',
-    '  "id": "slug-corto-opcional",',
-    '  "name": "Nombre receta",',
-    '  "icon": "emoji",',
-    '  "ingredient": "Ingrediente principal",',
-    '  "description": "Resumen corto",',
-    '  "tip": "Consejo breve",',
-    '  "baseYield": {',
-    '    "type": "servings|units|weight|volume|pan_size|tray_size|custom",',
-    '    "value": 2,',
-    '    "unit": "personas|huevos|g|ml|molde mediano",',
-    '    "label": "texto corto opcional"',
-    '  },',
-    '  "ingredients": [',
-    '    {',
-    '      "name": "Ingrediente",',
-    '      "emoji": "emoji",',
-    '      "indispensable": true,',
-    '      "amount": {',
-    '        "value": 200,',
-    '        "unit": "g",',
-    '        "text": "200 g",',
-    '        "scalable": true,',
-    '        "scalingPolicy": "linear|fixed|gentle|batch|container_dependent|non_scalable"',
-    '      }',
-    '    }',
-    '  ],',
-    '  "steps": [',
-    '    {',
-    '      "title": "Nombre paso",',
-    '      "fireLevel": "low|medium|high",',
-    '      "subSteps": [',
-    '        {',
-    '          "text": "Accion",',
-    '          "notes": "Detalle breve",',
-    '          "amount": { "value": 1, "unit": "taza", "text": "1 taza", "scalable": true, "scalingPolicy": "linear" },',
-    '          "timer": { "durationSeconds": 480, "scalingPolicy": "gentle" },',
-    '          "isTimer": true',
-    '        }',
-    '      ]',
-    '    }',
-    '  ],',
-    '  "timeSummary": { "prepMinutes": 10, "cookMinutes": 18, "totalMinutes": 28 },',
-    '  "experience": "standard|compound",',
-    '  "compoundMeta": null',
-    '}',
-    'Si un subStep no necesita amount o timer, puedes omitir el campo o enviarlo como null.',
-    'Si isTimer=true, timer.durationSeconds debe ser entero en segundos.',
-    'No uses fields legacy como portions, baseServings o baseValue salvo que sean necesarios como compatibilidad secundaria.',
-    'Mantén notes cortas y solo cuando aporten.',
-    'No generes mensajes de UX, banners, recordatorios ni texto extra.',
-    'No inventes campos adicionales.',
-  ]
-
-  if (complexity === 'complex') {
-    return [
-      ...baseLines,
-      'Organiza la receta para que sea clara cuando existan procesos paralelos o componentes que luego se integran.',
-      'Usa timers solo cuando realmente ayuden a coordinar hervor, coccion, reposo o reduccion.',
-      'Evita duplicar acciones triviales o explicaciones largas.',
-      'Usa entre 4 y 8 pasos y entre 1 y 4 subpasos por paso.',
-    ].join('\n')
-  }
-
-  return [
-    ...baseLines,
-    'Prefiere una receta lineal, compacta y directa.',
-    'Usa entre 3 y 6 pasos y entre 1 y 3 subpasos por paso.',
-    'No añadas timers si no cambian la ejecucion real de la receta.',
-  ].join('\n')
-}
-
 async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'Method not allowed' })
@@ -196,12 +76,21 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
   }
 
   let userPrompt = ''
-  let mode: 'generate' | 'clarify' = 'generate'
+  let mode: AIRecipeRequestMode = 'generate'
   try {
     const bodyText = await readRequestBody(req)
-    const body = bodyText ? (JSON.parse(bodyText) as { prompt?: string; mode?: string; context?: RecipeContextDraft | null }) : {}
+    const body = bodyText ? (JSON.parse(bodyText) as { prompt?: string; mode?: string; context?: Record<string, unknown> | null; messages?: unknown[]; preRecipe?: unknown }) : {}
     userPrompt = buildStructuredUserPrompt(body.prompt?.trim() ?? '', body.context ?? null)
-    mode = body.mode === 'clarify' ? 'clarify' : 'generate'
+    mode = body.mode === 'preview' ? 'preview' : body.mode === 'clarify' ? 'clarify' : 'generate'
+    if (mode === 'generate' && !body.preRecipe) {
+      sendJson(res, 400, { error: 'Debes confirmar una prereceta antes de generar la receta final.' })
+      return
+    }
+    const previewConversation = buildPreviewConversation(body.messages as never)
+    const approvedPreRecipe = serializeApprovedPreRecipe(body.preRecipe as never)
+    ;(req as IncomingMessage & {
+      _aiPromptExtras?: { previewConversation: string; approvedPreRecipe: string }
+    })._aiPromptExtras = { previewConversation, approvedPreRecipe }
   } catch {
     sendJson(res, 400, { error: 'Body JSON invalido.' })
     return
@@ -213,46 +102,10 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
   }
 
   const recipeComplexity = classifyRecipePromptComplexity(userPrompt)
-  const recipeSystemPrompt = buildRecipeSystemPrompt(recipeComplexity)
-  const clarifySystemPrompt = [
-    'Eres un asistente culinario. Responde SOLO JSON valido sin markdown.',
-    'Tu tarea NO es generar receta aun.',
-    'Debes devolver preguntas breves para aclarar datos faltantes antes de generar receta guiada.',
-    'Si el pedido ya es suficientemente claro, devuelve needsClarification=false y questions=[].',
-    'Si faltan datos criticos, devuelve needsClarification=true y entre 2 y 5 preguntas maximo.',
-    'Las preguntas deben depender del plato solicitado; no usar plantillas fijas.',
-    'Ejemplo: si piden pescado frito, pregunta tipo de pescado, tipo de corte (filete/trozos/entero), y base de cantidad (personas o lo que tiene en unidades/gramos).',
-    'Para recetas de proteina o fritura, intenta cubrir: tipo, corte/tamano, cantidad objetivo y nivel de coccion si aplica.',
-    'Incluye preguntas para "lo que tengo" cuando sea util (ej: 800 g, 4 filetes).',
-    'Formato exacto:',
-    '{',
-    '  "needsClarification": true,',
-    '  "questions": [',
-    '    {',
-    '      "id": "tipo_proteina",',
-    '      "question": "¿Qué tipo usarás?",',
-    '      "type": "single_choice",',
-    '      "required": true,',
-    '      "options": ["..."]',
-    '    },',
-    '    {',
-    '      "id": "cantidad",',
-    '      "question": "¿Cuántas unidades cocinarás?",',
-    '      "type": "number",',
-    '      "required": true,',
-    '      "min": 1,',
-    '      "max": 12,',
-    '      "step": 1,',
-    '      "unit": "und"',
-    '    }',
-    '  ]',
-    '}',
-    'Tipos permitidos: single_choice, number, text.',
-    'No inventes campos adicionales.',
-    'Usa español de Perú.',
-  ].join('\n')
-  const systemPrompt = mode === 'clarify' ? clarifySystemPrompt : recipeSystemPrompt
-  const userMessagePrefix = mode === 'clarify' ? 'Solicitud del usuario:' : 'Receta solicitada:'
+  const { systemPrompt, userPrefix: userMessagePrefix } = promptConfig(mode as AIRecipeRequestMode)
+  const promptExtras = (req as IncomingMessage & {
+    _aiPromptExtras?: { previewConversation: string; approvedPreRecipe: string }
+  })._aiPromptExtras
 
   if (googleApiKey) {
     const configuredGoogleModel = (process.env.GOOGLE_MODEL?.trim() || localGoogleModel || '').trim()
@@ -285,7 +138,12 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
                 role: 'user',
                 parts: [
                   {
-                    text: `${systemPrompt}\n\n${userMessagePrefix} ${userPrompt}`,
+                    text: [
+                      systemPrompt,
+                      `${userMessagePrefix} ${userPrompt}`,
+                      promptExtras?.previewConversation ?? '',
+                      promptExtras?.approvedPreRecipe ? `Prereceta aprobada:\n${promptExtras.approvedPreRecipe}` : '',
+                    ].filter(Boolean).join('\n\n'),
                   },
                 ],
               },
@@ -346,6 +204,11 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
                   : undefined,
                 usage,
               }
+            : mode === 'preview'
+              ? {
+                  preRecipe: parsed,
+                  usage,
+                }
             : {
                 recipe: {
                   ...(parsed as Record<string, unknown>),
@@ -415,20 +278,25 @@ async function handleAIRecipeRequest(req: IncomingMessage, res: ServerResponse):
     sendJson(
       res,
       200,
-      mode === 'clarify'
-        ? {
-            needsClarification: Boolean((parsed as { needsClarification?: unknown }).needsClarification),
-            questions: Array.isArray((parsed as { questions?: unknown }).questions)
+          mode === 'clarify'
+            ? {
+                needsClarification: Boolean((parsed as { needsClarification?: unknown }).needsClarification),
+                questions: Array.isArray((parsed as { questions?: unknown }).questions)
               ? (parsed as { questions: unknown[] }).questions
               : [],
             suggestedTitle: typeof (parsed as { suggestedTitle?: unknown }).suggestedTitle === 'string'
               ? (parsed as { suggestedTitle: string }).suggestedTitle
               : undefined,
-            tip: typeof (parsed as { tip?: unknown }).tip === 'string'
-              ? (parsed as { tip: string }).tip
-              : undefined,
-            usage,
-          }
+                tip: typeof (parsed as { tip?: unknown }).tip === 'string'
+                  ? (parsed as { tip: string }).tip
+                  : undefined,
+                usage,
+              }
+        : mode === 'preview'
+          ? {
+              preRecipe: parsed,
+              usage,
+            }
         : {
             recipe: {
               ...(parsed as Record<string, unknown>),

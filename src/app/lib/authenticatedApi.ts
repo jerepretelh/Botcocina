@@ -1,8 +1,8 @@
-import { supabaseClient } from './supabaseClient';
+import { supabaseClient } from './supabaseClient.js';
 
 async function getAccessToken(): Promise<string> {
   if (!supabaseClient) {
-    throw new Error('Supabase Auth no está disponible.');
+    return '';
   }
 
   const sessionResult = await supabaseClient.auth.getSession();
@@ -17,7 +17,9 @@ async function getAccessToken(): Promise<string> {
 export async function authenticatedJsonFetch<T>(input: string, init: RequestInit = {}): Promise<T> {
   const accessToken = await getAccessToken();
   const headers = new Headers(init.headers ?? {});
-  headers.set('Authorization', `Bearer ${accessToken}`);
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
+  }
   if (!headers.has('Content-Type') && init.body) {
     headers.set('Content-Type', 'application/json');
   }

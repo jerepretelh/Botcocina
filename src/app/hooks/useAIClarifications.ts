@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+    AIPreRecipe,
     AIClarificationQuestion,
+    AIPreviewMessage,
 } from '../lib/recipeAI';
 import {
     AIRequestSource,
@@ -25,6 +27,9 @@ export function useAIClarifications() {
     const [aiWizardStep, setAiWizardStep] = useState<AIWizardStep>('context');
     const [aiRequestSource, setAiRequestSource] = useState<AIRequestSource>('real');
     const [aiMockScenarioId, setAiMockScenarioId] = useState<string | null>(null);
+    const [aiPreRecipe, setAiPreRecipe] = useState<AIPreRecipe | null>(null);
+    const [aiPreviewMessages, setAiPreviewMessages] = useState<AIPreviewMessage[]>([]);
+    const [aiPreviewDraftMessage, setAiPreviewDraftMessage] = useState('');
     const [aiClarificationQuestions, setAiClarificationQuestions] = useState<AIClarificationQuestion[]>([]);
     const [aiClarificationAnswers, setAiClarificationAnswers] = useState<Record<string, string | number>>({});
     const [aiClarificationNumberModes, setAiClarificationNumberModes] = useState<Record<string, ClarificationNumberMode>>({});
@@ -32,6 +37,7 @@ export function useAIClarifications() {
     const [aiClarificationSuggestedTitle, setAiClarificationSuggestedTitle] = useState<string | null>(null);
     const [aiClarificationTip, setAiClarificationTip] = useState<string | null>(null);
     const [isCheckingClarifications, setIsCheckingClarifications] = useState(false);
+    const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
     const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
     const [aiSuccess, setAiSuccess] = useState<string | null>(null);
@@ -49,6 +55,12 @@ export function useAIClarifications() {
         setAiRequestSource,
         aiMockScenarioId,
         setAiMockScenarioId,
+        aiPreRecipe,
+        setAiPreRecipe,
+        aiPreviewMessages,
+        setAiPreviewMessages,
+        aiPreviewDraftMessage,
+        setAiPreviewDraftMessage,
         aiClarificationQuestions,
         setAiClarificationQuestions,
         aiClarificationAnswers,
@@ -63,6 +75,8 @@ export function useAIClarifications() {
         setAiClarificationTip,
         isCheckingClarifications,
         setIsCheckingClarifications,
+        isGeneratingPreview,
+        setIsGeneratingPreview,
         isGeneratingRecipe,
         setIsGeneratingRecipe,
         aiError,

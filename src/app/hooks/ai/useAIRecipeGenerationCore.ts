@@ -1,155 +1,52 @@
-/**
- * Hook que gestiona la generación de recetas con IA.
- * Mantiene la API pública estable, pero reparte wizard, clarificaciones
- * y handoff de runtime en módulos más pequeños.
- */
 import { useCallback } from 'react';
-import {
-  requestRecipeClarificationWithAI,
-  type AIClarificationQuestion,
-  type AIClarificationResult,
-} from '../../lib/recipeAI';
-import {
-  ClarificationNumberMode,
-  ClarificationQuantityUnit,
-} from '../../types';
-import {
-  inferPeopleCountFromClarifications,
-  inferSizingFromClarifications,
-  inferClarificationNumberIntent,
-  normalizeText,
-} from '../../utils/recipeHelpers';
+import { generatePreRecipeWithAI } from '../../lib/recipeAI';
 import { useAIClarifications } from '../useAIClarifications';
 import {
   findAIMockScenarioForPrompt,
   isAIMockModeEnabled,
 } from '../../lib/aiMockScenarios';
 import {
-  enrichClarificationQuestions,
-  resolveClarificationUnit,
-} from '../../lib/ai-recipe-generation/clarification';
-import {
   buildPromptWithContext,
-  isQuestionSatisfiedByContext,
   type UseAIRecipeGenerationDeps,
 } from './useAIRecipeGeneration.shared';
 import { useAIRecipeGenerationWizardState } from './useAIRecipeGenerationWizardState';
 import { useAIRecipeGenerationRuntimeHandoff } from './useAIRecipeGenerationRuntimeHandoff';
 
+function buildPreviewMessageId(prefix: 'user' | 'assistant') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
   const ai = useAIClarifications();
 
-  const buildPromptWithClarifications = useCallback((basePrompt: string): string => {
-    if (ai.aiClarificationQuestions.length === 0) return basePrompt;
-    const answeredLines = ai.aiClarificationQuestions
-      .map((question) => {
-        const value = ai.aiClarificationAnswers[question.id];
-        if (value === undefined || value === null || value === '') return '';
-        const unit = resolveClarificationUnit(question, ai.aiClarificationNumberModes, ai.aiClarificationQuantityUnits);
-        const numberMode = ai.aiClarificationNumberModes[question.id];
-        const label =
-          question.type === 'number' &&
-            inferClarificationNumberIntent(question) === 'ingredient_base' &&
-            numberMode === 'quantity' &&
-            normalizeText(question.question).includes('persona')
-            ? 'Cantidad disponible'
-            : question.question;
-        return `- ${label}: ${value}${unit ? ` ${unit}` : ''}`;
-      })
-      .filter(Boolean);
-    if (answeredLines.length === 0) return basePrompt;
-    return [basePrompt, '', 'Datos adicionales confirmados por el usuario:', ...answeredLines, '- Genera la receta alineada a estos datos.'].join('\n');
-  }, [ai.aiClarificationAnswers, ai.aiClarificationNumberModes, ai.aiClarificationQuantityUnits, ai.aiClarificationQuestions]);
-
   const buildFinalPrompt = useCallback(() => {
     const promptWithContext = buildPromptWithContext(ai.aiContextDraft);
-    const promptBase = promptWithContext || ai.aiPrompt.trim();
-    return buildPromptWithClarifications(promptBase);
-  }, [ai.aiContextDraft, ai.aiPrompt, buildPromptWithClarifications]);
-
-  const applyClarificationResult = useCallback((prompt: string, clarification: AIClarificationResult) => {
-    const normalizedQuestions = Array.isArray(clarification.questions)
-      ? clarification.questions
-        .filter((question) => question && question.id && question.question && question.type)
-        .slice(0, 5)
-      : [];
-    const enrichedQuestions = enrichClarificationQuestions(prompt, normalizedQuestions, ai.aiContextDraft)
-      .filter((question) => !isQuestionSatisfiedByContext(question, ai.aiContextDraft));
-    ai.setAiClarificationSuggestedTitle(clarification.suggestedTitle ?? null);
-    ai.setAiClarificationTip(clarification.tip ?? null);
-
-    if (clarification.needsClarification && enrichedQuestions.length > 0) {
-      const initialAnswers: Record<string, string | number> = {};
-      const initialNumberModes: Record<string, ClarificationNumberMode> = {};
-      const initialQuantityUnits: Record<string, ClarificationQuantityUnit> = {};
-      enrichedQuestions.forEach((question) => {
-        if (question.type === 'single_choice' && Array.isArray(question.options) && question.options.length > 0) {
-          initialAnswers[question.id] = '';
-          return;
-        }
-        if (question.type === 'number') {
-          initialAnswers[question.id] = typeof question.min === 'number' ? question.min : 1;
-          const questionIntent = inferClarificationNumberIntent(question);
-          initialNumberModes[question.id] = questionIntent === 'ingredient_base' ? 'quantity' : 'people';
-          initialQuantityUnits[question.id] =
-            normalizeText(question.unit ?? '').includes('g') || normalizeText(question.unit ?? '').includes('gram')
-              ? 'grams'
-              : 'units';
-          return;
-        }
-        initialAnswers[question.id] = '';
-      });
-      ai.setAiClarificationQuestions(enrichedQuestions);
-      ai.setAiClarificationAnswers(initialAnswers);
-      ai.setAiClarificationNumberModes(initialNumberModes);
-      ai.setAiClarificationQuantityUnits(initialQuantityUnits);
-      ai.setAiWizardStep('refinement');
-      deps.setScreen('ai-clarify');
-      return true;
-    }
-
-    ai.setAiClarificationQuestions([]);
-    ai.setAiClarificationAnswers({});
-    ai.setAiClarificationNumberModes({});
-    ai.setAiClarificationQuantityUnits({});
-    return false;
-  }, [ai, deps]);
+    return promptWithContext || ai.aiPrompt.trim();
+  }, [ai.aiContextDraft, ai.aiPrompt]);
 
   const wizard = useAIRecipeGenerationWizardState({
     ai,
     setScreen: deps.setScreen,
-    applyClarificationResult,
   });
-
-  const getMissingClarificationQuestion = useCallback(
-    () =>
-      ai.aiClarificationQuestions.find((question) => {
-        if (!question.required) return false;
-        const value = ai.aiClarificationAnswers[question.id];
-        return value === undefined || value === null || value === '';
-      }),
-    [ai.aiClarificationAnswers, ai.aiClarificationQuestions],
-  );
 
   const runtimeHandoff = useAIRecipeGenerationRuntimeHandoff({
     ai,
     deps,
     buildFinalPrompt,
-    inferSizing: () => inferSizingFromClarifications(
-      ai.aiClarificationQuestions,
-      ai.aiClarificationAnswers,
-      ai.aiClarificationNumberModes,
-      ai.aiClarificationQuantityUnits,
-    ),
-    inferPeopleCount: () => inferPeopleCountFromClarifications(
-      ai.aiClarificationQuestions,
-      ai.aiClarificationAnswers,
-      ai.aiClarificationNumberModes,
-    ),
+    inferSizing: () => null,
+    inferPeopleCount: () => {
+      if (typeof ai.aiContextDraft.servings === 'number' && ai.aiContextDraft.servings > 0) {
+        return ai.aiContextDraft.servings;
+      }
+      if (ai.aiPreRecipe?.baseYield?.type === 'servings' && typeof ai.aiPreRecipe.baseYield.value === 'number') {
+        return ai.aiPreRecipe.baseYield.value;
+      }
+      return 2;
+    },
     resetAiWizardState: wizard.resetAiWizardState,
   });
 
-  const handleAiContextContinue = useCallback(async () => {
+  const requestPreview = useCallback(async (userMessageText?: string) => {
     const prompt = ai.aiContextDraft.prompt.trim();
     if (!prompt) {
       ai.setAiError('Escribe una idea de receta antes de continuar.');
@@ -160,50 +57,92 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
     ai.setAiError(null);
     ai.setAiSuccess(null);
     ai.setIsCheckingClarifications(true);
+    ai.setIsGeneratingPreview(true);
+
+    const nextMessages = userMessageText?.trim()
+      ? [
+        ...ai.aiPreviewMessages,
+        {
+          id: buildPreviewMessageId('user'),
+          role: 'user' as const,
+          text: userMessageText.trim(),
+        },
+      ]
+      : ai.aiPreviewMessages;
+
+    if (userMessageText?.trim()) {
+      ai.setAiPreviewMessages(nextMessages);
+      ai.setAiPreviewDraftMessage('');
+    }
 
     try {
       const activeMockScenario = isAIMockModeEnabled() ? findAIMockScenarioForPrompt(prompt) : null;
-      if (activeMockScenario) {
+      if (activeMockScenario && nextMessages.length === 0) {
         ai.setAiRequestSource('mock');
         ai.setAiMockScenarioId(activeMockScenario.id);
-        const movedToRefinement = applyClarificationResult(prompt, activeMockScenario.clarification);
+        ai.setAiPreRecipe(activeMockScenario.preRecipe);
+        ai.setAiPreviewMessages([
+          {
+            id: buildPreviewMessageId('assistant'),
+            role: 'assistant',
+            text: `Prereceta base lista para ${activeMockScenario.preRecipe.name}.`,
+          },
+        ]);
+        ai.setAiWizardStep('preview');
+        deps.setScreen('ai-clarify');
         ai.setAiSuccess('Usando escenario de prueba. No se consumirán créditos de IA.');
-        if (movedToRefinement) return;
-        await runtimeHandoff.finalizeRecipeGeneration({
-          overrideMockScenario: activeMockScenario,
-          overrideRequestSource: 'mock',
-        });
         return;
       }
 
       ai.setAiRequestSource('real');
       ai.setAiMockScenarioId(null);
-      const clarification = await requestRecipeClarificationWithAI(prompt, ai.aiContextDraft);
-      const movedToRefinement = applyClarificationResult(prompt, clarification);
-      if (movedToRefinement) return;
-      await runtimeHandoff.finalizeRecipeGeneration();
+      const previewResult = await generatePreRecipeWithAI({
+        prompt,
+        context: ai.aiContextDraft,
+        messages: nextMessages,
+      });
+      ai.setAiPreRecipe(previewResult.preRecipe);
+      ai.setAiPreviewMessages([
+        ...nextMessages,
+        {
+          id: buildPreviewMessageId('assistant'),
+          role: 'assistant',
+          text: `Prereceta actualizada: ${previewResult.preRecipe.name}.`,
+        },
+      ]);
+      ai.setAiClarificationSuggestedTitle(previewResult.preRecipe.name);
+      ai.setAiClarificationTip(previewResult.preRecipe.tips?.[0] ?? null);
+      ai.setAiWizardStep('preview');
+      deps.setScreen('ai-clarify');
     } catch (error) {
-      ai.setAiWizardStep('context');
+      ai.setAiWizardStep(ai.aiPreRecipe ? 'preview' : 'context');
       ai.setAiError(error instanceof Error ? error.message : 'No se pudo consultar a la IA.');
     } finally {
       ai.setIsCheckingClarifications(false);
+      ai.setIsGeneratingPreview(false);
     }
-  }, [ai, applyClarificationResult, runtimeHandoff]);
+  }, [ai, deps]);
+
+  const handleAiContextContinue = useCallback(async () => {
+    await requestPreview();
+  }, [requestPreview]);
+
+  const handleUpdatePreRecipe = useCallback(async () => {
+    const draft = ai.aiPreviewDraftMessage.trim();
+    if (!draft) {
+      ai.setAiError('Escribe un ajuste antes de actualizar la prereceta.');
+      return;
+    }
+    await requestPreview(draft);
+  }, [ai, requestPreview]);
 
   const handleGenerateRecipe = useCallback(async () => {
-    if (ai.aiClarificationQuestions.length === 0) {
+    if (!ai.aiPreRecipe) {
       await handleAiContextContinue();
       return;
     }
-
-    const missingQuestion = getMissingClarificationQuestion();
-    if (missingQuestion) {
-      ai.setAiError(`Falta responder: ${missingQuestion.question}`);
-      return;
-    }
-
     await runtimeHandoff.finalizeRecipeGeneration();
-  }, [ai.aiClarificationQuestions.length, ai, getMissingClarificationQuestion, handleAiContextContinue, runtimeHandoff]);
+  }, [ai.aiPreRecipe, handleAiContextContinue, runtimeHandoff]);
 
   return {
     aiPrompt: ai.aiPrompt,
@@ -214,6 +153,12 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
     setSelectedRecipeSeed: ai.setSelectedRecipeSeed,
     aiWizardStep: ai.aiWizardStep,
     setAiWizardStep: ai.setAiWizardStep,
+    aiPreRecipe: ai.aiPreRecipe,
+    setAiPreRecipe: ai.setAiPreRecipe,
+    aiPreviewMessages: ai.aiPreviewMessages,
+    setAiPreviewMessages: ai.setAiPreviewMessages,
+    aiPreviewDraftMessage: ai.aiPreviewDraftMessage,
+    setAiPreviewDraftMessage: ai.setAiPreviewDraftMessage,
     aiClarificationQuestions: ai.aiClarificationQuestions,
     setAiClarificationQuestions: ai.setAiClarificationQuestions,
     aiClarificationAnswers: ai.aiClarificationAnswers,
@@ -232,24 +177,26 @@ export function useAIRecipeGeneration(deps: UseAIRecipeGenerationDeps) {
     setAiSuccess: ai.setAiSuccess,
     isCheckingClarifications: ai.isCheckingClarifications,
     setIsCheckingClarifications: ai.setIsCheckingClarifications,
+    isGeneratingPreview: ai.isGeneratingPreview,
+    setIsGeneratingPreview: ai.setIsGeneratingPreview,
     isGeneratingRecipe: ai.isGeneratingRecipe,
     setIsGeneratingRecipe: ai.setIsGeneratingRecipe,
     handleGenerateRecipe,
     handleAiContextContinue,
+    handleUpdatePreRecipe,
     handleAiWizardBack: wizard.handleAiWizardBack,
     handleAiPromptChange: wizard.handleAiPromptChange,
     startWizardFromSeed: wizard.startWizardFromSeed,
     isAiMockModeEnabled: isAIMockModeEnabled(),
     aiRequestSource: ai.aiRequestSource,
     applyMockScenarioToContext: wizard.applyMockScenarioToContext,
-    jumpToMockRefinement: wizard.jumpToMockRefinement,
+    jumpToMockPreview: wizard.jumpToMockPreview,
     generateMockRecipeDirect: runtimeHandoff.generateMockRecipeDirect,
     addAvailableIngredient: wizard.addAvailableIngredient,
     addAvoidIngredient: wizard.addAvoidIngredient,
     removeAvailableIngredient: wizard.removeAvailableIngredient,
     removeAvoidIngredient: wizard.removeAvoidIngredient,
-    resolveClarificationUnit: (question: AIClarificationQuestion) =>
-      resolveClarificationUnit(question, ai.aiClarificationNumberModes, ai.aiClarificationQuantityUnits),
-    getMissingClarificationQuestion,
+    resolveClarificationUnit: () => '',
+    getMissingClarificationQuestion: () => null,
   };
 }

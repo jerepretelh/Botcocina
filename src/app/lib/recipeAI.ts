@@ -1,6 +1,6 @@
-import type { AIRecipeContextDraft, AIUsageMetadata, ClarificationNumberIntent, CookingEquipment } from '../../types';
-import type { IngredientAmountV2, RecipeTimeSummaryV2, RecipeYieldV2, ScalingPolicy } from '../types/recipe-v2';
-import { authenticatedJsonFetch } from './authenticatedApi';
+import type { AIRecipeContextDraft, AIUsageMetadata, ClarificationNumberIntent, CookingEquipment } from '../../types/index.js';
+import type { IngredientAmountV2, RecipeTimeSummaryV2, RecipeYieldV2, ScalingPolicy } from '../types/recipe-v2.js';
+import { authenticatedJsonFetch } from './authenticatedApi.js';
 
 export type FireLevel = 'low' | 'medium' | 'high';
 
@@ -70,6 +70,37 @@ export interface GeneratedRecipe {
   equipment?: CookingEquipment;
 }
 
+export interface AIPreRecipeIngredient {
+  name: string;
+  emoji?: string;
+  amountText: string;
+  notes?: string | null;
+}
+
+export interface AIPreRecipePhase {
+  title: string;
+  summary?: string | null;
+  actions: string[];
+}
+
+export interface AIPreviewMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface AIPreRecipe {
+  name: string;
+  icon: string;
+  description: string;
+  chatResponse: string;
+  baseYield: RecipeYieldV2;
+  ingredients: AIPreRecipeIngredient[];
+  phases: AIPreRecipePhase[];
+  tips?: string[];
+  importantNotes?: string[];
+}
+
 export interface AIClarificationQuestion {
   id: string;
   question: string;
@@ -94,9 +125,14 @@ export interface AIClarificationResult {
   usage?: AIUsageMetadata;
 }
 
+export interface AIPreRecipeResult {
+  preRecipe: AIPreRecipe;
+  usage?: AIUsageMetadata;
+}
+
 async function fetchRecipeAI<T>(payload: Record<string, unknown>): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  const timeout = window.setTimeout(() => controller.abort(), 120_000);
 
   try {
     return await authenticatedJsonFetch<T>('/api/ai/recipe', {
@@ -106,7 +142,7 @@ async function fetchRecipeAI<T>(payload: Record<string, unknown>): Promise<T> {
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('La generación tardó demasiado. Revisa tu conexión e inténtalo nuevamente.');
+      throw new Error('La IA tardó demasiado en responder. Estoy pidiendo una prereceta bastante detallada, así que vuelve a intentarlo en unos segundos.');
     }
     throw error;
   } finally {
@@ -114,11 +150,35 @@ async function fetchRecipeAI<T>(payload: Record<string, unknown>): Promise<T> {
   }
 }
 
-export async function generateRecipeWithAI(prompt: string, context?: AIRecipeContextDraft): Promise<{
+export async function generatePreRecipeWithAI(args: {
+  prompt: string;
+  context?: AIRecipeContextDraft;
+  messages?: AIPreviewMessage[];
+}): Promise<AIPreRecipeResult> {
+  return fetchRecipeAI<AIPreRecipeResult>({
+    prompt: args.prompt,
+    context: args.context,
+    messages: args.messages,
+    mode: 'preview',
+  });
+}
+
+export async function generateRecipeWithAI(args: {
+  prompt: string;
+  preRecipe: AIPreRecipe;
+  context?: AIRecipeContextDraft;
+  messages?: AIPreviewMessage[];
+}): Promise<{
   recipe: GeneratedRecipe;
   usage?: AIUsageMetadata;
 }> {
-  const payload = await fetchRecipeAI<{ recipe: GeneratedRecipe; usage?: AIUsageMetadata }>({ prompt, context });
+  const payload = await fetchRecipeAI<{ recipe: GeneratedRecipe; usage?: AIUsageMetadata }>({
+    prompt: args.prompt,
+    context: args.context,
+    preRecipe: args.preRecipe,
+    messages: args.messages,
+    mode: 'generate',
+  });
 
   return payload;
 }

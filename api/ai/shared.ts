@@ -22,7 +22,7 @@ export type AIAuthMode = 'platform_key' | 'user_key'
 export type AIBudgetMode = 'none' | 'app_limit' | 'cloud_budget'
 export type AIKeyCheckStatus = 'unknown' | 'valid' | 'invalid'
 export type AIProvider = 'google_gemini' | 'openai'
-export type AIRequestKind = 'generate' | 'clarify' | 'validate'
+export type AIRequestKind = 'preview' | 'generate' | 'clarify' | 'validate'
 export type AIRequestStatus = 'success' | 'failed' | 'blocked'
 
 type ServiceClient = SupabaseClient<Database>
@@ -140,6 +140,10 @@ function supabaseServerConfig(): { url: string; key: string } | null {
     ''
   if (!url || !key) return null
   return { url, key }
+}
+
+export function hasSupabaseServerConfig(): boolean {
+  return Boolean(supabaseServerConfig())
 }
 
 export function createServiceClient(): ServiceClient {

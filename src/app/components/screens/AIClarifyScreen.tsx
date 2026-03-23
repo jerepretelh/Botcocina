@@ -1,21 +1,20 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowLeft, LoaderCircle, Minus, Plus, Sparkles, WandSparkles, X } from 'lucide-react';
-import { AIRecipeContextDraft, AIWizardStep, ClarificationNumberMode, ClarificationQuantityUnit, RecipeSeed } from '../../../types';
-import { AIClarificationQuestion } from '../../lib/recipeAI';
-import { inferClarificationNumberIntent } from '../../utils/recipeHelpers';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Bot, ImagePlus, LoaderCircle, MessageSquarePlus, Plus, SendHorizontal, Sparkles, WandSparkles, X, Sparkle } from 'lucide-react';
+import type { AIRecipeContextDraft, AIWizardStep, RecipeSeed } from '../../../types';
+import type { AIPreRecipe, AIPreviewMessage } from '../../lib/recipeAI';
 
 interface AIClarifyScreenProps {
     contextDraft: AIRecipeContextDraft;
     wizardStep: AIWizardStep;
-    questions: AIClarificationQuestion[];
-    answers: Record<string, string | number>;
-    numberModes: Record<string, ClarificationNumberMode>;
-    quantityUnits: Record<string, ClarificationQuantityUnit>;
+    preRecipe: AIPreRecipe | null;
+    previewMessages: AIPreviewMessage[];
+    previewDraftMessage: string;
     selectedSeed: RecipeSeed | null;
     suggestedTitle: string | null;
     tip: string | null;
     aiError: string | null;
-    isCheckingClarifications: boolean;
+    isGeneratingPreview: boolean;
     isGenerating: boolean;
     isMockModeEnabled: boolean;
     onContextPromptChange: (value: string) => void;
@@ -24,27 +23,234 @@ interface AIClarifyScreenProps {
     onRemoveAvailableIngredient: (id: string) => void;
     onAddAvoidIngredient: (value: string) => void;
     onRemoveAvoidIngredient: (id: string) => void;
-    onAnswerChange: (id: string, value: string | number) => void;
-    onNumberModeChange: (id: string, mode: ClarificationNumberMode) => void;
-    onQuantityUnitChange: (id: string, unit: ClarificationQuantityUnit) => void;
+    onPreviewDraftMessageChange: (value: string) => void;
     onBack: () => void;
     onContinue: () => void;
+    onUpdatePreRecipe: () => void;
     onGenerate: () => void;
     onLoadMockExample: () => void;
-    onSkipToMockRefinement: () => void;
+    onSkipToMockPreview: () => void;
     onGenerateMockRecipe: () => void;
-    resolveUnit: (question: AIClarificationQuestion) => string;
 }
 
-function StepDots({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+function ChatBubble({
+    role,
+    children,
+}: {
+    role: 'user' | 'assistant';
+    children: React.ReactNode;
+}) {
+    const isAssistant = role === 'assistant';
+
     return (
-        <div className="flex w-full flex-row items-center justify-center gap-3 py-3">
-            {[1, 2, 3].map((step) => (
-                <div
-                    key={step}
-                    className={`rounded-full transition-all ${step === currentStep ? 'h-2.5 w-10 bg-primary' : step < currentStep ? 'h-2.5 w-6 bg-primary/35' : 'h-2.5 w-2.5 bg-primary/20'}`}
-                />
-            ))}
+        <div className={`flex ${isAssistant ? 'justify-start' : 'justify-end'}`}>
+            <div
+                className={`max-w-[88%] rounded-[1.6rem] px-4 py-3 shadow-sm ${
+                    isAssistant
+                        ? 'rounded-tl-[0.4rem] border border-primary/10 bg-white text-slate-800 dark:bg-primary/5 dark:text-slate-100'
+                        : 'rounded-tr-[0.4rem] bg-primary text-primary-foreground'
+                }`}
+            >
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function ChatShell({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    return (
+        <motion.section 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-[2rem] border border-white/20 bg-white/60 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl dark:border-white/5 dark:bg-black/40 md:p-6"
+        >
+            {children}
+        </motion.section>
+    );
+}
+
+function isSectionHeading(line: string): boolean {
+    return /ingredientes|claves importantes|nota del chef|tips/i.test(line);
+}
+
+function isPhaseHeading(line: string): boolean {
+    return /fase\s+\d+/i.test(line);
+}
+
+function isLikelySubheading(line: string): boolean {
+    if (isSectionHeading(line) || isPhaseHeading(line)) return false;
+    if (line.length > 42) return false;
+    if (/[.!?]/.test(line)) return false;
+    return /^[\p{L}\p{N}🍚🥣🥩🍌🍹🍛🧁🌿⚡🔥🔄🛒]+/u.test(line);
+}
+
+function isBulletLike(line: string): boolean {
+    return /^(\d+\.\s|[-*•]\s|👉\s|❌\s|🔥\s|🔄\s|⚡\s|🍽️\s|⏱️\s)/u.test(line);
+}
+
+function renderLooseLines(lines: string[], keyPrefix: string) {
+    const items: React.ReactNode[] = [];
+    let index = 0;
+
+    while (index < lines.length) {
+        const line = lines[index];
+
+        if (isLikelySubheading(line)) {
+            const nested: string[] = [];
+            let nestedIndex = index + 1;
+            while (
+                nestedIndex < lines.length &&
+                !isLikelySubheading(lines[nestedIndex]) &&
+                !isBulletLike(lines[nestedIndex]) &&
+                !isPhaseHeading(lines[nestedIndex]) &&
+                !isSectionHeading(lines[nestedIndex])
+            ) {
+                nested.push(lines[nestedIndex]);
+                nestedIndex += 1;
+            }
+
+            items.push(
+                <div key={`${keyPrefix}-sub-${index}`} className="pt-3 first:pt-0">
+                    <h3 className="text-[1.35rem] font-semibold leading-tight text-[#171717] md:text-[1.5rem]">
+                        {line}
+                    </h3>
+                    {nested.length > 0 ? (
+                        <ul className="mt-3 space-y-2 pl-6 text-[1.16rem] leading-[1.8] text-[#2d2d2d] marker:text-[#8c8c8c] md:text-[1.24rem]">
+                            {nested.map((nestedLine, nestedLineIndex) => (
+                                <li key={`${keyPrefix}-sub-${index}-${nestedLineIndex}`}>{nestedLine}</li>
+                            ))}
+                        </ul>
+                    ) : null}
+                </div>,
+            );
+            index = nestedIndex;
+            continue;
+        }
+
+        if (isBulletLike(line)) {
+            const bulletLines: string[] = [];
+            let nestedIndex = index;
+            while (nestedIndex < lines.length && isBulletLike(lines[nestedIndex])) {
+                bulletLines.push(lines[nestedIndex]);
+                nestedIndex += 1;
+            }
+
+            const isOrdered = /^\d+\.\s/.test(bulletLines[0] ?? '');
+            if (isOrdered) {
+                items.push(
+                    <ol
+                        key={`${keyPrefix}-ol-${index}`}
+                        className="space-y-2.5 pl-8 text-[1.16rem] font-medium leading-[1.8] text-[#202020] marker:font-semibold md:text-[1.24rem]"
+                    >
+                        {bulletLines.map((bulletLine, bulletIndex) => (
+                            <li key={`${keyPrefix}-ol-${index}-${bulletIndex}`}>
+                                {bulletLine.replace(/^\d+\.\s/, '')}
+                            </li>
+                        ))}
+                    </ol>,
+                );
+            } else {
+                items.push(
+                    <ul
+                        key={`${keyPrefix}-ul-${index}`}
+                        className="space-y-2.5 text-[1.16rem] leading-[1.8] text-[#202020] md:text-[1.24rem]"
+                    >
+                        {bulletLines.map((bulletLine, bulletIndex) => (
+                            <li key={`${keyPrefix}-ul-${index}-${bulletIndex}`} className="flex gap-3">
+                                <span className="mt-[0.15rem] shrink-0 text-[1.05rem] text-[#7a7a7a]">
+                                    {bulletLine.match(/^(\d+\.\s|[-*•]\s|👉\s|❌\s|🔥\s|🔄\s|⚡\s|🍽️\s|⏱️\s)/u)?.[0].trim()}
+                                </span>
+                                <span>{bulletLine.replace(/^(\d+\.\s|[-*•]\s|👉\s|❌\s|🔥\s|🔄\s|⚡\s|🍽️\s|⏱️\s)/u, '')}</span>
+                            </li>
+                        ))}
+                    </ul>,
+                );
+            }
+            index = nestedIndex;
+            continue;
+        }
+
+        items.push(
+            <p
+                key={`${keyPrefix}-p-${index}`}
+                className="text-[1.16rem] leading-[1.85] text-[#262626] md:text-[1.24rem]"
+            >
+                {line}
+            </p>,
+        );
+        index += 1;
+    }
+
+    return items;
+}
+
+function RecipeMessageContent({ text }: { text: string }) {
+    const sections = text
+        .split(/\n{2,}/)
+        .map((section) => section.trim())
+        .filter(Boolean);
+
+    return (
+        <div className="space-y-8 text-[#1b1b1b]">
+            {sections.map((section, sectionIndex) => {
+                const lines = section
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+                const firstLine = lines[0] ?? '';
+                const remainingLines = lines.slice(1);
+
+                if (sectionIndex === 0) {
+                    return (
+                        <section key={`section-${sectionIndex}`} className="space-y-4">
+                            <h1 className="font-serif text-[2.2rem] leading-[1.08] tracking-[-0.02em] text-[#171717] md:text-[3rem]">
+                                {firstLine}
+                            </h1>
+                            {remainingLines.length > 0 ? (
+                                <div className="space-y-3">
+                                    {renderLooseLines(remainingLines, `intro-${sectionIndex}`)}
+                                </div>
+                            ) : null}
+                        </section>
+                    );
+                }
+
+                if (isPhaseHeading(firstLine)) {
+                    return (
+                        <section key={`section-${sectionIndex}`} className="border-t border-black/10 pt-7">
+                            <h2 className="text-[1.9rem] font-semibold leading-[1.15] tracking-[-0.02em] text-[#121212] md:text-[2.35rem]">
+                                {firstLine}
+                            </h2>
+                            <div className="mt-4 space-y-3">
+                                {renderLooseLines(remainingLines, `phase-${sectionIndex}`)}
+                            </div>
+                        </section>
+                    );
+                }
+
+                if (isSectionHeading(firstLine)) {
+                    return (
+                        <section key={`section-${sectionIndex}`} className="space-y-4">
+                            <h2 className="text-[1.7rem] font-semibold leading-tight tracking-[-0.02em] text-[#111111] md:text-[2.05rem]">
+                                {firstLine}
+                            </h2>
+                            <div className="space-y-3">
+                                {renderLooseLines(remainingLines, `section-${sectionIndex}`)}
+                            </div>
+                        </section>
+                    );
+                }
+
+                return (
+                    <section key={`section-${sectionIndex}`} className="space-y-3">
+                        {renderLooseLines(lines, `generic-${sectionIndex}`)}
+                    </section>
+                );
+            })}
         </div>
     );
 }
@@ -75,28 +281,34 @@ function IngredientSection({
     };
 
     return (
-        <section className="rounded-3xl border-2 border-primary/10 bg-white/85 p-5 shadow-sm dark:bg-primary/5">
+        <div className="rounded-3xl border border-primary/10 bg-white/60 p-5 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-black/20">
             <div className="flex items-center gap-2">
                 <span className="text-xl">{emoji}</span>
-                <h3 className="font-bold">{title}</h3>
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Opcional</span>
+                <h3 className="font-bold text-slate-800 dark:text-slate-200">{title}</h3>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60">Opcional</span>
             </div>
 
-            {tokens.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
+                <AnimatePresence mode="popLayout">
                     {tokens.map((token) => (
-                        <button
+                        <motion.button
+                            layout
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             key={token.id}
                             type="button"
                             onClick={() => onRemove(token.id)}
-                            className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/25"
+                            className="group inline-flex items-center gap-2 rounded-full border border-primary/20 bg-gradient-to-br from-primary/10 to-primary/5 px-3 py-1.5 text-sm font-semibold text-primary shadow-sm transition-all hover:border-primary/40 hover:from-primary/20 hover:to-primary/10 hover:shadow"
                         >
                             <span>{token.value}</span>
-                            <X className="size-3.5" />
-                        </button>
+                            <X className="size-3.5 opacity-50 transition-opacity group-hover:opacity-100" />
+                        </motion.button>
                     ))}
-                </div>
-            )}
+                </AnimatePresence>
+            </div>
 
             <div className="mt-4 flex gap-2">
                 <input
@@ -109,32 +321,33 @@ function IngredientSection({
                         }
                     }}
                     placeholder={placeholder}
-                    className="min-w-0 flex-1 rounded-2xl border border-primary/10 bg-background/90 px-4 py-3 text-sm outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    className="min-w-0 flex-1 rounded-2xl border border-primary/10 bg-white/50 px-4 py-3 text-sm shadow-inner outline-none transition-all placeholder:text-slate-400 focus:border-primary/50 focus:bg-white focus:ring-4 focus:ring-primary/10 dark:bg-black/40 dark:focus:bg-black"
                 />
-                <button
+                <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={submitDraft}
-                    className="shrink-0 rounded-2xl border-2 border-dashed border-primary/30 px-4 py-3 text-sm font-bold text-primary transition-colors hover:bg-primary/5"
+                    className="shrink-0 rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg"
                 >
                     {actionLabel}
-                </button>
+                </motion.button>
             </div>
-        </section>
+        </div>
     );
 }
 
 export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
     contextDraft,
     wizardStep,
-    questions,
-    answers,
-    numberModes,
-    quantityUnits,
+    preRecipe,
+    previewMessages,
+    previewDraftMessage,
     selectedSeed,
     suggestedTitle,
     tip,
     aiError,
-    isCheckingClarifications,
+    isGeneratingPreview,
     isGenerating,
     isMockModeEnabled,
     onContextPromptChange,
@@ -143,29 +356,29 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
     onRemoveAvailableIngredient,
     onAddAvoidIngredient,
     onRemoveAvoidIngredient,
-    onAnswerChange,
-    onNumberModeChange,
-    onQuantityUnitChange,
+    onPreviewDraftMessageChange,
     onBack,
     onContinue,
+    onUpdatePreRecipe,
     onGenerate,
     onLoadMockExample,
-    onSkipToMockRefinement,
+    onSkipToMockPreview,
     onGenerateMockRecipe,
-    resolveUnit,
 }) => {
-    const displayStep: 1 | 2 | 3 = useMemo(() => {
-        if (wizardStep === 'refinement') return 2;
-        if (wizardStep === 'generating') return 3;
-        return 1;
-    }, [wizardStep]);
     const [isServingsEnabled, setIsServingsEnabled] = useState(Boolean(contextDraft.servings));
     const servingsValue = contextDraft.servings ?? 2;
+    const handleComposerSubmit = () => {
+        if (wizardStep === 'context') {
+            onContinue();
+            return;
+        }
+        onUpdatePreRecipe();
+    };
 
     return (
-        <div className="min-h-screen bg-background text-foreground">
-            <header className="sticky top-0 z-20 border-b border-primary/10 bg-background/85 backdrop-blur-md">
-                <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 text-foreground dark:from-slate-950 dark:to-slate-900">
+            <header className="sticky top-0 z-20 border-b border-black/5 bg-white/60 backdrop-blur-xl dark:border-white/5 dark:bg-black/40">
+                <div className="flex items-center justify-between px-4 py-3 md:px-8 lg:px-12">
                     <button
                         onClick={onBack}
                         className="flex size-10 items-center justify-center rounded-full text-foreground transition-colors hover:bg-primary/10"
@@ -173,176 +386,171 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                         <ArrowLeft className="size-5" />
                     </button>
                     <div className="flex flex-col items-center">
-                        <span className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
-                            Paso {displayStep} de 3
-                        </span>
-                        <h2 className="text-xs font-bold sm:text-sm">
-                            {displayStep === 1 ? 'Contexto' : displayStep === 2 ? 'Refinamiento' : 'Generando'}
-                        </h2>
+                        <span className="font-serif text-xl italic tracking-tight text-[#526145]">Kitchen Assistant</span>
                     </div>
                     <div className="size-10" />
                 </div>
-                <div className="mx-auto max-w-md border-t border-primary/5 px-4">
-                    <StepDots currentStep={displayStep} />
-                </div>
             </header>
 
-            <main className="mx-auto max-w-md px-4 pb-32 pt-4">
+            <main className="w-full px-4 pb-40 pt-4 md:px-8 lg:px-12">
                 {wizardStep === 'context' && (
                     <div className="space-y-6">
-                        <section>
-                            <h1 className="text-[2rem] font-extrabold leading-tight sm:text-3xl">🥣 ¡Vamos a cocinar!</h1>
-                            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                Cuéntanos qué quieres resolver con la IA. Puedes añadir comensales o ingredientes si te ayuda a orientar mejor la receta.
-                            </p>
-                        </section>
+                        <ChatShell>
+                            <div className="mb-5 flex items-center justify-between gap-3 px-1">
+                                <div className="min-w-0">
+                                    <p className="font-serif text-xl italic tracking-tight text-[#526145]">Kitchen Assistant</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#526145]/70">Modern Gastronomer</p>
+                                </div>
+                                <div className="rounded-full bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#526145] shadow-sm">
+                                    Nuevo chat
+                                </div>
+                            </div>
 
-                        {selectedSeed && (
-                            <section className="rounded-[1.35rem] border border-primary/20 bg-primary/10 p-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-2xl">🍽️</span>
-                                    <div>
-                                        <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">Receta base seleccionada</p>
-                                        <h3 className="text-lg font-bold">{selectedSeed.name}</h3>
+                            <div className="mb-4 flex justify-center">
+                                <span className="rounded-full bg-[#e4e2dd] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">
+                                    Hoy • Inicio de conversación
+                                </span>
+                            </div>
+
+                            <div className="space-y-4">
+                                {aiError ? (
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 shadow-sm">
+                                            <Bot className="size-4" />
+                                        </div>
+                                        <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md border border-red-200 bg-red-50 p-4 shadow-sm">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-red-600">
+                                                Error
+                                            </div>
+                                            <p className="mt-2 text-sm leading-6 text-red-700">
+                                                {aiError}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                <div className="flex items-start gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                        <Bot className="size-4" />
+                                    </div>
+                                    <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                            IA editorial
+                                        </div>
+                                        <div className="mt-3 font-serif text-[28px] leading-[1.1] text-[#1b1c19] md:text-[40px]">
+                                            Armemos la prereceta
+                                        </div>
+                                        <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600 md:text-lg">
+                                            La IA primero te mostrará ingredientes y fases. Cuando estés conforme, recién pasaremos al paso a paso final.
+                                        </p>
                                     </div>
                                 </div>
-                                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                    La búsqueda ya dejó precargada esta idea. Ajusta el contexto si quieres y continúa con la generación guiada.
-                                </p>
-                            </section>
-                        )}
 
-                        <section>
-                                <div className="mb-3 flex items-center gap-2">
-                                    <span className="text-xl">💡</span>
-                                <label className="text-base font-bold sm:text-lg">¿Qué vamos a cocinar hoy?</label>
-                                </div>
-                            <textarea
-                                value={contextDraft.prompt}
-                                onChange={(event) => onContextPromptChange(event.target.value)}
-                                placeholder="Describe tu idea... Ej: una cena rápida con pollo, pasta cremosa para 3 personas o un almuerzo con lo que tengo en la refri."
-                                className="min-h-[150px] w-full rounded-[1.35rem] border-2 border-primary/20 bg-white p-4 text-base text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-primary/5 dark:text-slate-100 dark:placeholder:text-slate-500"
-                            />
-                        </section>
+                                {selectedSeed && (
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                            <Bot className="size-4" />
+                                        </div>
+                                        <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                                Idea base
+                                            </div>
+                                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                                                Tomaré como punto de partida <span className="font-bold">{selectedSeed.name}</span>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {isMockModeEnabled && (
-                            <section className="rounded-3xl border border-dashed border-primary/30 bg-primary/5 p-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">🧪</span>
-                                    <h3 className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Pruebas sin consumo</h3>
+                                <div className="flex items-start gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                        <Bot className="size-4" />
+                                    </div>
+                                    <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                            Base de la prereceta
+                                        </div>
+                                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                                            Si no defines cantidad, asumiré <span className="font-bold">2 personas</span>.
+                                        </p>
+                                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (isServingsEnabled) {
+                                                        setIsServingsEnabled(false);
+                                                        onContextServingsChange(null);
+                                                    } else {
+                                                        setIsServingsEnabled(true);
+                                                        onContextServingsChange(2);
+                                                    }
+                                                }}
+                                                className="rounded-full bg-[#e4e2dd] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#526145]"
+                                            >
+                                                {isServingsEnabled ? 'Base definida' : 'Usar base 2'}
+                                            </button>
+                                            {isServingsEnabled ? (
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={20}
+                                                    value={servingsValue}
+                                                    onChange={(event) => onContextServingsChange(Math.max(1, Number(event.target.value || 2)))}
+                                                    className="w-24 rounded-full border border-primary/15 bg-[#f5f3ee] px-3 py-2 text-sm font-bold outline-none"
+                                                />
+                                            ) : null}
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                    Puedes cargar un ejemplo local o saltar directamente al refinamiento mock. También funciona escribiendo palabras como “milanesa”.
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={onLoadMockExample}
-                                        className="rounded-full border border-primary/25 bg-white px-4 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 dark:bg-background"
-                                    >
-                                        Cargar ejemplo Milanesa
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={onSkipToMockRefinement}
-                                        className="rounded-full border border-primary/25 bg-white px-4 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 dark:bg-background"
-                                    >
-                                        Saltar a refinamiento
-                                    </button>
-                                </div>
-                            </section>
-                        )}
 
-                        <section className="rounded-[1.5rem] border border-primary/20 bg-primary/5 p-4">
-                            <div className="mb-4 flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xl">👥</span>
-                                    <h3 className="text-base font-bold sm:text-lg">¿Para cuántas personas?</h3>
+                                <div className="flex items-start gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                        <Bot className="size-4" />
+                                    </div>
+                                    <div className="min-w-0 max-w-[92%] flex-1 rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                            Ajustes del contexto
+                                        </div>
+                                        <p className="mt-2 text-sm leading-6 text-slate-700">
+                                            Puedes decir qué ingredientes tienes o qué ingredientes quieres evitar.
+                                        </p>
+                                        <div className="mt-4 space-y-3">
+                                            <IngredientSection
+                                                title="Ingredientes que tengo"
+                                                emoji="🛒"
+                                                placeholder="Añade un ingrediente que ya tienes"
+                                                actionLabel="Añadir"
+                                                tokens={contextDraft.availableIngredients}
+                                                onAdd={onAddAvailableIngredient}
+                                                onRemove={onRemoveAvailableIngredient}
+                                            />
+                                            <IngredientSection
+                                                title="Evitar ingredientes"
+                                                emoji="🚫"
+                                                placeholder="Alergias, disgustos o restricciones"
+                                                actionLabel="Evitar"
+                                                tokens={contextDraft.avoidIngredients}
+                                                onAdd={onAddAvoidIngredient}
+                                                onRemove={onRemoveAvoidIngredient}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (isServingsEnabled) {
-                                            setIsServingsEnabled(false);
-                                            onContextServingsChange(null);
-                                        } else {
-                                            setIsServingsEnabled(true);
-                                            onContextServingsChange(2);
-                                        }
-                                    }}
-                                    className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] transition-colors ${isServingsEnabled ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-500 dark:bg-background dark:text-slate-300'}`}
-                                >
-                                    {isServingsEnabled ? 'Omitir' : 'Usar'}
-                                </button>
                             </div>
-
-                            <div className={`flex items-center justify-between rounded-[1.35rem] border border-primary/20 bg-white px-3 py-4 shadow-sm transition-opacity dark:bg-background ${isServingsEnabled ? 'opacity-100' : 'opacity-55'}`}>
-                                <button
-                                    type="button"
-                                    disabled={!isServingsEnabled}
-                                    onClick={() => onContextServingsChange(Math.max(1, servingsValue - 1))}
-                                    className="flex size-12 items-center justify-center rounded-full border-2 border-primary/30 bg-white text-primary transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-background sm:size-14"
-                                >
-                                    <Minus className="size-6" />
-                                </button>
-                                <div className="flex flex-col items-center">
-                                    <span className="text-3xl font-black text-primary sm:text-4xl">{servingsValue}</span>
-                                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Comensales</span>
-                                </div>
-                                <button
-                                    type="button"
-                                    disabled={!isServingsEnabled}
-                                    onClick={() => onContextServingsChange(Math.min(20, servingsValue + 1))}
-                                    className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:size-14"
-                                >
-                                    <Plus className="size-6" />
-                                </button>
-                            </div>
-                        </section>
-
-                        <div className="grid gap-4">
-                            <IngredientSection
-                                title="Ingredientes que tengo"
-                                emoji="🛒"
-                                placeholder="Añade un ingrediente que ya tienes"
-                                actionLabel="Añadir"
-                                tokens={contextDraft.availableIngredients}
-                                onAdd={onAddAvailableIngredient}
-                                onRemove={onRemoveAvailableIngredient}
-                            />
-                            <IngredientSection
-                                title="Evitar ingredientes"
-                                emoji="🚫"
-                                placeholder="Alergias, disgustos o restricciones"
-                                actionLabel="Evitar"
-                                tokens={contextDraft.avoidIngredients}
-                                onAdd={onAddAvoidIngredient}
-                                onRemove={onRemoveAvoidIngredient}
-                            />
-                        </div>
+                        </ChatShell>
                     </div>
                 )}
 
                 {wizardStep !== 'context' && (
                     <div className="space-y-6">
-                        {suggestedTitle && (
-                            <div className="flex items-center gap-3 rounded-[1.5rem] border border-primary/20 bg-primary/10 p-4">
-                                <span className="text-2xl">🍽️</span>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-primary">Dirección sugerida</p>
-                                    <h3 className="text-lg font-bold">{suggestedTitle}</h3>
-                                </div>
-                            </div>
-                        )}
-
                         {wizardStep === 'generating' ? (
                             <div className="flex min-h-[55vh] flex-col items-center justify-center text-center">
                                 <div className="rounded-full bg-primary/15 p-5 text-primary">
                                     <LoaderCircle className="size-10 animate-spin" />
                                 </div>
-                                <h1 className="mt-6 text-3xl font-extrabold">Empezando tu receta</h1>
+                                <h1 className="mt-6 text-3xl font-extrabold">Generando receta final</h1>
                                 <p className="mt-3 max-w-sm text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                    La IA está terminando de combinar tu idea inicial, los ingredientes y las preferencias de refinamiento para abrir la cocción guiada.
+                                    La IA está transformando tu prereceta aprobada en pasos detallados, tiempos y cocción guiada.
                                 </p>
                             </div>
                         ) : (
@@ -354,210 +562,179 @@ export const AIClarifyScreen: React.FC<AIClarifyScreenProps> = ({
                                     </div>
                                 ) : null}
 
-                                <section>
-                                    <h1 className="text-[2rem] font-extrabold leading-tight sm:text-3xl">✨ Afinemos la receta</h1>
-                                    <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                                        La IA necesita confirmar algunos detalles para generar una receta más precisa y útil para tu cocina. Si algo falla, tus respuestas quedarán listas para reintentar.
-                                    </p>
-                                </section>
+                                <ChatShell>
+                                    <div className="mb-5 flex items-center justify-between gap-3 px-1">
+                                        <div className="min-w-0">
+                                            <p className="font-serif text-xl italic tracking-tight text-[#526145]">Kitchen Assistant</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#526145]/70">Modern Gastronomer</p>
+                                        </div>
+                                        <div className="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-[#526145] shadow-sm">
+                                            {preRecipe?.name ?? suggestedTitle ?? 'Chat'}
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-4">
-                                    {questions.map((question, index) => (
-                                        <section key={question.id} className="space-y-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="rounded-md bg-primary/20 px-2 py-1 text-sm font-bold text-primary">
-                                                    {String(index + 1).padStart(2, '0')}
-                                                </span>
-                                                <h4 className="text-base font-bold sm:text-lg">{question.question}</h4>
+                                    <div className="mb-4 flex justify-center">
+                                        <span className="rounded-full bg-[#e4e2dd] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">
+                                            Hoy • Prereceta activa
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="flex justify-end">
+                                            <div className="max-w-[82%] rounded-[1.4rem] rounded-br-md bg-[#96472f] px-4 py-3 text-white shadow-sm">
+                                                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">Tú</div>
+                                                <div className="mt-2 whitespace-pre-wrap text-[15px] leading-6">
+                                                    {contextDraft.prompt}
+                                                </div>
                                             </div>
+                                        </div>
 
-                                            {question.type === 'single_choice' && (
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    {question.options?.map((option) => {
-                                                        const selected = answers[question.id] === option;
-                                                        return (
-                                                            <button
-                                                                key={option}
-                                                                type="button"
-                                                                onClick={() => onAnswerChange(question.id, option)}
-                                                                className={`flex items-center gap-3 rounded-[1.15rem] border-2 p-3.5 text-left transition-all ${selected ? 'border-primary bg-primary/8' : 'border-primary/10 bg-white/70 hover:border-primary/35 dark:bg-white/5'}`}
-                                                            >
-                                                                <div className={`flex size-6 items-center justify-center rounded-full border-2 ${selected ? 'border-primary bg-primary' : 'border-primary/30'}`}>
-                                                                    <div className="size-2 rounded-full bg-white" />
-                                                                </div>
-                                                                <div className="min-w-0">
-                                                                    <p className="font-bold">{option}</p>
-                                                                </div>
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-
-                                            {question.type === 'number' && (
-                                                <div className="space-y-4 rounded-[1.35rem] border border-primary/20 bg-primary/5 p-4">
-                                                    {inferClarificationNumberIntent(question) === 'ingredient_base' && (
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => onNumberModeChange(question.id, 'people')}
-                                                                className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'people' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
-                                                            >
-                                                                Por personas
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => onNumberModeChange(question.id, 'quantity')}
-                                                                className={`flex-1 rounded-full px-4 py-2 text-sm font-bold transition-colors ${numberModes[question.id] === 'quantity' ? 'bg-primary text-primary-foreground' : 'bg-white text-slate-600 dark:bg-background dark:text-slate-300'}`}
-                                                            >
-                                                                Por cantidad
-                                                            </button>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex items-center justify-between rounded-[1.15rem] bg-white px-3 py-4 dark:bg-background">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => onAnswerChange(question.id, Math.max(question.min ?? 1, Number(answers[question.id] ?? question.min ?? 1) - (question.step ?? 1)))}
-                                                            className="flex size-11 items-center justify-center rounded-full border border-primary/30 text-primary sm:size-12"
-                                                        >
-                                                            <Minus className="size-5" />
-                                                        </button>
-                                                        <div className="text-center">
-                                                            <div className="text-3xl font-black text-primary sm:text-4xl">{answers[question.id]}</div>
-                                                            <div className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{resolveUnit(question)}</div>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => onAnswerChange(question.id, Math.min(question.max ?? 20, Number(answers[question.id] ?? question.min ?? 1) + (question.step ?? 1)))}
-                                                            className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground sm:size-12"
-                                                        >
-                                                            <Plus className="size-5" />
-                                                        </button>
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                                <Bot className="size-4" />
+                                            </div>
+                                            <div className="min-w-0 flex-1 space-y-4">
+                                                <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                                    <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                                        IA editorial
                                                     </div>
-
-                                                    {inferClarificationNumberIntent(question) === 'ingredient_base' && numberModes[question.id] === 'quantity' && (
-                                                        <div className="flex justify-center">
-                                                            <div className="inline-flex rounded-full bg-white p-1 dark:bg-background">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => onQuantityUnitChange(question.id, 'units')}
-                                                                    className={`rounded-full px-3 py-1 text-xs font-bold ${quantityUnits[question.id] === 'units' ? 'bg-primary text-primary-foreground' : 'text-slate-500'}`}
-                                                                >
-                                                                    unid
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => onQuantityUnitChange(question.id, 'grams')}
-                                                                    className={`rounded-full px-3 py-1 text-xs font-bold ${quantityUnits[question.id] === 'grams' ? 'bg-primary text-primary-foreground' : 'text-slate-500'}`}
-                                                                >
-                                                                    gramos
-                                                                </button>
+                                                    <div className="mt-4">
+                                                        {preRecipe?.chatResponse ? (
+                                                            <RecipeMessageContent text={preRecipe.chatResponse} />
+                                                        ) : (
+                                                            <div className="text-[1.08rem] leading-8 text-[#3a3a3a]">
+                                                                Estoy preparando tu prereceta...
                                                             </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {tip ? (
+                                                    <div className="max-w-[90%] rounded-[1.4rem] bg-[#e4e2dd] p-4 text-[#1b1c19] shadow-sm">
+                                                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                                            Nota del chef
                                                         </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {question.type === 'text' && (
-                                                <div className="relative">
-                                                    <textarea
-                                                        value={String(answers[question.id] ?? '')}
-                                                        onChange={(event) => onAnswerChange(question.id, event.target.value)}
-                                                        rows={3}
-                                                        placeholder="Escribe aquí tu preferencia..."
-                                                        className="w-full rounded-[1.5rem] border-2 border-primary/10 bg-white/70 p-4 outline-none transition-all focus:border-primary focus:ring-4 focus:ring-primary/10 dark:bg-white/5"
-                                                    />
-                                                    <span className="pointer-events-none absolute bottom-3 right-3 text-xl">✨</span>
-                                                </div>
-                                            )}
-                                        </section>
-                                    ))}
-                                </div>
-
-                                {tip && (
-                                    <div className="flex gap-4 rounded-[1.5rem] border border-primary/20 bg-gradient-to-br from-primary/20 to-transparent p-4">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                                            <WandSparkles className="size-5" />
+                                                        <p className="mt-2 text-sm leading-6">{tip}</p>
+                                                    </div>
+                                                ) : null}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold">Tip de la IA</p>
-                                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{tip}</p>
+
+                                        {previewMessages
+                                            .filter((message) => message.role === 'user')
+                                            .map((message) => (
+                                                <div key={message.id} className="flex justify-end">
+                                                    <div className="max-w-[82%] rounded-[1.4rem] rounded-br-md bg-[#96472f] px-4 py-3 text-white shadow-sm">
+                                                        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-white/70">Tú</div>
+                                                        <div className="mt-2 whitespace-pre-wrap text-[15px] leading-6">
+                                                            {message.text}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#6a795c] text-white shadow-sm">
+                                                <Bot className="size-4" />
+                                            </div>
+                                            <div className="max-w-[92%] rounded-[1.5rem] rounded-bl-md bg-white p-4 shadow-sm">
+                                                <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#526145]/75">
+                                                    Siguiente acción
+                                                </div>
+                                                <p className="mt-2 text-sm leading-6 text-slate-700">
+                                                    Si esta prereceta ya quedó bien, genero la receta final con tiempos y pasos guiados.
+                                                </p>
+                                                <div className="mt-4 flex flex-wrap items-center gap-3">
+                                                    {preRecipe?.baseYield?.label ? (
+                                                        <div className="rounded-full bg-[#f0e0cc] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-[#221a0e]">
+                                                            {preRecipe.baseYield.label}
+                                                        </div>
+                                                    ) : null}
+                                                    <button
+                                                        onClick={onGenerate}
+                                                        disabled={isGeneratingPreview || isGenerating || wizardStep === 'generating'}
+                                                        className="inline-flex items-center justify-center gap-2 rounded-[1rem] bg-[#526145] px-5 py-3 text-sm font-bold uppercase tracking-[0.14em] text-white shadow-sm transition-all hover:opacity-95 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {isGenerating ? (
+                                                            <>
+                                                                <LoaderCircle className="size-4 animate-spin" />
+                                                                Generando receta
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                Generar receta
+                                                                <Sparkles className="size-4" />
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
-
-                                {isMockModeEnabled && (
-                                    <div className="rounded-[1.5rem] border border-dashed border-primary/30 bg-primary/5 p-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">🧪</span>
-                                            <p className="text-sm font-bold text-primary">Modo de pruebas</p>
-                                        </div>
-                                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                                            Si quieres evitar llamadas reales a la IA, puedes generar la receta mock directamente.
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={onGenerateMockRecipe}
-                                            className="mt-3 rounded-full border border-primary/25 bg-white px-4 py-2 text-sm font-bold text-primary transition-colors hover:bg-primary/10 dark:bg-background"
-                                        >
-                                            Generar receta mock
-                                        </button>
-                                    </div>
-                                )}
+                                </ChatShell>
                             </>
                         )}
                     </div>
                 )}
-
-                {aiError && wizardStep === 'context' && (
-                    <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
-                        {aiError}
-                    </div>
-                )}
             </main>
 
-            <div className="fixed inset-x-0 bottom-0 border-t border-primary/10 bg-gradient-to-t from-background via-background to-transparent px-4 pb-4 pt-3 backdrop-blur-xl">
-                <div className="mx-auto max-w-md">
-                    {wizardStep === 'context' ? (
-                        <button
-                            onClick={onContinue}
-                            disabled={isCheckingClarifications || isGenerating}
-                            className="flex w-full items-center justify-center gap-2 rounded-[1.25rem] bg-primary py-4 text-lg font-bold text-primary-foreground shadow-xl shadow-primary/20 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {isCheckingClarifications ? (
-                                <>
+            <motion.div 
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="fixed inset-x-0 bottom-0 bg-gradient-to-t from-white via-white/90 to-transparent px-4 pb-6 pt-12 dark:from-black dark:via-black/90 md:px-8 lg:px-12"
+            >
+                <div className="mx-auto max-w-4xl">
+                    <div className="rounded-full border border-white/20 bg-white/70 p-2 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-900/70">
+                        <div className="flex items-end gap-2 rounded-full bg-white/50 px-2 py-2 dark:bg-black/50">
+                            <button
+                                type="button"
+                                className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                <Plus className="size-5" />
+                            </button>
+                            <button
+                                type="button"
+                                className="flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-200/50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                            >
+                                <ImagePlus className="size-5" />
+                            </button>
+                            <textarea
+                                value={wizardStep === 'context' ? contextDraft.prompt : previewDraftMessage}
+                                onChange={(event) => {
+                                    if (wizardStep === 'context') {
+                                        onContextPromptChange(event.target.value);
+                                        return;
+                                    }
+                                    onPreviewDraftMessageChange(event.target.value);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' && !event.shiftKey) {
+                                        event.preventDefault();
+                                        handleComposerSubmit();
+                                    }
+                                }}
+                                rows={1}
+                                placeholder={wizardStep === 'context' ? '¿Qué vamos a cocinar hoy?' : 'Escribe tu ajuste para la prereceta...'}
+                                className="max-h-28 min-h-10 flex-1 resize-none self-center bg-transparent px-2 py-2 text-[15px] font-medium text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-200 dark:placeholder:text-slate-500"
+                            />
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                type="button"
+                                onClick={handleComposerSubmit}
+                                disabled={isGeneratingPreview || isGenerating}
+                                className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isGeneratingPreview ? (
                                     <LoaderCircle className="size-5 animate-spin" />
-                                    Consultando a la IA...
-                                </>
-                            ) : (
-                                <>
-                                    Continuar
-                                    <Sparkles className="size-5" />
-                                </>
-                            )}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={onGenerate}
-                            disabled={isCheckingClarifications || isGenerating || wizardStep === 'generating'}
-                            className="flex w-full items-center justify-center gap-2 rounded-[1.25rem] bg-primary py-4 text-lg font-bold text-primary-foreground shadow-xl shadow-primary/20 transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {isGenerating || wizardStep === 'generating' ? (
-                                <>
-                                    <LoaderCircle className="size-5 animate-spin" />
-                                    Empezando receta...
-                                </>
-                            ) : (
-                                <>
-                                    Empezar receta
-                                    <Sparkles className="size-5" />
-                                </>
-                            )}
-                        </button>
-                    )}
+                                ) : (
+                                    <SendHorizontal className="size-4 -translate-x-[1px] translate-y-[1px]" />
+                                )}
+                            </motion.button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

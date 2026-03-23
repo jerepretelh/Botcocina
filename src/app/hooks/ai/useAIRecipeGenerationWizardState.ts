@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import type { AIClarificationResult } from '../../lib/recipeAI';
 import { type AIMockScenarioId, getAIMockScenario, getDefaultAIMockScenario } from '../../lib/aiMockScenarios';
 import { normalizeText } from '../../utils/recipeHelpers';
 import type { AIIngredientToken, AIRecipeContextDraft, RecipeSeed } from '../../types';
@@ -9,7 +8,6 @@ import type { AIClarificationsController } from './useAIRecipeGeneration.shared'
 export function useAIRecipeGenerationWizardState(args: {
   ai: AIClarificationsController;
   setScreen: (screen: string) => void;
-  applyClarificationResult: (prompt: string, clarification: AIClarificationResult) => boolean;
 }) {
   const resetAiWizardState = useCallback((nextContextDraft?: AIRecipeContextDraft) => {
     args.ai.setAiPrompt(nextContextDraft?.prompt ?? '');
@@ -18,6 +16,9 @@ export function useAIRecipeGenerationWizardState(args: {
     args.ai.setAiWizardStep('context');
     args.ai.setAiRequestSource('real');
     args.ai.setAiMockScenarioId(null);
+    args.ai.setAiPreRecipe(null);
+    args.ai.setAiPreviewMessages([]);
+    args.ai.setAiPreviewDraftMessage('');
     args.ai.setAiClarificationQuestions([]);
     args.ai.setAiClarificationAnswers({});
     args.ai.setAiClarificationNumberModes({});
@@ -37,20 +38,32 @@ export function useAIRecipeGenerationWizardState(args: {
     args.ai.setSelectedRecipeSeed(null);
     args.ai.setAiContextDraft(clonedContextDraft);
     args.ai.setAiPrompt(clonedContextDraft.prompt);
+    args.ai.setAiPreRecipe(null);
+    args.ai.setAiPreviewMessages([]);
+    args.ai.setAiPreviewDraftMessage('');
     args.ai.setAiError(null);
     args.ai.setAiSuccess('Ejemplo cargado en modo prueba. No consumirá créditos.');
     args.ai.setAiRequestSource('mock');
     args.ai.setAiMockScenarioId(scenario.id);
   }, [args.ai]);
 
-  const jumpToMockRefinement = useCallback((scenarioId?: AIMockScenarioId) => {
+  const jumpToMockPreview = useCallback((scenarioId?: AIMockScenarioId) => {
     const scenario = scenarioId ? getAIMockScenario(scenarioId) : getDefaultAIMockScenario();
     if (!scenario) return;
     applyMockScenarioToContext(scenario.id);
     args.ai.setAiRequestSource('mock');
     args.ai.setAiMockScenarioId(scenario.id);
-    args.applyClarificationResult(scenario.contextDraft.prompt, scenario.clarification);
-    args.ai.setAiSuccess('Refinamiento mock cargado. Puedes seguir probando sin usar IA real.');
+    args.ai.setAiPreRecipe(scenario.preRecipe);
+    args.ai.setAiPreviewMessages([
+      {
+        id: `assistant-${scenario.id}`,
+        role: 'assistant',
+        text: `Prereceta base lista para ${scenario.preRecipe.name}.`,
+      },
+    ]);
+    args.ai.setAiWizardStep('preview');
+    args.ai.setAiSuccess('Prereceta mock cargada. Puedes seguir ajustándola sin usar IA real.');
+    args.setScreen('ai-clarify');
   }, [applyMockScenarioToContext, args]);
 
   const startWizardFromSeed = useCallback((seed: RecipeSeed) => {
@@ -64,6 +77,9 @@ export function useAIRecipeGenerationWizardState(args: {
     args.ai.setAiWizardStep('context');
     args.ai.setAiRequestSource('real');
     args.ai.setAiMockScenarioId(null);
+    args.ai.setAiPreRecipe(null);
+    args.ai.setAiPreviewMessages([]);
+    args.ai.setAiPreviewDraftMessage('');
     args.ai.setAiClarificationQuestions([]);
     args.ai.setAiClarificationAnswers({});
     args.ai.setAiClarificationNumberModes({});
@@ -81,13 +97,10 @@ export function useAIRecipeGenerationWizardState(args: {
     if (args.ai.selectedRecipeSeed && normalizeText(value) !== normalizeText(args.ai.selectedRecipeSeed.name)) {
       args.ai.setSelectedRecipeSeed(null);
     }
-    if (args.ai.aiClarificationQuestions.length > 0) {
-      args.ai.setAiClarificationQuestions([]);
-      args.ai.setAiClarificationAnswers({});
-      args.ai.setAiClarificationNumberModes({});
-      args.ai.setAiClarificationQuantityUnits({});
-      args.ai.setAiClarificationSuggestedTitle(null);
-      args.ai.setAiClarificationTip(null);
+    if (args.ai.aiWizardStep === 'preview') {
+      args.ai.setAiPreRecipe(null);
+      args.ai.setAiPreviewMessages([]);
+      args.ai.setAiPreviewDraftMessage('');
       args.ai.setAiWizardStep('context');
     }
     args.ai.setAiRequestSource('real');
@@ -122,7 +135,7 @@ export function useAIRecipeGenerationWizardState(args: {
   }, [args.ai]);
 
   const handleAiWizardBack = useCallback(() => {
-    if (args.ai.aiWizardStep === 'refinement') {
+    if (args.ai.aiWizardStep === 'preview') {
       args.ai.setAiWizardStep('context');
       args.ai.setAiError(null);
       return;
@@ -135,7 +148,7 @@ export function useAIRecipeGenerationWizardState(args: {
   return {
     resetAiWizardState,
     applyMockScenarioToContext,
-    jumpToMockRefinement,
+    jumpToMockPreview,
     startWizardFromSeed,
     handleAiPromptChange,
     addAvailableIngredient: (value: string) => upsertContextIngredients('availableIngredients', value),

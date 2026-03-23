@@ -32,12 +32,13 @@ function formatScaledNumber(value: number): string {
   return String(Math.round(value * 100) / 100).replace(/\.0$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 }
 
-export function scaleQuantityText(baseValue: string, factor: number): string {
+export function scaleQuantityText(baseValue: string | undefined | null, factor: number): string {
   const normalizedFactor = Number.isFinite(factor) ? factor : 1;
-  if (Math.abs(normalizedFactor - 1) < 0.01) return baseValue;
+  const safeBase = String(baseValue ?? '');
+  if (Math.abs(normalizedFactor - 1) < 0.01) return safeBase;
 
-  const match = baseValue.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)/);
-  if (!match) return baseValue;
+  const match = safeBase.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:[.,]\d+)?)/);
+  if (!match) return safeBase;
 
   const parsed = parseFractionToken(match[1]);
   if (parsed == null) return baseValue;

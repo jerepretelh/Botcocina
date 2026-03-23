@@ -24,15 +24,14 @@ export function ThermomixCookingScreenHost({ appShell, cookingUi, overlayUi }: {
         <AIClarifyScreen
           contextDraft={cookingUi.ai.aiContextDraft}
           wizardStep={cookingUi.ai.aiWizardStep}
-          questions={cookingUi.ai.aiClarificationQuestions}
-          answers={cookingUi.ai.aiClarificationAnswers}
-          numberModes={cookingUi.ai.aiClarificationNumberModes}
-          quantityUnits={cookingUi.ai.aiClarificationQuantityUnits}
+          preRecipe={cookingUi.ai.aiPreRecipe}
+          previewMessages={cookingUi.ai.aiPreviewMessages}
+          previewDraftMessage={cookingUi.ai.aiPreviewDraftMessage}
           selectedSeed={cookingUi.ai.selectedRecipeSeed}
           suggestedTitle={cookingUi.ai.aiClarificationSuggestedTitle}
           tip={cookingUi.ai.aiClarificationTip}
           aiError={cookingUi.ai.aiError}
-          isCheckingClarifications={cookingUi.ai.isCheckingClarifications}
+          isGeneratingPreview={cookingUi.ai.isGeneratingPreview}
           onContextPromptChange={cookingUi.ai.handleAiPromptChange}
           isMockModeEnabled={cookingUi.ai.isAiMockModeEnabled}
           onContextServingsChange={(value) => cookingUi.ai.setAiContextDraft((prev: AIRecipeContextDraft) => ({ ...prev, servings: value }))}
@@ -40,17 +39,15 @@ export function ThermomixCookingScreenHost({ appShell, cookingUi, overlayUi }: {
           onRemoveAvailableIngredient={cookingUi.ai.removeAvailableIngredient}
           onAddAvoidIngredient={cookingUi.ai.addAvoidIngredient}
           onRemoveAvoidIngredient={cookingUi.ai.removeAvoidIngredient}
-          onAnswerChange={cookingUi.compatActions.handleAnswerChange}
-          onNumberModeChange={cookingUi.ai.setAiClarificationNumberModes}
-          onQuantityUnitChange={cookingUi.ai.setAiClarificationQuantityUnits}
+          onPreviewDraftMessageChange={cookingUi.ai.setAiPreviewDraftMessage}
           onBack={cookingUi.ai.handleAiWizardBack}
           onContinue={cookingUi.ai.handleAiContextContinue}
+          onUpdatePreRecipe={cookingUi.ai.handleUpdatePreRecipe}
           onGenerate={cookingUi.ai.handleGenerateRecipe}
           onLoadMockExample={() => cookingUi.ai.applyMockScenarioToContext('milanesa')}
-          onSkipToMockRefinement={() => cookingUi.ai.jumpToMockRefinement('milanesa')}
+          onSkipToMockPreview={() => cookingUi.ai.jumpToMockPreview('milanesa')}
           onGenerateMockRecipe={() => void cookingUi.ai.generateMockRecipeDirect('milanesa')}
           isGenerating={cookingUi.ai.isGeneratingRecipe}
-          resolveUnit={cookingUi.ai.resolveClarificationUnit}
         />
       </Suspense>
     );

@@ -39,7 +39,7 @@ export function inferPortionFromPrompt(prompt: string): Portion | null {
   ];
 
   for (const pattern of patterns) {
-    const match = normalized.match(pattern);
+    const match = String(normalized).match(pattern);
     if (!match) continue;
     const value = Number.parseInt(match[1], 10);
     if (value === 1 || value === 2 || value === 4) {
@@ -63,7 +63,7 @@ export function inferPeopleCountFromClarifications(
       return clampNumber(Math.round(forcedValue), 1, 8);
     }
     if (typeof forcedValue === 'string') {
-      const match = forcedValue.match(/(\d+(?:[.,]\d+)?)/);
+      const match = String(forcedValue).match(/(\d+(?:[.,]\d+)?)/);
       if (!match) return null;
       const parsed = Number.parseFloat(match[1].replace(',', '.'));
       if (!Number.isFinite(parsed)) return null;
@@ -82,7 +82,7 @@ export function inferPeopleCountFromClarifications(
     return clampNumber(Math.round(raw), 1, 8);
   }
   if (typeof raw === 'string') {
-    const match = raw.match(/(\d+(?:[.,]\d+)?)/);
+    const match = String(raw).match(/(\d+(?:[.,]\d+)?)/);
     if (!match) return null;
     const parsed = Number.parseFloat(match[1].replace(',', '.'));
     if (!Number.isFinite(parsed)) return null;
@@ -104,7 +104,7 @@ export function inferSizingFromClarifications(
     if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
       count = Math.round(rawValue);
     } else if (typeof rawValue === 'string') {
-      const match = rawValue.match(/(\d+(?:[.,]\d+)?)/);
+      const match = String(rawValue).match(/(\d+(?:[.,]\d+)?)/);
       if (match) {
         const parsed = Number.parseFloat(match[1].replace(',', '.'));
         if (Number.isFinite(parsed)) {
@@ -387,7 +387,8 @@ export function clampNumber(value: number, min: number, max: number): number {
 }
 
 
-export function parseFirstNumber(value: string): number | null {
+export function parseFirstNumber(value: string | undefined | null): number | null {
+  if (!value || typeof value !== 'string') return null;
   const match = value.match(/(\d+(?:[.,]\d+)?)/);
   if (!match) return null;
   const parsed = Number.parseFloat(match[1].replace(',', '.'));
@@ -470,7 +471,8 @@ export function splitIngredientQuantity(value: string): { main: string; detail: 
   return { main: trimmed, detail: null };
 }
 
-export function parseUnitCount(value: string): number | null {
+export function parseUnitCount(value: string | undefined | null): number | null {
+  if (!value || typeof value !== 'string') return null;
   const match = value.match(/(\d+(?:[.,]\d+)?)/);
   if (!match) return null;
   const parsed = Number.parseFloat(match[1].replace(',', '.'));

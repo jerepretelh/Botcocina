@@ -8,18 +8,7 @@ export function formatGenerationFailureMessage(error: unknown): string {
     return generic;
   }
 
-  if (
-    detail.includes('respuesta inválida') ||
-    detail.includes('receta incompleta') ||
-    detail.includes('No se pudo interpretar') ||
-    detail.includes('Google AI') ||
-    detail.includes('OpenAI') ||
-    detail.includes('No se pudo guardar')
-  ) {
-    return `${generic} Detalle: ${detail}`;
-  }
-
-  return generic;
+  return `${generic} Detalle: ${detail}`;
 }
 
 export function assertGeneratedRecipePayload(

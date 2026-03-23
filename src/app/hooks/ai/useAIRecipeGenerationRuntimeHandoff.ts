@@ -30,8 +30,13 @@ export function useAIRecipeGenerationRuntimeHandoff(args: {
     overrideRequestSource?: 'real' | 'mock';
   }) => {
     const finalPrompt = args.buildFinalPrompt();
+    const approvedPreRecipe = options?.overrideMockScenario?.preRecipe ?? args.ai.aiPreRecipe;
     if (!finalPrompt) {
       args.ai.setAiError('Escribe una idea de receta antes de generar.');
+      return;
+    }
+    if (!approvedPreRecipe) {
+      args.ai.setAiError('Primero genera y confirma una prereceta.');
       return;
     }
 
@@ -57,7 +62,12 @@ export function useAIRecipeGenerationRuntimeHandoff(args: {
         { recipe: GeneratedRecipe; usage?: { totalTokens: number } | undefined; mock?: false } =
         activeMockScenario
           ? { recipe: activeMockScenario.recipe, mock: true }
-          : await generateRecipeWithAI(finalPrompt);
+          : await generateRecipeWithAI({
+            prompt: finalPrompt,
+            context: args.ai.aiContextDraft,
+            preRecipe: approvedPreRecipe,
+            messages: args.ai.aiPreviewMessages,
+          });
       const validatedResult = assertGeneratedRecipePayload(generatedResult);
       let prepared = prepareGeneratedAIRecipeArtifacts({
         generatedRecipe: validatedResult.recipe,
@@ -66,7 +76,7 @@ export function useAIRecipeGenerationRuntimeHandoff(args: {
         aiUserId: args.deps.aiUserId,
         contextDraft: args.ai.aiContextDraft,
         selectedSeed: args.ai.selectedRecipeSeed,
-        suggestedTitle: args.ai.aiClarificationSuggestedTitle,
+        suggestedTitle: approvedPreRecipe.name,
         clarifiedSizing,
         clarifiedPeopleCount,
         canUseCompoundRecipes: canUseCompoundRecipes(),
@@ -190,7 +200,7 @@ export function useAIRecipeGenerationRuntimeHandoff(args: {
       if (import.meta.env.DEV) {
         console.error('[ai-recipe-generation] finalizeRecipeGeneration failed', error);
       }
-      args.ai.setAiWizardStep(args.ai.aiClarificationQuestions.length > 0 ? 'refinement' : 'context');
+      args.ai.setAiWizardStep(args.ai.aiPreRecipe ? 'preview' : 'context');
       args.ai.setAiError(formatGenerationFailureMessage(error));
     } finally {
       args.ai.setIsCheckingClarifications(false);
@@ -203,6 +213,14 @@ export function useAIRecipeGenerationRuntimeHandoff(args: {
     if (!scenario) return;
     args.ai.setAiRequestSource('mock');
     args.ai.setAiMockScenarioId(scenario.id);
+    args.ai.setAiPreRecipe(scenario.preRecipe);
+    args.ai.setAiPreviewMessages([
+      {
+        id: `assistant-${scenario.id}`,
+        role: 'assistant',
+        text: `Prereceta base lista para ${scenario.preRecipe.name}.`,
+      },
+    ]);
     args.ai.setAiClarificationQuestions([]);
     args.ai.setAiClarificationAnswers({});
     args.ai.setAiClarificationNumberModes({});

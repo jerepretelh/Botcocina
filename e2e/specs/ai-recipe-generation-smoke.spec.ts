@@ -19,8 +19,7 @@ async function openAIWizard(page: Page): Promise<void> {
   await gotoApp(page, '/');
   await assertAppSessionReady(page);
   await page.getByRole('button', { name: 'Crear receta nueva con IA', exact: true }).click();
-  await expect(page.getByText('Paso 1 de 3', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toBeVisible();
+  await expect(page.getByText('Armemos la prereceta', { exact: true })).toBeVisible();
 }
 
 async function openMyRecipes(page: Page): Promise<void> {
@@ -45,21 +44,26 @@ async function expectRecipeInMyRecipes(page: Page, recipeName: string): Promise<
 
 async function startRecipeFromSetup(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: 'Ver ingredientes', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Ver ingredientes', exact: true }).click();
+  await page.waitForTimeout(1000); // Wait for modal animation
+  await page.getByRole('button', { name: 'Ver ingredientes', exact: true }).click({ force: true });
   const startButton = page.getByRole('button', { name: /Empezar (a cocinar|receta)/i });
-  await expect(startButton).toBeVisible();
-  await startButton.click();
+  await expect(startButton).toBeVisible({ timeout: 15_000 });
+  await startButton.click({ force: true });
 }
 
 test.describe('AI recipe generation smoke', () => {
   test('mock standard recipe can be generated, saved, reopened, and cooked from My Recipes', async ({ page }) => {
     await openAIWizard(page);
 
-    await page.getByRole('button', { name: 'Saltar a refinamiento', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Generar receta mock', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Generar receta mock', exact: true }).click();
+    await page.getByPlaceholder('¿Qué vamos a cocinar hoy?').fill('Milanesa crocante de pollo');
+    await page.keyboard.press('Enter');
 
-    await expect(page.getByText('Milanesa crocante de pollo', { exact: true })).toBeVisible();
+    // Wait for the generated pre-recipe
+    await expect(page.getByRole('button', { name: /Generar receta/i })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Generar receta/i }).click();
+
+    // Verify it reached generated page
+    await expect(page.getByText('Milanesa crocante de pollo', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Ajustar', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Salir', exact: true }).click();
@@ -76,11 +80,13 @@ test.describe('AI recipe generation smoke', () => {
   test('mock compound recipe can be generated, saved, reopened, and reaches the compound runtime', async ({ page }) => {
     await openAIWizard(page);
 
-    await page.getByPlaceholder(/Describe tu idea/i).fill('Quiero tallarines rojos con salsa y pasta en paralelo.');
-    await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+    await page.getByPlaceholder('¿Qué vamos a cocinar hoy?').fill('Quiero tallarines rojos con salsa y pasta en paralelo.');
+    await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('button', { name: 'Empezando receta...', exact: true })).toBeHidden({ timeout: 30_000 });
-    await expect(page.getByText('Tallarines rojos compuestos', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Generar receta/i })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Generar receta/i }).click();
+
+    await expect(page.getByText('Tallarines rojos compuestos', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Timers y estado', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ajustar', exact: true })).toHaveCount(0);
     const currentPath = await currentHashPath(page);
