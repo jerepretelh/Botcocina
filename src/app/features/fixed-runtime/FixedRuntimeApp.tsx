@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   ArrowDown,
   CalendarDays,
+  Camera,
   ChefHat,
   ChevronDown,
   ChevronRight,
@@ -210,9 +211,41 @@ function shellMomentSortValue(moment: ShellMoment): number {
   return 3;
 }
 
+function formatDecimalToFraction(value: number | string): string {
+  if (typeof value === 'string') {
+    const num = parseFloat(value);
+    if (isNaN(num) || String(num) !== value.trim()) return value.trim();
+    value = num;
+  }
+  
+  // Basic fractional mappings
+  if (value === 0.25) return '1/4';
+  if (value === 0.33 || value === 0.333 || value === 0.3333) return '1/3';
+  if (value === 0.5) return '1/2';
+  if (value === 0.66 || value === 0.666 || value === 0.6666) return '2/3';
+  if (value === 0.75) return '3/4';
+  if (value === 1.5) return '1 1/2';
+  if (value === 1.25) return '1 1/4';
+  if (value === 2.5) return '2 1/2';
+  
+  // Return original string representation if no match
+  return String(value);
+}
+
 function formatIngredientLine(item: FixedRecipeIngredientItem): string {
-  const amountText = item.displayAmount?.trim() || (typeof item.amount === 'number' ? String(item.amount) : item.amount.trim());
-  const unitText = item.displayUnit?.trim() || item.unit.trim();
+  let amountText = item.displayAmount?.trim() || formatDecimalToFraction(item.amount);
+  let unitText = item.displayUnit?.trim() || item.unit.trim();
+  
+  // Clean up common AI generation anomalies
+  if (amountText.toLowerCase() === 'al gusto' && unitText.toLowerCase() === 'al gusto') {
+    unitText = '';
+  }
+  if (amountText.toLowerCase() === 'al gusto' || amountText.toLowerCase() === 'cantidad necesaria') {
+    if (unitText.toLowerCase() === 'texto' || unitText.toLowerCase() === 'ninguna') {
+      unitText = '';
+    }
+  }
+
   const prepText = item.preparation ? `, ${item.preparation}` : '';
   const notesText = item.notes ? ` (${item.notes})` : '';
   return `${amountText} ${unitText} ${item.name}${prepText}${notesText}`.replace(/\s+/g, ' ').trim();
@@ -639,17 +672,28 @@ function initialTimerState(phases: FixedRecipePhase[]) {
 }
 
 function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRecipe; recipeJson: FixedRecipeJson; onExit: () => void }) {
-  const [screen, setScreen] = useState<'ingredients' | 'phases'>('ingredients');
   const [phasesView, setPhasesView] = useState<'runtime' | 'guide'>('runtime');
   const [timers, setTimers] = useState<Record<string, FixedTimerState>>(() => initialTimerState(recipe.phases));
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
-  const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
   const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({});
+  const [recipeImages, setRecipeImages] = useState<Record<string, string>>(() => {
+    try {
+      const raw = window.localStorage.getItem('RUNTIME_RECIPE_IMAGES');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
   const previousTimersRef = useRef(timers);
 
+  const updateRecipeImage = (id: string, url: string) => {
+    setRecipeImages(prev => {
+      const next = { ...prev, [id]: url };
+      window.localStorage.setItem('RUNTIME_RECIPE_IMAGES', JSON.stringify(next));
+      return next;
+    });
+  };
+
   useEffect(() => {
-    setScreen('ingredients');
     setPhasesView('runtime');
     const nextTimers = initialTimerState(recipe.phases);
     setTimers(nextTimers);
@@ -1427,14 +1471,25 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
 
       {/* Cinematic Header */}
       <div 
-        className="rt-cinematic-header" 
-        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=1200&q=80')` }}
+        className="rt-cinematic-header group relative overflow-hidden" 
+        style={{ backgroundImage: `url('${recipeImages[recipe.id] || 'https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=1200&q=80'}')` }}
       >
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 z-0" />
         <div className="absolute left-4 right-4 top-4 flex justify-between z-10 sm:left-6 sm:right-6 sm:top-6">
-          <button onClick={exitRecipe} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/20 font-bold text-white backdrop-blur-md transition hover:bg-black/40">
+          <button onClick={onExit} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/20 font-bold text-white backdrop-blur-md transition hover:bg-black/40">
             <X size={20} />
           </button>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const url = window.prompt('Pega el enlace URL de la imagen de tu receta (ej. https://images.unsplash.com/...)');
+                if (url) updateRecipeImage(recipe.id, url);
+              }}
+              className="hidden lg:flex items-center gap-2 rounded-full bg-black/20 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/50 lg:opacity-0 lg:group-hover:opacity-100"
+            >
+              <Camera size={16} />
+              <span>Cambiar portada</span>
+            </button>
             <button
               onClick={() => downloadRecipeAsJson(recipeJson)}
               className="flex items-center gap-2 rounded-full bg-black/20 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/40"
@@ -1445,6 +1500,16 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
           </div>
         </div>
         <div className="absolute bottom-10 left-[5%] right-[5%] z-10 text-white sm:bottom-14">
+          <button
+            onClick={() => {
+              const url = window.prompt('Pega el enlace URL de la imagen de tu receta (ej. https://images.unsplash.com/...)');
+              if (url) updateRecipeImage(recipe.id, url);
+            }}
+            className="mb-4 inline-flex lg:hidden items-center gap-2 rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur"
+          >
+            <Camera size={14} />
+            <span>Editar portada</span>
+          </button>
           <h1 className="rt-page-title drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] !text-white !mb-4">{recipe.title}</h1>
           <p className="rt-page-subtitle !text-white/90 drop-shadow-md">
             {recipe.recipeCategory} {recipe.recipeCategory && '·'} {recipe.yield ? `Rinde: ${recipe.yield} · ` : ''}{recipe.servings} serving(s)
@@ -1455,54 +1520,39 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
       <div className="rt-view-container relative z-20 pb-40">
         <div className="flex flex-col gap-6 sm:gap-10">
           
-          {/* Mobile Tabs */}
-          <div className="flex rounded-full bg-[var(--bg-soft-rt)] p-1.5 lg:hidden">
-            <button
-              onClick={() => setScreen('ingredients')}
-              className={`flex-1 rounded-full py-2.5 text-sm font-bold transition ${screen === 'ingredients' ? 'bg-white text-[var(--primary-rt)] shadow-sm' : 'text-[var(--text-muted-rt)]'}`}
-            >
-              Ingredientes
-            </button>
-            <button
-              onClick={() => setScreen('phases')}
-              className={`flex-1 rounded-full py-2.5 text-sm font-bold transition ${screen === 'phases' ? 'bg-white text-[var(--primary-rt)] shadow-sm' : 'text-[var(--text-muted-rt)]'}`}
-            >
-              Preparación
-            </button>
-            <button
-              onClick={() => setPhasesView(phasesView === 'runtime' ? 'guide' : 'runtime')}
-              className={`flex-1 rounded-full py-2.5 text-sm font-bold transition text-[var(--text-muted-rt)]`}
-            >
-              {phasesView === 'runtime' ? 'Modo Guía' : 'Receta'}
-            </button>
+
+
+
+
+          {/* Ingredients View (Inline on all screens) */}
+          <div className="rt-focused-preparation">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="font-editorial text-[32px] font-medium tracking-tight text-[#23180f] sm:text-[42px]">🧺 Ingredientes</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
+              {recipe.ingredients.map((group) => (
+                <section key={group.title} className="rounded-2xl bg-[var(--bg-soft-rt)] p-5">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="text-xl">{group.icon}</div>
+                    <h3 className="font-editorial text-[22px] font-medium tracking-tight text-[#23180f]">
+                      {group.title}
+                    </h3>
+                  </div>
+                  <ul className="space-y-2">
+                    {group.items.map((item) => (
+                      <li key={`${item.shoppingKey ?? item.canonicalName}-${item.name}`} className="text-[15px] font-medium leading-relaxed text-[#5f5245]">
+                        {formatIngredientLine(item)}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
           </div>
 
-
-
-          {/* Mobile Ingredients View */}
-          <div className={`lg:hidden flex-col gap-6 ${screen === 'ingredients' ? 'flex' : 'hidden'}`}>
-            {recipe.ingredients.map((group) => (
-              <section key={group.title} className="rounded-2xl bg-[var(--bg-soft-rt)] p-5">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="text-xl">{group.icon}</div>
-                  <h3 className="font-editorial text-[22px] font-medium tracking-tight text-[#23180f]">
-                    {group.title}
-                  </h3>
-                </div>
-                <ul className="space-y-2">
-                  {group.items.map((item) => (
-                    <li key={`${item.shoppingKey ?? item.canonicalName}-${item.name}`} className="text-[15px] font-medium leading-relaxed text-[#5f5245]">
-                      {formatIngredientLine(item)}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-
-          {/* Desktop Split View Grid */}
-          <div className={`rt-focused-preparation ${screen === 'phases' ? 'block' : 'hidden lg:block'}`}>
-            <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between hidden lg:flex">
+          {/* Phases View */}
+          <div className="rt-focused-preparation mt-10">
+            <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="font-editorial text-[32px] font-medium tracking-tight text-[#23180f] sm:text-[42px]">🍳 Fases</h2>
                 <div className="flex bg-[var(--bg-soft-rt)] rounded-full p-1">
                   <button
@@ -1684,55 +1734,9 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
           </div>
         </div>
 
-      <div className={`rt-ingredients-overlay hidden lg:block ${isIngredientsOpen ? 'visible' : ''}`} onClick={() => setIsIngredientsOpen(false)} />
-      
-      <aside className={`rt-ingredients-drawer hidden lg:block ${isIngredientsOpen ? 'open' : ''}`}>
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="font-editorial text-[28px] font-medium tracking-tight text-[#23180f]">🧺 Ingredientes</h2>
-          <button onClick={() => setIsIngredientsOpen(false)} className="rounded-full bg-stone-100 p-2 text-stone-500 transition hover:bg-stone-200">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="flex flex-col gap-6">
-          {recipe.ingredients.map((group) => (
-            <section key={group.title} className="rounded-2xl bg-[var(--bg-soft-rt)] p-5">
-              <div className="mb-3 flex items-center gap-3">
-                <div className="text-xl">{group.icon}</div>
-                <h3 className="font-editorial text-[22px] font-medium tracking-tight text-[#23180f]">
-                  {group.title}
-                </h3>
-              </div>
-              <ul className="space-y-2">
-                {group.items.map((item) => (
-                  <li key={`${item.shoppingKey ?? item.canonicalName}-${item.name}`} className="text-[15px] font-medium leading-relaxed text-[#5f5245]">
-                    {formatIngredientLine(item)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      </aside>
 
-      <button 
-        onClick={() => setIsIngredientsOpen(!isIngredientsOpen)}
-        className="rt-floating-ingredients-btn hidden lg:flex"
-      >
-        <ShoppingBasket size={18} />
-        <span>{isIngredientsOpen ? 'Cerrar' : 'Ingredientes'}</span>
-      </button>
 
-      {screen === 'ingredients' ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 bg-white/90 backdrop-blur-xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] lg:hidden">
-          <button
-            onClick={() => setScreen('phases')}
-            className="rt-btn-create w-full justify-center min-h-14 text-base"
-          >
-            Empezar a cocinar
-            <ChevronRight size={20} />
-          </button>
-        </div>
-      ) : null}
+
 
       {runningTimers.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:left-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:px-0 sm:pb-4 sm:pt-0">
@@ -1919,6 +1923,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
   const [shoppingUiState, setShoppingUiState] = useState<Record<string, ShoppingUiState>>({});
   const [shoppingScope, setShoppingScope] = useState<ShoppingScope>('weekly');
   const [weeklySelectedRecipeIds, setWeeklySelectedRecipeIds] = useState<string[]>([]);
+  const knownWeeklyRecipeIdsRef = useRef<Set<string>>(new Set());
   const [extraSelectedRecipeIds, setExtraSelectedRecipeIds] = useState<string[]>([]);
   const [shoppingRecipeQuery, setShoppingRecipeQuery] = useState('');
   const [manualShoppingItems, setManualShoppingItems] = useState<ManualShoppingItemInput[]>([]);
@@ -2174,16 +2179,22 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
 
   useEffect(() => {
     setWeeklySelectedRecipeIds((current) => {
-      if (weeklyRecipeIds.length === 0) {
-        weeklySelectionInitializedRef.current = false;
-        return [];
+      const nextSelection = new Set(current);
+      let hasChanges = false;
+      
+      weeklyRecipeIds.forEach(id => {
+        if (!knownWeeklyRecipeIdsRef.current.has(id)) {
+          nextSelection.add(id);
+          knownWeeklyRecipeIdsRef.current.add(id);
+          hasChanges = true;
+        }
+      });
+
+      const finalSelection = weeklyRecipeIds.filter(id => nextSelection.has(id));
+      if (finalSelection.length !== current.length || hasChanges) {
+        return finalSelection;
       }
-      if (!weeklySelectionInitializedRef.current) {
-        weeklySelectionInitializedRef.current = true;
-        return weeklyRecipeIds;
-      }
-      const currentSet = new Set(current);
-      return weeklyRecipeIds.filter((recipeId) => currentSet.has(recipeId));
+      return current;
     });
   }, [weeklyRecipeIds]);
 
@@ -2905,28 +2916,18 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
         showShellToast(`Se limpiaron ${removedCount} bloque(s) incompatibles del plan`);
       }
 
-      const entriesForScope = targetScope === 'weekly'
-        ? [
-            ...resolvableEntries.filter((entry) => weeklySelectedRecipeIds.includes(entry.recipeId)),
-            ...extraSelectedRecipeIds
-              .filter((recipeId) => recipesById.has(recipeId) && !weeklySelectedRecipeIds.includes(recipeId))
-              .map((recipeId) => ({
-                id: `shopping-extra-${recipeId}`,
-                recipeId,
-                day: resolveTodayShellDay(),
-                moment: 'Almuerzo' as ShellMoment,
-                createdAt: 0,
-              })),
-          ]
-        : extraSelectedRecipeIds
-            .filter((recipeId) => recipesById.has(recipeId))
-            .map((recipeId) => ({
-              id: `shopping-extra-${recipeId}`,
-              recipeId,
-              day: resolveTodayShellDay(),
-              moment: 'Almuerzo' as ShellMoment,
-              createdAt: 0,
-            }));
+      const entriesForScope = [
+        ...resolvableEntries.filter((entry) => weeklySelectedRecipeIds.includes(entry.recipeId)),
+        ...extraSelectedRecipeIds
+          .filter((recipeId) => recipesById.has(recipeId) && !weeklySelectedRecipeIds.includes(recipeId))
+          .map((recipeId) => ({
+            id: `shopping-extra-${recipeId}`,
+            recipeId,
+            day: resolveTodayShellDay(),
+            moment: 'Almuerzo' as ShellMoment,
+            createdAt: 0,
+          })),
+      ];
 
       if (entriesForScope.length > 0) {
         await syncShoppingListFromEntries(entriesForScope);
@@ -3359,62 +3360,41 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
 
               {runtimeScreen === 'library' && activeShellTab === 'shopping' ? (
                 <div className="space-y-4 pb-24">
-                  <section className={`${SHELL_UI.surface} px-4 py-4`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <section className={`${SHELL_UI.surface} px-4 py-5`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d86315]">Compras semanales</p>
-                        <h2 className="mt-1 text-[22px] font-extrabold leading-[1.04] tracking-[-0.03em] text-[#23180f]">Selecciona qué recetas incluir</h2>
+                        <h2 className="text-[22px] font-extrabold leading-[1.04] tracking-[-0.03em] text-[#23180f]">Generar lista de compras</h2>
+                        <p className="mt-1 text-[13px] text-[#5f5245] max-w-sm">
+                          Tus platos semanales ya están preseleccionados. Suma recetas sueltas o productos libres a tu voluntad.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void openShoppingTab('weekly')}
-                          className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-bold transition ${
-                            shoppingScope === 'weekly'
-                              ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
-                              : 'border-[#dacfc3] bg-white text-[#5f5245] hover:bg-[#f8f2eb]'
-                          }`}
-                        >
-                          Semana
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShoppingScope('selected')}
-                          className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-bold transition ${
-                            shoppingScope === 'selected'
-                              ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
-                              : 'border-[#dacfc3] bg-white text-[#5f5245] hover:bg-[#f8f2eb]'
-                          }`}
-                        >
-                          Solo extras
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsManualSheetOpen(true)}
-                          className="inline-flex min-h-9 items-center rounded-full bg-[#111111] px-3 text-xs font-bold text-white transition hover:bg-black"
-                        >
-                          Producto libre
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsManualSheetOpen(true)}
+                        className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-stone-900 px-5 text-sm font-bold text-white transition hover:bg-stone-800"
+                      >
+                        + Agregar producto suelto
+                      </button>
+                    </div>
+                    
+                    <div className="mt-6 border-t border-[#f4f1ea] pt-5">
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <div className="relative">
+                          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0a6]">
+                            <path d="M11 4a7 7 0 1 1 0 14a7 7 0 0 1 0-14m0 0l0 0m8.5 15.5L17 17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+                          </svg>
+                          <input
+                            value={shoppingRecipeQuery}
+                            onChange={(event) => setShoppingRecipeQuery(event.target.value)}
+                            placeholder="Buscar y añadir receta extra (ej: Postre)"
+                            className="h-11 w-full rounded-xl border border-black/10 bg-[#f8f9fa] pl-11 pr-4 text-sm text-[#1f2328] outline-none transition focus:border-[var(--primary-rt)] focus:ring-2 focus:ring-[#fce2ba]"
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-                      <div className="relative">
-                        <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0a6]">
-                          <path d="M11 4a7 7 0 1 1 0 14a7 7 0 0 1 0-14m0 0l0 0m8.5 15.5L17 17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-                        </svg>
-                        <input
-                          value={shoppingRecipeQuery}
-                          onChange={(event) => setShoppingRecipeQuery(event.target.value)}
-                          placeholder="Agregar por receta, ingrediente o categoría"
-                          className="h-11 w-full rounded-2xl border border-black/10 bg-[#f8f9fa] pl-11 pr-4 text-sm text-[#1f2328] outline-none transition focus:border-[#f39c12] focus:ring-2 focus:ring-[#fce2ba]"
-                        />
-                      </div>
-                      <span className="inline-flex min-h-11 items-center rounded-2xl bg-[#f3f4f6] px-4 text-xs font-semibold text-[#6b7280]">
-                        + receta extra
-                      </span>
-                    </div>
+                    
                     {shoppingRecipeQuery.trim().length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         {shoppingRecipeSuggestions.length === 0 ? (
                           <span className="rounded-full bg-[#f8f2eb] px-3 py-1.5 text-xs font-semibold text-[#8a7768]">Sin coincidencias</span>
                         ) : (
@@ -3422,8 +3402,11 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
                             <button
                               key={recipe.id}
                               type="button"
-                              onClick={() => addRecipeToShoppingSelection(recipe.id)}
-                              className="inline-flex min-h-9 items-center rounded-full border border-[#e3d9ce] bg-white px-3 text-xs font-semibold text-[#5f5245] transition hover:bg-[#fff7ef]"
+                              onClick={() => {
+                                addRecipeToShoppingSelection(recipe.id);
+                                setShoppingRecipeQuery('');
+                              }}
+                              className="inline-flex min-h-9 items-center rounded-full border border-[#e3d9ce] bg-white px-3 text-xs font-bold text-[#d86315] transition hover:bg-[#fff7ef]"
                             >
                               + {recipe.title}
                             </button>
@@ -3431,53 +3414,50 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
                         )}
                       </div>
                     ) : null}
-                    <div className="mt-3 space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a6759]">Recetas de la semana</p>
+
+                    <div className="mt-6">
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a6759]">
+                        Recetas incluidas ({weeklySelectedRecipeIds.length + selectedExtraRecipes.length})
+                      </p>
                       <div className="flex flex-wrap gap-2">
-                        {weeklyRecipeIds.length === 0 ? (
-                          <span className="rounded-full bg-[#f8f2eb] px-3 py-1.5 text-xs font-semibold text-[#8a7768]">No hay recetas en el plan semanal</span>
+                        {weeklyRecipeIds.length === 0 && selectedExtraRecipes.length === 0 ? (
+                          <span className="rounded-xl border border-dashed border-[#d5c9ba] px-4 py-3 text-[13px] font-medium text-[#8a7768] w-full text-center">
+                            Ninguna receta seleccionada. ¿Planeamos la semana?
+                          </span>
                         ) : (
-                          weeklyRecipeIds.map((recipeId) => {
-                            const recipe = recipesById.get(recipeId);
-                            if (!recipe) return null;
-                            const active = weeklySelectedRecipeIds.includes(recipeId);
-                            return (
-                              <button
-                                key={recipeId}
-                                type="button"
-                                onClick={() => toggleWeeklyRecipeSelection(recipeId)}
-                                className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                                  active
-                                    ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
-                                    : 'border-[#dacfc3] bg-white text-[#7a6759]'
-                                }`}
-                              >
-                                {recipe.title}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a6759]">Recetas extra</p>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedExtraRecipes.length === 0 ? (
-                          <span className="rounded-full bg-[#f8f2eb] px-3 py-1.5 text-xs font-semibold text-[#8a7768]">Aún no agregas recetas extra</span>
-                        ) : (
-                          selectedExtraRecipes.map((recipe) => (
-                            <span key={recipe.id} className="inline-flex min-h-9 items-center gap-2 rounded-full bg-[#fff1e3] px-3 py-1 text-xs font-semibold text-[#d86315]">
-                              {recipe.title}
-                              <button
-                                type="button"
-                                onClick={() => removeExtraRecipeFromShoppingSelection(recipe.id)}
-                                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#b15a20] transition hover:bg-[#fef4e8]"
-                                aria-label={`Quitar ${recipe.title}`}
-                              >
-                                <X size={12} />
-                              </button>
-                            </span>
-                          ))
+                          <>
+                            {weeklyRecipeIds.map((recipeId) => {
+                              const recipe = recipesById.get(recipeId);
+                              if (!recipe) return null;
+                              const active = weeklySelectedRecipeIds.includes(recipeId);
+                              return (
+                                <button
+                                  key={recipeId}
+                                  type="button"
+                                  onClick={() => toggleWeeklyRecipeSelection(recipeId)}
+                                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-[13px] font-semibold transition ${
+                                    active
+                                      ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
+                                      : 'border-[#dacfc3] bg-[#fdfaf7] text-[#8a7768] hover:bg-white'
+                                  }`}
+                                >
+                                  {active ? '✓ ' : ''}{recipe.title}
+                                </button>
+                              );
+                            })}
+                            {selectedExtraRecipes.map((recipe) => (
+                              <span key={recipe.id} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--primary-rt)] bg-[var(--primary-rt)] px-3 py-1 text-[13px] font-semibold text-white">
+                                ✓ {recipe.title}
+                                <button
+                                  type="button"
+                                  onClick={() => removeExtraRecipeFromShoppingSelection(recipe.id)}
+                                  className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </span>
+                            ))}
+                          </>
                         )}
                       </div>
                     </div>

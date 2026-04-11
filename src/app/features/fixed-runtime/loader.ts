@@ -47,7 +47,7 @@ function parseIngredientReference(
   const amountIsValid = (typeof amount === 'number' && Number.isFinite(amount) && amount > 0)
     || (typeof amount === 'string' && amount.trim().length > 0);
   const unit = typeof raw.unit === 'string' ? raw.unit.trim() : '';
-  if (!name || !canonicalName || !amountIsValid || !unit) {
+  if (!name || !canonicalName || !amountIsValid || typeof raw.unit !== 'string') {
     throw new Error(`Paso con ingrediente incompleto en receta ${recipeId}, fase ${phaseId}, índice ${stepIndex}.`);
   }
   return {
@@ -92,7 +92,7 @@ function parseIngredientItem(raw: unknown, recipeId: string, groupIndex: number)
   const amountIsValid = (typeof amount === 'number' && Number.isFinite(amount) && amount > 0)
     || (typeof amount === 'string' && amount.trim().length > 0);
   const unit = typeof raw.unit === 'string' ? raw.unit.trim() : '';
-  if (!name || !canonicalName || !amountIsValid || !unit) {
+  if (!name || !canonicalName || !amountIsValid || typeof raw.unit !== 'string') {
     throw new Error(`Grupo con item inválido en receta ${recipeId}, índice ${groupIndex}.`);
   }
   return {
@@ -240,7 +240,7 @@ function inferGroupPositions(steps: FixedRecipeStep[]): FixedRecipeStep[] {
       substepCount++;
     }
 
-    if (substepCount < 2) continue; // need at least 2 substeps to form a group
+    if (substepCount < 1) continue; // need at least 1 substep to form a group
 
     const groupId = candidate.id;
     candidate.groupPosition = 'header';
