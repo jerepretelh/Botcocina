@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Plan - Asistente de Cocina</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .plan-grid { display: grid; gap: 20px; grid-template-columns: 1fr; }
+    @media (min-width: 1024px) { .plan-grid { grid-template-columns: 1fr 1fr 1fr; } }
+    @media (min-width: 1400px) { .plan-grid { grid-template-columns: repeat(5, 1fr); } }
+
+    .day-col { background: var(--bg-surface); border-radius: var(--radius-md); padding: 24px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-line); display: flex; flex-direction: column; gap: 16px; }
+    .day-col.focused { border-color: var(--primary); border-top: 4px solid var(--primary); box-shadow: var(--shadow-md); padding-top: 21px; }
+
+    .day-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-line); padding-bottom: 12px; }
+    .day-name { font-size: 18px; font-weight: 800; color: var(--text-main); }
+    .day-date { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+    .day-col.focused .day-name, .day-col.focused .day-date { color: var(--primary); }
+
+    .meal-slot { display: flex; gap: 12px; align-items: center; background: var(--bg-body); border-radius: var(--radius-sm); padding: 12px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; text-decoration: none; color: inherit; }
+    .meal-slot:hover { border-color: #D6D3D1; background: #fff; }
+    .meal-img { width: 56px; height: 56px; border-radius: 10px; background-size: cover; background-position: center; flex-shrink: 0; }
+    .meal-info { display: flex; flex-direction: column; gap: 2px; }
+    .meal-type { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); }
+    .meal-title { font-size: 14px; font-weight: 700; color: var(--text-main); line-height: 1.3;}
+
+    .meal-empty { background: transparent; border: 1.5px dashed var(--border-line); justify-content: center; padding: 20px; color: var(--text-muted); font-size: 14px; font-weight: 700; display: flex; text-decoration: none; }
+    .meal-empty:hover { background: var(--primary-fade); border-color: var(--primary); color: var(--primary); border-style: solid; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <nav class="nav-bar">
+      <a href="library.html" class="nav-item">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></div>
+        <span>Explorar</span>
+      </a>
+      <a href="plan.html" class="nav-item active">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+        <span>Mi Plan</span>
+      </a>
+      <a href="shop.html" class="nav-item">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>
+        <span>Compras</span>
+      </a>
+    </nav>
+    <main class="main-viewport">
+      <div class="view-container">
+        <div class="header-row">
+          <div><h1 class="page-title">Mi Plan Semanal</h1><p class="page-subtitle">Semana del 12 al 18 de Marzo</p></div>
+          <button class="btn-create" style="background: var(--text-main);">Modificar Plan</button>
+        </div>
+        <div class="plan-grid">
+          <div class="day-col focused">
+            <div class="day-head"><span class="day-name">Hoy</span><span class="day-date">13 Mar</span></div>
+            <a href="recipe_detail.html" class="meal-slot">
+              <div class="meal-img" style="background-image: url('https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=200')"></div>
+              <div class="meal-info"><span class="meal-type">Almuerzo</span><span class="meal-title">Arroz con Pollo Casero</span></div>
+            </a>
+            <a href="#" class="meal-empty">+ Planear Cena</a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

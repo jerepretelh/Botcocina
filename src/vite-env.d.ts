@@ -5,11 +5,17 @@ declare const __APP_METADATA__: {
   version: string;
   environment: 'production' | 'preview' | 'development';
 };
+declare const __SUPABASE_CLIENT_CONFIG__: {
+  enabled: boolean;
+  url: string;
+  anonKey: string;
+};
 
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_SUPABASE_ENABLED?: string;
+  readonly VITE_FIXED_RUNTIME_STORAGE_MODE?: string;
   readonly VITE_SUPABASE_RECIPE_SEEDS_ENABLED?: string;
   readonly VITE_SUPABASE_USER_RECIPE_CONFIGS_ENABLED?: string;
   readonly VITE_AI_MOCK_MODE?: string;

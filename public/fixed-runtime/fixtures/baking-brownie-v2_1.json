@@ -1,0 +1,89 @@
+{
+  "id": "brownie-clasico-8p",
+  "title": "Brownie clásico",
+  "recipeCategory": "baking",
+  "equipment": ["horno", "molde cuadrado 20 cm", "batidor de mano"],
+  "servings": 8,
+  "ingredients": [
+    {
+      "title": "Masa",
+      "icon": "🍫",
+      "items": [
+        {
+          "name": "chocolate bitter",
+          "canonicalName": "chocolate bitter",
+          "shoppingKey": "chocolate-bitter",
+          "amount": 200,
+          "unit": "g",
+          "displayAmount": "1",
+          "displayUnit": "tableta"
+        },
+        {
+          "name": "mantequilla",
+          "canonicalName": "mantequilla",
+          "shoppingKey": "mantequilla",
+          "amount": 120,
+          "unit": "g"
+        },
+        {
+          "name": "azucar",
+          "canonicalName": "azucar",
+          "shoppingKey": "azucar",
+          "amount": 180,
+          "unit": "g",
+          "displayAmount": "3/4",
+          "displayUnit": "taza"
+        },
+        {
+          "name": "huevo",
+          "canonicalName": "huevo",
+          "shoppingKey": "huevo",
+          "amount": 3,
+          "unit": "unidad"
+        },
+        {
+          "name": "vainilla",
+          "canonicalName": "vainilla",
+          "shoppingKey": "vainilla",
+          "amount": 5,
+          "unit": "ml",
+          "displayAmount": "1",
+          "displayUnit": "cdta"
+        },
+        {
+          "name": "nueces",
+          "canonicalName": "nuez",
+          "shoppingKey": "nuez",
+          "amount": 60,
+          "unit": "g",
+          "isOptional": true
+        }
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "fase-1-preparacion",
+      "number": "FASE 1",
+      "title": "Preparación",
+      "emoji": "🔪",
+      "purpose": "Organizar ingredientes y pre-calentar.",
+      "steps": [
+        { "id": "f1-s1", "kind": "action", "text": "Precalentar horno a 180 C.", "container": "horno-1" },
+        { "id": "f1-s2", "kind": "action", "text": "Engrasar molde de 20 cm.", "container": "molde-1" }
+      ]
+    },
+    {
+      "id": "fase-2-horneado",
+      "number": "FASE 2",
+      "title": "Horneado",
+      "emoji": "🔥",
+      "purpose": "Cocinar masa hasta centro húmedo.",
+      "steps": [
+        { "id": "f2-s1", "kind": "action", "text": "Verter mezcla en el molde.", "container": "molde-1" },
+        { "id": "f2-s2", "kind": "timer", "text": "Hornear brownie.", "timerSec": 1800, "container": "horno-1" },
+        { "id": "f2-s3", "kind": "result", "text": "Superficie brillante con centro húmedo.", "result": "brownie horneado" }
+      ]
+    }
+  ]
+}

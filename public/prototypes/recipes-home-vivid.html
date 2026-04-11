@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recetas • Biblioteca fresca</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      color-scheme:light;
+
+      --canvas:#fbfcfa;
+      --canvas-tint:#f4f8f4;
+      --surface:#ffffff;
+      --surface-soft:#f5f7f5;
+      --ink:#19181f;
+      --muted:#6b6876;
+      --line:rgba(25,24,31,.08);
+      --line-strong:rgba(25,24,31,.14);
+      --leaf:#63b64d;
+      --mint:#e8f5ea;
+      --berry:#db5c93;
+      --sky:#6f87ff;
+      --focus:rgba(111,135,255,.28);
+
+      --space-1:4px;
+      --space-2:8px;
+      --space-3:12px;
+      --space-4:16px;
+      --space-5:20px;
+      --space-6:24px;
+      --space-8:32px;
+
+      --radius-sm:14px;
+      --radius-md:18px;
+      --radius-lg:22px;
+      --radius-xl:24px;
+      --radius-full:999px;
+
+      --shadow-1:0 8px 20px rgba(47,62,116,.05);
+      --shadow-2:0 14px 28px rgba(47,62,116,.08);
+      --nav-h:68px;
+      --ease:cubic-bezier(.4,0,.2,1);
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:"Inter",system-ui,-apple-system,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(102,187,78,.09), transparent 18%),
+        radial-gradient(circle at 100% 0%, rgba(111,135,255,.07), transparent 16%),
+        linear-gradient(180deg, #fbfcfa 0%, var(--canvas-tint) 100%);
+    }
+
+    button,input{font:inherit}
+    button{cursor:pointer}
+
+    .page{
+      width:min(100%, 1040px);
+      margin:0 auto;
+      padding:10px 16px calc(var(--nav-h) + 14px);
+    }
+
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+
+    .title{
+      margin:0;
+      font-family:"Sora",system-ui,sans-serif;
+      font-size:clamp(1.5rem, 2.1vw, 1.85rem);
+      line-height:1;
+      letter-spacing:-.05em;
+    }
+
+    .search-zone{
+      position:sticky;
+      top:0;
+      z-index:20;
+      padding:6px 0 10px;
+      margin-bottom:12px;
+      background:linear-gradient(180deg, rgba(251,252,248,.95) 0%, rgba(251,252,248,.84) 78%, rgba(251,252,248,0) 100%);
+      backdrop-filter:blur(12px);
+    }
+
+    .search-row{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:10px;
+      align-items:center;
+    }
+
+    .search-wrap{
+      position:relative;
+      min-width:0;
+    }
+
+    .search-icon{
+      position:absolute;
+      left:16px;
+      top:50%;
+      transform:translateY(-50%);
+      color:#8e8aa0;
+      font-size:16px;
+      font-weight:700;
+      pointer-events:none;
+    }
+
+    .search{
+      width:100%;
+      min-height:50px;
+      border:none;
+      outline:none;
+      border-radius:17px;
+      padding:0 16px 0 44px;
+      background:var(--surface);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--line), var(--shadow-1);
+      font-size:14px;
+      font-weight:600;
+      transition:box-shadow 150ms var(--ease), transform 150ms var(--ease);
+    }
+
+    .search:focus{
+      box-shadow:inset 0 0 0 2px var(--focus), var(--shadow-2);
+      transform:translateY(-1px);
+    }
+
+    .filter-button{
+      min-width:50px;
+      min-height:50px;
+      border:none;
+      border-radius:17px;
+      background:var(--surface);
+      color:#636078;
+      box-shadow:inset 0 0 0 1px var(--line), var(--shadow-1);
+      font-size:18px;
+      font-weight:700;
+      transition:transform 150ms var(--ease), box-shadow 150ms var(--ease), color 150ms var(--ease);
+    }
+
+    .filter-button:hover{
+      transform:translateY(-1px);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--line-strong), var(--shadow-2);
+    }
+
+    .create-inline{
+      min-height:36px;
+      padding:0 12px;
+      border:none;
+      border-radius:12px;
+      background:linear-gradient(135deg, var(--sky), #5968ea);
+      color:#fbfbff;
+      font-size:12px;
+      font-weight:800;
+      box-shadow:0 10px 20px rgba(89,104,234,.16);
+      transition:transform 150ms var(--ease), filter 150ms var(--ease), box-shadow 150ms var(--ease);
+    }
+
+    .create-inline:hover{
+      transform:translateY(-1px);
+      filter:saturate(1.04);
+    }
+
+    .create-inline:active{
+      transform:translateY(1px) scale(.99);
+    }
+
+    .search-meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-top:8px;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:700;
+    }
+
+    .search-meta p{margin:0}
+
+    .section-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+
+    .section-title{
+      margin:0;
+      font-family:"Sora",system-ui,sans-serif;
+      font-size:17px;
+      font-weight:700;
+      letter-spacing:-.03em;
+    }
+
+    .ghost{
+      padding:0;
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .filters{
+      display:flex;
+      gap:10px;
+      overflow:auto;
+      padding:2px 0 4px;
+      margin-bottom:14px;
+      scrollbar-width:none;
+    }
+
+    .filters::-webkit-scrollbar{display:none}
+
+    .chip{
+      flex:0 0 auto;
+      min-height:36px;
+      padding:0 13px;
+      border:none;
+      border-radius:var(--radius-full);
+      background:var(--surface);
+      color:#666271;
+      box-shadow:inset 0 0 0 1px var(--line);
+      font-size:12px;
+      font-weight:800;
+      transition:transform 150ms var(--ease), background 150ms var(--ease), color 150ms var(--ease);
+    }
+
+    .chip:hover{
+      transform:translateY(-1px);
+      color:var(--ink);
+    }
+
+    .chip.active{
+      background:var(--ink);
+      color:#fdfdfd;
+      box-shadow:none;
+    }
+
+    .recipes{
+      display:grid;
+      gap:2px;
+    }
+
+    .recipe{
+      display:grid;
+      grid-template-columns:88px minmax(0,1fr) auto;
+      gap:14px;
+      align-items:center;
+      padding:12px 0;
+      border-bottom:1px solid var(--line);
+      transition:transform 150ms var(--ease);
+    }
+
+    .recipe:hover{
+      transform:translateY(-1px);
+    }
+
+    .thumb{
+      width:88px;
+      height:88px;
+      border-radius:22px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:40px;
+      line-height:1;
+      box-shadow:var(--shadow-1);
+    }
+
+    .recipe-body{
+      min-width:0;
+    }
+
+    .recipe-name{
+      margin:0;
+      font-size:19px;
+      line-height:1.04;
+      letter-spacing:-.04em;
+      font-weight:800;
+      word-break:break-word;
+    }
+
+    .recipe-line{
+      margin:5px 0 0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.4;
+      max-width:30ch;
+    }
+
+    .meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:7px;
+      color:#595668;
+      font-size:11px;
+      font-weight:700;
+    }
+
+    .meta span{
+      position:relative;
+    }
+
+    .meta span + span::before{
+      content:"•";
+      margin-right:10px;
+      color:#c1bccd;
+    }
+
+    .recipe-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex:0 0 auto;
+    }
+
+    .plan-icon{
+      min-width:36px;
+      min-height:36px;
+      border:none;
+      border-radius:12px;
+      background:var(--surface);
+      color:#676372;
+      box-shadow:inset 0 0 0 1px var(--line);
+      font-size:16px;
+      font-weight:800;
+      transition:transform 150ms var(--ease), color 150ms var(--ease), box-shadow 150ms var(--ease), background 150ms var(--ease);
+    }
+
+    .plan-icon:hover{
+      transform:translateY(-1px);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--line-strong), var(--shadow-1);
+      background:var(--surface-soft);
+    }
+
+    .plan-icon:active{
+      transform:translateY(1px) scale(.99);
+    }
+
+    .action{
+      min-width:86px;
+      min-height:38px;
+      padding:0 14px;
+      border:none;
+      border-radius:14px;
+      font-size:12px;
+      font-weight:800;
+      transition:transform 150ms var(--ease), filter 150ms var(--ease);
+    }
+
+    .action:hover{
+      transform:translateY(-1px);
+    }
+
+    .action:active{
+      transform:translateY(1px) scale(.99);
+    }
+
+    .action-bright{
+      background:var(--mint);
+      color:#237244;
+      box-shadow:inset 0 0 0 1px rgba(102,187,78,.12);
+    }
+
+    .empty{
+      display:none;
+      padding:26px 0 8px;
+    }
+
+    .empty.show{display:block}
+
+    .empty h3{
+      margin:0;
+      font-family:"Sora",system-ui,sans-serif;
+      font-size:28px;
+      line-height:1;
+      letter-spacing:-.04em;
+    }
+
+    .empty p{
+      margin:10px 0 0;
+      max-width:34ch;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .empty-actions{
+      display:flex;
+      gap:10px;
+      margin-top:16px;
+      flex-wrap:wrap;
+    }
+
+    .bottom-nav{
+      position:fixed;
+      left:0;
+      right:0;
+      bottom:0;
+      z-index:30;
+      height:var(--nav-h);
+      background:rgba(255,255,255,.94);
+      border-top:1px solid var(--line);
+      backdrop-filter:blur(14px);
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      padding:6px 10px max(6px, env(safe-area-inset-bottom));
+      gap:6px;
+    }
+
+    .nav-item{
+      border:none;
+      border-radius:14px;
+      background:transparent;
+      color:#75707d;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+      font-size:11px;
+      font-weight:800;
+      transition:background 150ms var(--ease), color 150ms var(--ease), transform 150ms var(--ease);
+    }
+
+    .nav-item:hover{
+      transform:translateY(-1px);
+      color:var(--ink);
+    }
+
+    .nav-item.active{
+      background:rgba(111,135,255,.10);
+      color:#4f5fdd;
+    }
+
+    .nav-icon{
+      font-size:17px;
+      line-height:1;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:calc(var(--nav-h) + 12px);
+      transform:translate(-50%, 12px);
+      z-index:40;
+      max-width:min(92vw, 420px);
+      padding:12px 16px;
+      border-radius:var(--radius-full);
+      background:rgba(25,24,31,.92);
+      color:#fff;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity 200ms var(--ease), transform 200ms var(--ease);
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform:translate(-50%, 0);
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+
+    button:focus-visible,
+    input:focus-visible{
+      outline:2px solid rgba(111,135,255,.45);
+      outline-offset:2px;
+    }
+
+    @media (min-width:900px){
+      .recipes{
+        grid-template-columns:1fr 1fr;
+        column-gap:24px;
+      }
+    }
+
+    @media (max-width:639px){
+      .page{
+        padding-inline:12px;
+      }
+
+      .topbar{
+        margin-bottom:8px;
+      }
+
+      .title{
+        font-size:1.4rem;
+      }
+
+      .search-zone{
+        margin-bottom:10px;
+      }
+
+      .recipe{
+        grid-template-columns:72px minmax(0,1fr) auto;
+        gap:12px;
+        align-items:start;
+      }
+
+      .thumb{
+        width:72px;
+        height:72px;
+        border-radius:20px;
+        font-size:34px;
+      }
+
+      .recipe-name{
+        font-size:17px;
+      }
+
+      .recipe-line{
+        font-size:12px;
+        max-width:none;
+      }
+
+      .search{
+        min-height:46px;
+        padding-left:38px;
+        font-size:13px;
+      }
+
+      .search-icon{
+        left:14px;
+        font-size:14px;
+      }
+
+      .search-meta{
+        display:none;
+      }
+
+      .meta{
+        margin-top:6px;
+        gap:6px;
+      }
+
+      .action-bright{
+        min-width:74px;
+        min-height:34px;
+        padding:0 12px;
+        border-radius:12px;
+        font-size:12px;
+      }
+
+      .plan-icon{
+        min-width:34px;
+        min-height:34px;
+        border-radius:11px;
+        font-size:15px;
+      }
+
+      .search-row{
+        grid-template-columns:minmax(0,1fr) auto;
+      }
+
+      .filter-button{
+        min-width:46px;
+        min-height:46px;
+        border-radius:16px;
+      }
+
+      .section-head{
+        margin-bottom:10px;
+      }
+
+      .section-title{
+        font-size:16px;
+      }
+
+      #surpriseButton{
+        display:none;
+      }
+
+      #createInlineButton{
+        min-height:32px;
+        padding:0 10px;
+        border-radius:10px;
+        font-size:11px;
+      }
+
+      .filters{
+        margin-bottom:12px;
+      }
+
+      .chip{
+        min-height:34px;
+        padding:0 12px;
+        font-size:12px;
+      }
+
+      .bottom-nav{
+        padding-top:6px;
+      }
+
+      .nav-item{
+        font-size:10px;
+      }
+
+      .nav-icon{
+        font-size:16px;
+      }
+
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      *,
+      *::before,
+      *::after{
+        animation-duration:.01ms !important;
+        animation-iteration-count:1 !important;
+        transition-duration:.01ms !important;
+        scroll-behavior:auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <h1 class="title">Recetas</h1>
+    </header>
+
+    <section class="search-zone" aria-label="Buscar recetas">
+      <div class="search-row">
+        <div class="search-wrap">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <label class="sr-only" for="searchInput">Buscar recetas</label>
+          <input id="searchInput" class="search" type="search" placeholder="Buscar por receta, ingrediente o categoría" autocomplete="off" />
+        </div>
+        <button class="filter-button" id="filterButton" type="button" aria-label="Filtros">≣</button>
+      </div>
+      <div class="search-meta">
+        <p id="resultsLabel">8 recetas</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="filtersTitle">
+      <div class="section-head">
+        <h2 class="section-title" id="filtersTitle">Categorías</h2>
+        <button class="ghost" id="clearButton" type="button">Limpiar</button>
+      </div>
+      <div class="filters" id="filters"></div>
+    </section>
+
+    <section aria-labelledby="recipesTitle">
+      <div class="section-head">
+        <h2 class="section-title" id="recipesTitle">Biblioteca</h2>
+        <button class="create-inline" id="createInlineButton" type="button">Nueva receta</button>
+      </div>
+      <div class="recipes" id="recipes"></div>
+      <div class="empty" id="emptyState" role="status" aria-live="polite">
+        <h3>No apareció ninguna receta.</h3>
+        <p>Prueba otra búsqueda o limpia filtros. También puedes crear una receta nueva.</p>
+        <div class="empty-actions">
+          <button class="action action-soft" id="emptyResetButton" type="button">Ver todo</button>
+          <button class="action action-bright" id="emptyCreateButton" type="button">Nueva receta</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button class="nav-item active" type="button">
+      <span class="nav-icon" aria-hidden="true">⌂</span>
+      <span>Recetas</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">◔</span>
+      <span>Plan</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">♡</span>
+      <span>Guardadas</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">☰</span>
+      <span>Perfil</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Listo</div>
+
+  <script>
+    const recipes = [
+      { name: "Tacos crujientes de pollo", category: "Cena", time: "22 min", servings: "3 porciones", note: "Picantes y rápidos, con topping fresco.", tags: ["tacos", "pollo", "picante", "cena"], emoji: "🌮", palette: "linear-gradient(135deg, #f24b5c, #ff7b7a)" },
+      { name: "Pasta verde con pistacho", category: "Cena", time: "18 min", servings: "2 porciones", note: "Brillante y cremosa, lista sin esfuerzo.", tags: ["pasta", "pistacho", "verde", "rápido"], emoji: "🍝", palette: "linear-gradient(135deg, #66bb4e, #a3da57)" },
+      { name: "Bowl de salmón cítrico", category: "Ligero", time: "16 min", servings: "1 porción", note: "Fresco y limpio, con mucha textura.", tags: ["salmón", "bowl", "cítrico", "ligero"], emoji: "🍣", palette: "linear-gradient(135deg, #e14e8c, #f48db7)" },
+      { name: "Curry de coco", category: "Veggie", time: "28 min", servings: "3 porciones", note: "Suave, cálido y perfecto para repetir.", tags: ["curry", "coco", "vegano", "comfort"], emoji: "🍛", palette: "linear-gradient(135deg, #6f87ff, #99a8ff)" },
+      { name: "Tostadas de ricotta", category: "Desayuno", time: "9 min", servings: "2 tostadas", note: "Saladas, simples y muy de brunch.", tags: ["tostadas", "ricotta", "brunch", "rápido"], emoji: "🍯", palette: "linear-gradient(135deg, #66bb4e, #95db85)" },
+      { name: "Ensalada de soba", category: "Ligero", time: "14 min", servings: "2 porciones", note: "Fría y viva, con aderezo intenso.", tags: ["soba", "ensalada", "sesamo", "frío"], emoji: "🥗", palette: "linear-gradient(135deg, #6f87ff, #8ec5ff)" },
+      { name: "Rollitos de canela", category: "Postre", time: "55 min", servings: "8 piezas", note: "Esponjosos y con glaseado suave.", tags: ["canela", "postre", "horno", "dulce"], emoji: "🧁", palette: "linear-gradient(135deg, #e14e8c, #f6a1bf)" },
+      { name: "Shakshuka roja", category: "Desayuno", time: "20 min", servings: "2 porciones", note: "Huevos en tomate con mucha personalidad.", tags: ["huevos", "tomate", "brunch", "sartén"], emoji: "🍅", palette: "linear-gradient(135deg, #f24b5c, #ff8b7e)" }
+    ];
+
+    const categories = ["Todas", ...new Set(recipes.map((recipe) => recipe.category))];
+
+    const filtersEl = document.getElementById("filters");
+    const recipesEl = document.getElementById("recipes");
+    const searchInputEl = document.getElementById("searchInput");
+    const resultsLabelEl = document.getElementById("resultsLabel");
+    const emptyStateEl = document.getElementById("emptyState");
+    const toastEl = document.getElementById("toast");
+
+    let activeCategory = "Todas";
+    let searchQuery = "";
+    let toastTimer;
+
+    function syncSearchPlaceholder() {
+      searchInputEl.placeholder = window.innerWidth <= 639
+        ? "Buscar recetas"
+        : "Buscar por receta, ingrediente o categoría";
+    }
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1800);
+    }
+
+    function getFilteredRecipes() {
+      const query = searchQuery.trim().toLowerCase();
+      return recipes.filter((recipe) => {
+        const matchesCategory = activeCategory === "Todas" || recipe.category === activeCategory;
+        const matchesQuery = !query || [recipe.name, recipe.category, recipe.note, ...recipe.tags].join(" ").toLowerCase().includes(query);
+        return matchesCategory && matchesQuery;
+      });
+    }
+
+    function renderFilters() {
+      filtersEl.innerHTML = categories.map((category) => `
+        <button class="chip ${category === activeCategory ? "active" : ""}" type="button" data-category="${category}">
+          ${category}
+        </button>
+      `).join("");
+
+      filtersEl.querySelectorAll("[data-category]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeCategory = button.dataset.category;
+          render();
+          showToast(activeCategory === "Todas" ? "Mostrando toda la biblioteca" : `Filtro: ${activeCategory}`);
+        });
+      });
+    }
+
+    function renderRecipes(items) {
+      recipesEl.innerHTML = items.map((recipe) => `
+        <article class="recipe">
+          <div class="thumb" style="background:${recipe.palette}">
+            <span aria-hidden="true">${recipe.emoji}</span>
+          </div>
+          <div class="recipe-body">
+            <h3 class="recipe-name">${recipe.name}</h3>
+            <p class="recipe-line">${recipe.note}</p>
+            <div class="meta">
+              <span>${recipe.category}</span>
+              <span>${recipe.time}</span>
+              <span>${recipe.servings}</span>
+            </div>
+          </div>
+          <div class="recipe-actions">
+            <button class="plan-icon" type="button" data-plan="${recipe.name}" aria-label="Planificar ${recipe.name}">◔</button>
+            <button class="action action-bright" type="button" data-open="${recipe.name}">Abrir</button>
+          </div>
+        </article>
+      `).join("");
+
+      recipesEl.querySelectorAll("[data-plan]").forEach((button) => {
+        button.addEventListener("click", () => showToast(`Añadido al plan: ${button.dataset.plan}`));
+      });
+
+      recipesEl.querySelectorAll("[data-open]").forEach((button) => {
+        button.addEventListener("click", () => showToast(`Abriendo ${button.dataset.open}`));
+      });
+    }
+
+    function render() {
+      const filtered = getFilteredRecipes();
+      resultsLabelEl.textContent = `${filtered.length} recetas`;
+      renderFilters();
+      renderRecipes(filtered);
+      const hasResults = filtered.length > 0;
+      recipesEl.hidden = !hasResults;
+      emptyStateEl.classList.toggle("show", !hasResults);
+    }
+
+    searchInputEl.addEventListener("input", (event) => {
+      searchQuery = event.target.value;
+      render();
+    });
+
+    document.getElementById("clearButton").addEventListener("click", () => {
+      activeCategory = "Todas";
+      searchQuery = "";
+      searchInputEl.value = "";
+      render();
+      showToast("Filtros reiniciados");
+    });
+
+    document.getElementById("emptyResetButton").addEventListener("click", () => {
+      activeCategory = "Todas";
+      searchQuery = "";
+      searchInputEl.value = "";
+      render();
+      showToast("Volviste a toda la biblioteca");
+    });
+
+    ["createInlineButton", "emptyCreateButton"].forEach((id) => {
+      document.getElementById(id).addEventListener("click", () => {
+        showToast("Nueva receta lista para empezar");
+      });
+    });
+
+    document.getElementById("filterButton").addEventListener("click", () => {
+      showToast("Filtros rápidos");
+    });
+
+    window.addEventListener("resize", syncSearchPlaceholder);
+    syncSearchPlaceholder();
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compras - Asistente de Cocina</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .shop-wrapper { max-width: 800px; margin: 0 auto; }
+    
+    /* Stats con Barra de Progreso */
+    .shop-stats { display: flex; gap: 16px; margin-bottom: 32px; align-items: stretch; }
+    .stat-card { 
+      flex: 1; background: var(--bg-surface); padding: 20px; border-radius: var(--radius-md); 
+      box-shadow: var(--shadow-sm); border: 1px solid var(--border-line);
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .stat-val { font-size: 32px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; display: flex; align-items: baseline; gap: 4px; }
+    .stat-val span { font-size: 16px; color: var(--text-muted); font-weight: 600; }
+    .stat-lbl { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+    
+    .progress-track { height: 6px; background: var(--bg-soft); border-radius: 100px; overflow: hidden; margin-top: 12px; }
+    .progress-fill { height: 100%; background: var(--success); width: 33%; border-radius: 100px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .shop-category { margin-bottom: 32px; }
+    .shop-cat-title { font-size: 14px; font-weight: 800; color: var(--text-muted); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    .shop-item {
+      display: flex; align-items: center; gap: 16px; padding: 18px 24px; background: var(--bg-surface); border-radius: var(--radius-sm); margin-bottom: 10px;
+      border: 1px solid var(--border-line); cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: var(--shadow-sm); border-left: 4px solid transparent;
+    }
+    .shop-item:hover { transform: translateX(4px); box-shadow: var(--shadow-md); border-color: rgba(234, 230, 223, 1); }
+    .shop-item:active { transform: scale(0.98); }
+    
+    .shop-item.checked { background: rgba(244, 241, 234, 0.5); opacity: 0.7; border-left: 4px solid var(--success); box-shadow: none; transform: translateX(0); }
+    .shop-item.checked:hover { opacity: 0.9; }
+    
+    /* Animated Strikethrough */
+    .si-name { font-size: 17px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; position: relative; display: inline-block; }
+    .si-name::after {
+      content: ''; position: absolute; left: 0; top: 50%; width: 0%; height: 2px; background: var(--text-muted);
+      transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .shop-item.checked .si-name { color: var(--text-muted); }
+    .shop-item.checked .si-name::after { width: 100%; }
+    
+    .check-circle { 
+        width: 28px; height: 28px; border: 2px solid #D6D2CC; border-radius: 50%; 
+        display: flex; align-items: center; justify-content: center; color: transparent; 
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); flex-shrink: 0; background: var(--bg-surface);
+    }
+    .shop-item:hover .check-circle { border-color: var(--primary); }
+    .shop-item.checked .check-circle { background: var(--success); border-color: var(--success); color: white; transform: scale(1.1); }
+    
+    .si-info { flex: 1; }
+    .si-details { font-size: 13px; font-weight: 500; color: #A8A29E; display: flex; align-items: center; gap: 8px; }
+    .si-recipe-tag { background: var(--bg-soft); border: 1px solid var(--border-line); padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <nav class="nav-bar">
+      <a href="library.html" class="nav-item">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg></div>
+        <span>Explorar</span>
+      </a>
+      <a href="plan.html" class="nav-item">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+        <span>Mi Plan</span>
+      </a>
+      <a href="shop.html" class="nav-item active">
+        <div class="nav-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>
+        <span>Compras</span>
+      </a>
+    </nav>
+    <main class="main-viewport">
+      <div class="view-container shop-wrapper">
+        <div class="header-row">
+          <div><h1 class="page-title">Por Comprar</h1><p class="page-subtitle">Generada de tu plan semanal activo</p></div>
+        </div>
+        <div class="shop-stats">
+          <div class="stat-card">
+            <div class="stat-val">12 <span>restantes</span></div>
+            <div class="stat-lbl">6 artículos listos</div>
+            <div class="progress-track"><div class="progress-fill" id="pb"></div></div>
+          </div>
+          <div class="stat-card" style="align-items: center; justify-content: center; background: var(--success); color: white; cursor: pointer; border: none; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4); transform: scale(1); transition: 0.2s;">
+            <div style="font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px;">Finalizar Compra <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+          </div>
+        </div>
+
+        <div class="shop-category">
+          <div class="shop-cat-title">🍖 Carnes y Aves</div>
+          <div class="shop-item" onclick="toggleShop(this)">
+            <div class="check-circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+            <div class="si-info">
+              <div class="si-name">1 kg de Pollo en trozos</div>
+              <div class="si-details"><span class="si-recipe-tag">Arroz con Pollo</span></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="shop-category">
+          <div class="shop-cat-title">🥬 Base verde</div>
+          <div class="shop-item checked" onclick="toggleShop(this)">
+            <div class="check-circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+            <div class="si-info"><div class="si-name">1 atado de Culantro</div><div class="si-details"><span class="si-recipe-tag">Arroz con Pollo</span></div></div>
+          </div>
+          <div class="shop-item" onclick="toggleShop(this)">
+            <div class="check-circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+            <div class="si-info"><div class="si-name">2 Cebollas rojas</div><div class="si-details"><span class="si-recipe-tag">Aderezos</span></div></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script>
+    function toggleShop(el) {
+      el.classList.toggle('checked');
+      // Update progress logic as a demo
+      let total = document.querySelectorAll('.shop-item').length;
+      let chk = document.querySelectorAll('.shop-item.checked').length;
+      document.getElementById('pb').style.width = (chk/total*100) + '%';
+    }
+    toggleShop(document.querySelector('.shop-item.checked')); // init
+  </script>
+</body>
+</html>

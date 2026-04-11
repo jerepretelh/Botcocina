@@ -289,6 +289,16 @@ export interface ShoppingAggregationEntry {
     itemName: string;
     quantityText: string;
     isAmbiguous: boolean;
+    mergeKey?: string;
+    mergeSource?: 'shoppingKey' | 'canonicalName' | 'name';
+    bucket?: 'essential' | 'optional';
+    canonicalName?: string;
+    displayName?: string;
+    unit?: string | null;
+    unitFamily?: 'weight' | 'volume' | 'unit' | 'other' | 'ambiguous';
+    amount?: number | null;
+    quantityStatus?: 'resolved' | 'ambiguous' | 'incompatible';
+    hasIncompatibleUnits?: boolean;
     sourceRecipes: Array<{
         recipeId: string | null;
         recipeName: string;
@@ -303,11 +313,34 @@ export interface ShoppingAggregationByRecipeGroup {
     dayOfWeek: number | null;
     slot: WeeklyPlanSlot | null;
     items: ShoppingAggregationEntry[];
+    essentials?: ShoppingAggregationEntry[];
+    optionals?: ShoppingAggregationEntry[];
+}
+
+export interface ShoppingAggregationGroup {
+    mergeKey: string;
+    canonicalName: string;
+    displayName: string;
+    mergeSource: 'shoppingKey' | 'canonicalName' | 'name';
+    bucket: 'essential' | 'optional';
+    hasIncompatibleUnits: boolean;
+    entries: ShoppingAggregationEntry[];
+}
+
+export interface ShoppingAggregationIssue {
+    code: 'FALLBACK_TO_CANONICAL' | 'FALLBACK_TO_NAME' | 'INCOMPATIBLE_UNIT' | 'AMBIGUOUS_AMOUNT';
+    mergeKey: string;
+    mergeSource: 'shoppingKey' | 'canonicalName' | 'name';
+    details: string;
+    affectedKeys: string[];
 }
 
 export interface ShoppingAggregationResult {
     totalized: ShoppingAggregationEntry[];
+    essentials?: ShoppingAggregationGroup[];
+    optionals?: ShoppingAggregationGroup[];
     byRecipe: ShoppingAggregationByRecipeGroup[];
+    issues?: ShoppingAggregationIssue[];
 }
 
 export interface RecipeCategory {

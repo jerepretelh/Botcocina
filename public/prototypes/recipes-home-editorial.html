@@ -1,0 +1,973 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recetas • Biblioteca serena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      color-scheme:light;
+
+      --canvas:#f6f0e8;
+      --paper:#fcfaf6;
+      --paper-strong:#ffffff;
+      --paper-muted:#f1e9de;
+      --ink:#241a13;
+      --smoke:#726255;
+      --steam:rgba(36,26,19,.08);
+      --steam-strong:rgba(36,26,19,.14);
+      --hearth:#c76c42;
+      --olive:#73815d;
+      --focus:rgba(199,108,66,.22);
+
+      --space-1:4px;
+      --space-2:8px;
+      --space-3:12px;
+      --space-4:16px;
+      --space-5:20px;
+      --space-6:24px;
+      --space-8:32px;
+
+      --radius-sm:12px;
+      --radius-md:18px;
+      --radius-lg:24px;
+      --radius-xl:30px;
+      --radius-full:999px;
+
+      --shadow-1:0 10px 22px rgba(77,53,37,.06);
+      --shadow-2:0 16px 30px rgba(77,53,37,.08);
+      --nav-h:84px;
+
+      --ease-standard:cubic-bezier(.4,0,.2,1);
+      --ease-decelerate:cubic-bezier(0,0,.2,1);
+    }
+
+    *{box-sizing:border-box}
+
+    html{scroll-behavior:smooth}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:"Manrope",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(239,215,189,.6), transparent 26%),
+        radial-gradient(circle at 100% 0%, rgba(225,202,178,.26), transparent 18%),
+        linear-gradient(180deg, #faf5ef 0%, var(--canvas) 100%);
+    }
+
+    button,
+    input{
+      font:inherit;
+    }
+
+    button{cursor:pointer}
+
+    .page{
+      width:min(100%, 960px);
+      margin:0 auto;
+      padding:18px 14px calc(var(--nav-h) + 32px);
+    }
+
+    .topbar{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:var(--space-4);
+      margin-bottom:var(--space-5);
+    }
+
+    .eyebrow{
+      margin:0 0 var(--space-2);
+      color:var(--smoke);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+
+    .title{
+      margin:0;
+      font-family:"Fraunces",Georgia,serif;
+      font-size:clamp(2rem, 5vw, 3.15rem);
+      line-height:.96;
+      letter-spacing:-.035em;
+      max-width:8ch;
+    }
+
+    .summary{
+      margin:var(--space-3) 0 0;
+      max-width:34ch;
+      color:var(--smoke);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .utility{
+      flex:0 0 auto;
+      min-width:88px;
+      display:flex;
+      justify-content:flex-end;
+    }
+
+    .week-button{
+      min-height:44px;
+      padding:0 14px;
+      border:1px solid var(--steam);
+      border-radius:var(--radius-full);
+      color:var(--ink);
+      background:rgba(252,250,246,.72);
+      box-shadow:var(--shadow-1);
+      font-size:13px;
+      font-weight:700;
+      transition:background 150ms var(--ease-standard), transform 150ms var(--ease-standard), border-color 150ms var(--ease-standard);
+    }
+
+    .week-button:hover{
+      background:rgba(255,255,255,.92);
+      border-color:var(--steam-strong);
+      transform:translateY(-1px);
+    }
+
+    .search-dock{
+      position:sticky;
+      top:0;
+      z-index:20;
+      padding:8px 0 14px;
+      margin-bottom:var(--space-5);
+      background:linear-gradient(180deg, rgba(246,240,232,.94) 0%, rgba(246,240,232,.82) 76%, rgba(246,240,232,0) 100%);
+      backdrop-filter:blur(14px);
+    }
+
+    .search-card{
+      padding:var(--space-3);
+      border:1px solid rgba(255,255,255,.72);
+      border-radius:var(--radius-xl);
+      background:rgba(252,250,246,.82);
+      box-shadow:var(--shadow-1);
+    }
+
+    .search-row{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:var(--space-3);
+      align-items:center;
+    }
+
+    .search-wrap{
+      position:relative;
+      min-width:0;
+    }
+
+    .search-icon{
+      position:absolute;
+      inset-block-start:50%;
+      inset-inline-start:16px;
+      transform:translateY(-50%);
+      color:#9a8472;
+      pointer-events:none;
+      font-size:15px;
+      font-weight:700;
+    }
+
+    .search{
+      width:100%;
+      min-height:56px;
+      border:none;
+      outline:none;
+      border-radius:20px;
+      padding:0 16px 0 42px;
+      background:var(--paper-strong);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px var(--steam);
+      font-size:15px;
+      font-weight:600;
+      transition:box-shadow 150ms var(--ease-standard), transform 150ms var(--ease-standard);
+    }
+
+    .search:focus{
+      box-shadow:inset 0 0 0 2px var(--focus);
+      transform:translateY(-1px);
+    }
+
+    .create-button{
+      min-width:144px;
+      min-height:56px;
+      padding:0 18px;
+      border:none;
+      border-radius:20px;
+      background:var(--ink);
+      color:#fcf7f1;
+      font-size:14px;
+      font-weight:800;
+      letter-spacing:-.01em;
+      transition:transform 150ms var(--ease-standard), filter 150ms var(--ease-standard);
+    }
+
+    .create-button:hover{
+      transform:translateY(-1px);
+      filter:brightness(1.05);
+    }
+
+    .create-button:active{
+      transform:translateY(1px) scale(.99);
+    }
+
+    .search-meta{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:var(--space-3);
+      margin-top:var(--space-3);
+      color:var(--smoke);
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .search-meta p{
+      margin:0;
+    }
+
+    .section-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:var(--space-3);
+      margin-bottom:var(--space-3);
+    }
+
+    .section-title{
+      margin:0;
+      font-size:18px;
+      font-weight:800;
+      letter-spacing:-.02em;
+    }
+
+    .ghost-link{
+      padding:0;
+      border:none;
+      background:transparent;
+      color:var(--smoke);
+      font-size:13px;
+      font-weight:700;
+    }
+
+    .filters{
+      display:flex;
+      gap:10px;
+      overflow:auto;
+      padding:2px 0 6px;
+      margin-bottom:var(--space-6);
+      scrollbar-width:none;
+    }
+
+    .filters::-webkit-scrollbar{display:none}
+
+    .chip{
+      flex:0 0 auto;
+      min-height:40px;
+      padding:0 14px;
+      border:none;
+      border-radius:var(--radius-full);
+      background:rgba(255,255,255,.54);
+      box-shadow:inset 0 0 0 1px rgba(36,26,19,.06);
+      color:var(--smoke);
+      font-size:13px;
+      font-weight:800;
+      transition:background 150ms var(--ease-standard), color 150ms var(--ease-standard), transform 150ms var(--ease-standard);
+    }
+
+    .chip:hover{
+      transform:translateY(-1px);
+      background:rgba(255,255,255,.8);
+      color:var(--ink);
+    }
+
+    .chip.active{
+      background:var(--paper-strong);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px rgba(36,26,19,.1), var(--shadow-1);
+    }
+
+    .recipes{
+      display:grid;
+      gap:12px;
+    }
+
+    .recipe{
+      display:grid;
+      grid-template-columns:92px minmax(0,1fr) auto;
+      gap:14px;
+      align-items:center;
+      padding:14px;
+      border-radius:26px;
+      background:rgba(252,250,246,.78);
+      border:1px solid rgba(255,255,255,.72);
+      box-shadow:var(--shadow-1);
+      transition:transform 150ms var(--ease-standard), box-shadow 150ms var(--ease-standard), border-color 150ms var(--ease-standard);
+    }
+
+    .recipe:hover{
+      transform:translateY(-1px);
+      box-shadow:var(--shadow-2);
+      border-color:var(--steam-strong);
+    }
+
+    .thumb{
+      width:92px;
+      height:96px;
+      border-radius:22px;
+      padding:12px;
+      color:#fffdf8;
+      display:flex;
+      align-items:flex-end;
+      justify-content:flex-start;
+      font-size:26px;
+      font-weight:700;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.22);
+    }
+
+    .recipe-body{
+      min-width:0;
+    }
+
+    .kicker{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:6px;
+      color:var(--smoke);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    }
+
+    .recipe-name{
+      margin:0;
+      font-size:20px;
+      line-height:1.08;
+      letter-spacing:-.03em;
+      font-weight:800;
+    }
+
+    .recipe-note{
+      margin:7px 0 0;
+      color:var(--smoke);
+      font-size:13px;
+      line-height:1.45;
+      max-width:42ch;
+    }
+
+    .recipe-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:12px;
+    }
+
+    .meta-pill{
+      min-height:28px;
+      padding:0 10px;
+      border-radius:var(--radius-full);
+      background:var(--paper-muted);
+      color:#625346;
+      display:inline-flex;
+      align-items:center;
+      font-size:11px;
+      font-weight:800;
+    }
+
+    .recipe-actions{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:flex-end;
+    }
+
+    .status{
+      color:var(--olive);
+      font-size:12px;
+      font-weight:800;
+      text-align:right;
+      white-space:nowrap;
+    }
+
+    .action-row{
+      display:flex;
+      gap:8px;
+    }
+
+    .action{
+      min-width:86px;
+      min-height:42px;
+      padding:0 14px;
+      border:none;
+      border-radius:16px;
+      font-size:13px;
+      font-weight:800;
+      transition:transform 150ms var(--ease-standard), filter 150ms var(--ease-standard), background 150ms var(--ease-standard);
+    }
+
+    .action:hover{
+      transform:translateY(-1px);
+    }
+
+    .action:active{
+      transform:translateY(1px) scale(.99);
+    }
+
+    .action-secondary{
+      background:var(--paper-strong);
+      color:#5f5146;
+      box-shadow:inset 0 0 0 1px rgba(36,26,19,.08);
+    }
+
+    .action-primary{
+      background:rgba(199,108,66,.12);
+      color:#8b4f2e;
+      box-shadow:inset 0 0 0 1px rgba(199,108,66,.08);
+    }
+
+    .empty{
+      display:none;
+      padding:24px 20px;
+      border-radius:28px;
+      background:rgba(252,250,246,.82);
+      border:1px solid rgba(255,255,255,.72);
+      box-shadow:var(--shadow-1);
+    }
+
+    .empty.show{display:block}
+
+    .empty h3{
+      margin:0;
+      font-family:"Fraunces",Georgia,serif;
+      font-size:28px;
+      line-height:1;
+      letter-spacing:-.03em;
+    }
+
+    .empty p{
+      margin:10px 0 0;
+      color:var(--smoke);
+      font-size:14px;
+      line-height:1.5;
+      max-width:34ch;
+    }
+
+    .empty-actions{
+      display:flex;
+      gap:10px;
+      margin-top:16px;
+      flex-wrap:wrap;
+    }
+
+    .bottom-nav{
+      position:fixed;
+      inset-inline:50% auto auto 50%;
+      bottom:14px;
+      transform:translateX(-50%);
+      z-index:30;
+      width:min(980px, calc(100vw - 20px));
+      padding:8px;
+      border-radius:28px;
+      background:rgba(252,250,246,.82);
+      border:1px solid rgba(255,255,255,.76);
+      box-shadow:var(--shadow-2);
+      backdrop-filter:blur(16px);
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:8px;
+    }
+
+    .nav-item{
+      min-height:56px;
+      border:none;
+      border-radius:20px;
+      background:transparent;
+      color:#7b6b5f;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+      font-size:12px;
+      font-weight:800;
+      transition:background 150ms var(--ease-standard), color 150ms var(--ease-standard), transform 150ms var(--ease-standard);
+    }
+
+    .nav-item:hover{
+      transform:translateY(-1px);
+      color:var(--ink);
+    }
+
+    .nav-item.active{
+      background:var(--paper-strong);
+      color:var(--ink);
+      box-shadow:inset 0 0 0 1px rgba(36,26,19,.06);
+    }
+
+    .nav-icon{
+      font-size:16px;
+      line-height:1;
+    }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:calc(var(--nav-h) + 16px);
+      transform:translate(-50%, 12px);
+      z-index:40;
+      max-width:min(92vw, 420px);
+      padding:12px 16px;
+      border-radius:var(--radius-full);
+      background:rgba(36,26,19,.92);
+      color:#fcf7f1;
+      box-shadow:var(--shadow-2);
+      opacity:0;
+      pointer-events:none;
+      transition:opacity 200ms var(--ease-decelerate), transform 200ms var(--ease-decelerate);
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .toast.show{
+      opacity:1;
+      transform:translate(-50%, 0);
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+
+    button:focus-visible,
+    input:focus-visible{
+      outline:2px solid rgba(199,108,66,.42);
+      outline-offset:2px;
+    }
+
+    @media (min-width:860px){
+      .recipes{
+        grid-template-columns:1fr 1fr;
+      }
+
+      .recipe{
+        align-items:start;
+      }
+
+      .recipe-actions{
+        padding-top:4px;
+      }
+    }
+
+    @media (max-width:859px){
+      .search-row{
+        grid-template-columns:1fr;
+      }
+
+      .create-button{
+        width:100%;
+      }
+    }
+
+    @media (max-width:639px){
+      .topbar{
+        align-items:flex-start;
+      }
+
+      .week-button{
+        min-width:44px;
+        padding:0 12px;
+      }
+
+      .recipe{
+        grid-template-columns:76px minmax(0,1fr);
+      }
+
+      .thumb{
+        width:76px;
+        height:84px;
+        border-radius:18px;
+        font-size:22px;
+      }
+
+      .recipe-actions{
+        grid-column:1 / -1;
+        align-items:stretch;
+      }
+
+      .status{
+        text-align:left;
+      }
+
+      .action-row{
+        width:100%;
+      }
+
+      .action{
+        flex:1 1 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      *,
+      *::before,
+      *::after{
+        animation-duration:.01ms !important;
+        animation-iteration-count:1 !important;
+        transition-duration:.01ms !important;
+        scroll-behavior:auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Biblioteca personal</p>
+        <h1 class="title">Encuentra algo rico rápido.</h1>
+        <p class="summary">Una pantalla hecha para abrir recetas, no para admirar tarjetas. Busca, filtra y entra.</p>
+      </div>
+      <div class="utility">
+        <button class="week-button" id="weekButton" type="button">Semana</button>
+      </div>
+    </header>
+
+    <section class="search-dock" aria-label="Búsqueda de recetas">
+      <div class="search-card">
+        <div class="search-row">
+          <div class="search-wrap">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <label class="sr-only" for="searchInput">Buscar recetas</label>
+            <input id="searchInput" class="search" type="search" placeholder="Busca por receta, ingrediente o categoría" autocomplete="off" />
+          </div>
+          <button class="create-button" id="createButton" type="button">Nueva receta</button>
+        </div>
+        <div class="search-meta">
+          <p id="resultLabel">8 recetas listas</p>
+          <p>Buscar en vivo</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="filtersTitle">
+      <div class="section-head">
+        <h2 class="section-title" id="filtersTitle">Filtrar por categoría</h2>
+        <button class="ghost-link" id="clearButton" type="button">Limpiar</button>
+      </div>
+      <div class="filters" id="filters"></div>
+    </section>
+
+    <section aria-labelledby="recipesTitle">
+      <div class="section-head">
+        <h2 class="section-title" id="recipesTitle">Recetas</h2>
+        <button class="ghost-link" id="surpriseButton" type="button">Elegir por mí</button>
+      </div>
+      <div class="recipes" id="recipes"></div>
+      <div class="empty" id="emptyState" role="status" aria-live="polite">
+        <h3>Sin resultados.</h3>
+        <p>Prueba otra palabra o limpia el filtro. También puedes crear una receta nueva para guardarla aquí.</p>
+        <div class="empty-actions">
+          <button class="action action-secondary" id="emptyResetButton" type="button">Ver todo</button>
+          <button class="action action-primary" id="emptyCreateButton" type="button">Nueva receta</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button class="nav-item active" type="button">
+      <span class="nav-icon" aria-hidden="true">⌂</span>
+      <span>Recetas</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">◔</span>
+      <span>Plan</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">♡</span>
+      <span>Guardadas</span>
+    </button>
+    <button class="nav-item" type="button">
+      <span class="nav-icon" aria-hidden="true">☰</span>
+      <span>Perfil</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">Listo</div>
+
+  <script>
+    const recipes = [
+      {
+        id: 1,
+        name: "Pasta de limón y ricotta",
+        category: "Cena",
+        time: "18 min",
+        difficulty: "Fácil",
+        servings: "2 porciones",
+        note: "Ligera, cremosa y lista cuando no quieres pensar demasiado.",
+        status: "Muy guardada esta semana",
+        tags: ["pasta", "limón", "rápido", "cena"],
+        emoji: "🍋",
+        palette: "linear-gradient(180deg, #c8a161, #8f6a43)"
+      },
+      {
+        id: 2,
+        name: "Pollo asado con hierbas",
+        category: "Horno",
+        time: "42 min",
+        difficulty: "Intermedio",
+        servings: "4 porciones",
+        note: "Una receta confiable para cocinar una vez y comer mejor dos días.",
+        status: "Perfecta para fin de semana",
+        tags: ["pollo", "horno", "domingo", "casero"],
+        emoji: "🍗",
+        palette: "linear-gradient(180deg, #b86b47, #7f4a35)"
+      },
+      {
+        id: 3,
+        name: "Bowl verde con quinoa",
+        category: "Ligero",
+        time: "16 min",
+        difficulty: "Fácil",
+        servings: "1 porción",
+        note: "Fresco y crujiente, con proteína suficiente para sentirse completo.",
+        status: "Ideal al mediodía",
+        tags: ["verde", "quinoa", "saludable", "ligero"],
+        emoji: "🥬",
+        palette: "linear-gradient(180deg, #8b9766, #5c6547)"
+      },
+      {
+        id: 4,
+        name: "Curry rojo de garbanzos",
+        category: "Veggie",
+        time: "27 min",
+        difficulty: "Medio",
+        servings: "3 porciones",
+        note: "Cálido, especiado y de esos platos que mejoran cuando reposan.",
+        status: "Recomendado para batch cooking",
+        tags: ["curry", "garbanzos", "vegano", "comfort"],
+        emoji: "🍛",
+        palette: "linear-gradient(180deg, #b36a4d, #875042)"
+      },
+      {
+        id: 5,
+        name: "Tostadas de palta",
+        category: "Desayuno",
+        time: "9 min",
+        difficulty: "Express",
+        servings: "2 tostadas",
+        note: "Desayuno rápido con textura y un poco de picante si quieres levantarlo.",
+        status: "Abierta 12 veces este mes",
+        tags: ["palta", "desayuno", "brunch", "rápido"],
+        emoji: "🥑",
+        palette: "linear-gradient(180deg, #8e9a63, #647049)"
+      },
+      {
+        id: 6,
+        name: "Cheesecake vasco mini",
+        category: "Postre",
+        time: "55 min",
+        difficulty: "Horno",
+        servings: "6 porciones",
+        note: "Centro suave, bordes tostados y una presencia de sobremesa muy seria.",
+        status: "Favorita para visitas",
+        tags: ["postre", "dulce", "horno", "cremoso"],
+        emoji: "🍰",
+        palette: "linear-gradient(180deg, #c69b67, #8b6547)"
+      },
+      {
+        id: 7,
+        name: "Ramen miso de semana",
+        category: "Cena",
+        time: "24 min",
+        difficulty: "Medio",
+        servings: "2 bowls",
+        note: "Un bowl profundo, salino y reconfortante para cerrar el día.",
+        status: "Muy elegida en noches frías",
+        tags: ["ramen", "miso", "sopa", "cena"],
+        emoji: "🍜",
+        palette: "linear-gradient(180deg, #ad7655, #7c5640)"
+      },
+      {
+        id: 8,
+        name: "Panqueques de avena",
+        category: "Desayuno",
+        time: "14 min",
+        difficulty: "Fácil",
+        servings: "8 unidades",
+        note: "Tiernos, dorados y listos para dejar hechos para mañana.",
+        status: "Muy prácticos para repetir",
+        tags: ["avena", "dulce", "desayuno", "batch"],
+        emoji: "🥞",
+        palette: "linear-gradient(180deg, #c59d62, #91683f)"
+      }
+    ];
+
+    const categories = ["Todas", ...new Set(recipes.map((recipe) => recipe.category))];
+
+    const filtersEl = document.getElementById("filters");
+    const recipesEl = document.getElementById("recipes");
+    const searchInputEl = document.getElementById("searchInput");
+    const resultLabelEl = document.getElementById("resultLabel");
+    const emptyStateEl = document.getElementById("emptyState");
+    const toastEl = document.getElementById("toast");
+
+    let activeCategory = "Todas";
+    let searchQuery = "";
+    let toastTimer;
+
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastEl.classList.remove("show");
+      }, 1800);
+    }
+
+    function getFilteredRecipes() {
+      const query = searchQuery.trim().toLowerCase();
+
+      return recipes.filter((recipe) => {
+        const matchesCategory = activeCategory === "Todas" || recipe.category === activeCategory;
+        const matchesQuery = !query || [
+          recipe.name,
+          recipe.category,
+          recipe.note,
+          recipe.status,
+          ...recipe.tags
+        ].join(" ").toLowerCase().includes(query);
+
+        return matchesCategory && matchesQuery;
+      });
+    }
+
+    function renderFilters() {
+      filtersEl.innerHTML = categories.map((category) => `
+        <button class="chip ${category === activeCategory ? "active" : ""}" type="button" data-category="${category}">
+          ${category}
+        </button>
+      `).join("");
+
+      filtersEl.querySelectorAll("[data-category]").forEach((button) => {
+        button.addEventListener("click", () => {
+          activeCategory = button.dataset.category;
+          render();
+          showToast(activeCategory === "Todas" ? "Mostrando toda la biblioteca" : `Filtro: ${activeCategory}`);
+        });
+      });
+    }
+
+    function renderRecipes(items) {
+      recipesEl.innerHTML = items.map((recipe) => `
+        <article class="recipe">
+          <div class="thumb" style="background:${recipe.palette}">
+            <span aria-hidden="true">${recipe.emoji}</span>
+          </div>
+
+          <div class="recipe-body">
+            <div class="kicker">
+              <span>${recipe.category}</span>
+              <span>•</span>
+              <span>${recipe.difficulty}</span>
+            </div>
+            <h3 class="recipe-name">${recipe.name}</h3>
+            <p class="recipe-note">${recipe.note}</p>
+            <div class="recipe-meta">
+              <span class="meta-pill">${recipe.time}</span>
+              <span class="meta-pill">${recipe.servings}</span>
+              <span class="meta-pill">${recipe.tags[0]}</span>
+            </div>
+          </div>
+
+          <div class="recipe-actions">
+            <div class="status">${recipe.status}</div>
+            <div class="action-row">
+              <button class="action action-secondary" type="button" data-plan="${recipe.name}">Planificar</button>
+              <button class="action action-primary" type="button" data-open="${recipe.name}">Abrir</button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      recipesEl.querySelectorAll("[data-plan]").forEach((button) => {
+        button.addEventListener("click", () => {
+          showToast(`Añadido al plan: ${button.dataset.plan}`);
+        });
+      });
+
+      recipesEl.querySelectorAll("[data-open]").forEach((button) => {
+        button.addEventListener("click", () => {
+          showToast(`Abriendo ${button.dataset.open}`);
+        });
+      });
+    }
+
+    function render() {
+      const filtered = getFilteredRecipes();
+
+      resultLabelEl.textContent = `${filtered.length} de ${recipes.length} recetas`;
+      renderFilters();
+      renderRecipes(filtered);
+
+      const hasResults = filtered.length > 0;
+      recipesEl.hidden = !hasResults;
+      emptyStateEl.classList.toggle("show", !hasResults);
+    }
+
+    searchInputEl.addEventListener("input", (event) => {
+      searchQuery = event.target.value;
+      render();
+    });
+
+    document.getElementById("clearButton").addEventListener("click", () => {
+      activeCategory = "Todas";
+      searchQuery = "";
+      searchInputEl.value = "";
+      render();
+      showToast("Filtros reiniciados");
+    });
+
+    document.getElementById("emptyResetButton").addEventListener("click", () => {
+      activeCategory = "Todas";
+      searchQuery = "";
+      searchInputEl.value = "";
+      render();
+      showToast("Volviste a toda la biblioteca");
+    });
+
+    ["createButton", "emptyCreateButton"].forEach((id) => {
+      document.getElementById(id).addEventListener("click", () => {
+        showToast("Nueva receta lista para empezar");
+      });
+    });
+
+    document.getElementById("surpriseButton").addEventListener("click", () => {
+      const options = getFilteredRecipes();
+      const selected = options[Math.floor(Math.random() * options.length)] || recipes[0];
+      showToast(`Hoy podría ser: ${selected.name}`);
+    });
+
+    document.getElementById("weekButton").addEventListener("click", () => {
+      showToast("Abriendo tu semana");
+    });
+
+    render();
+  </script>
+</body>
+</html>

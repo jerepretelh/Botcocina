@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asistente de Cocina - Prototipo Refinado</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+    :root {
+      --bg-body: #FDFBFA;
+      --bg-surface: #FFFFFF;
+      --bg-soft: #F5F3ED;
+      
+      --primary: #E0583E;
+      --primary-hover: #C54C34;
+      --primary-fade: rgba(224, 88, 62, 0.1);
+      
+      --text-main: #1F1A17;
+      --text-muted: #7A726B;
+      --border-line: #E8E4DF;
+      --success: #16A34A;
+      
+      --shadow-sm: 0 2px 10px rgba(31, 26, 23, 0.03);
+      --shadow-md: 0 12px 32px rgba(31, 26, 23, 0.06);
+      
+      --radius-sm: 12px;
+      --radius-md: 20px;
+      --radius-lg: 32px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; scroll-behavior: smooth;}
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ================================= */
+    /* RECETA RUNTIME (Overlay Completo) */
+    /* ================================= */
+    .rt-overlay {
+      position: fixed; inset: 0; background: var(--bg-body); z-index: 1000;
+      display: block; /* Forzado activo para la demo */
+      overflow-y: auto; overflow-x: hidden;
+    }
+
+    .rt-header-img {
+      position: relative; height: 320px; background-size: cover; background-position: center;
+      background-image: url('https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=1600&q=80');
+    }
+    @media (min-width: 1024px) { .rt-header-img { height: 380px; } }
+    .rt-header-img::after {
+      content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(28,25,23,0.8) 100%);
+    }
+
+    .rt-nav { position: absolute; top: 0; left: 0; right: 0; padding: 24px; z-index: 10; display: flex; justify-content: space-between; }
+    .rt-back { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; transition: 0.2s; }
+    .rt-back:hover { background: rgba(255,255,255,0.3); transform: scale(1.05); }
+
+    .rt-hero-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 40px 24px; z-index: 10; color: #fff; }
+    .rt-hero-content h1 { font-size: 36px; font-weight: 800; line-height: 1.1; margin-bottom: 16px; text-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    .rt-badges { display: flex; gap: 12px; flex-wrap: wrap; }
+    .rt-badge { background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 8px 16px; border-radius: 100px; font-size: 13px; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; gap: 6px; }
+
+    .rt-container { max-width: 1200px; margin: 0 auto; padding: 32px 20px 100px; }
+
+    /* ================================= */
+    /* LAYOUT SPLIT (Desktop)            */
+    /* ================================= */
+    @media (min-width: 1024px) {
+      .desk-flex { display: flex; gap: 40px; align-items: flex-start; }
+      .desk-ing { width: 340px; position: sticky; top: 40px; }
+      .desk-prep { flex: 1; min-width: 0; }
+    }
+
+    /* Tabs (Solo Visible en Mobile) */
+    .rt-tabs { display: flex; background: var(--border-line); padding: 4px; border-radius: 100px; margin-bottom: 32px; }
+    .rt-tab { flex: 1; text-align: center; padding: 12px; border-radius: 100px; font-weight: 700; font-size: 14px; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
+    .rt-tab.active { background: var(--bg-surface); color: var(--text-main); box-shadow: var(--shadow-sm); }
+    @media (min-width: 1024px) { .rt-tabs { display: none; } }
+
+    /* ================================= */
+    /* INGREDIENTES (SIDEBAR / TAB)      */
+    /* ================================= */
+    .ing-card {
+      background: var(--bg-surface); border-radius: var(--radius-lg); padding: 28px;
+      box-shadow: var(--shadow-sm); border: 1px solid var(--border-line); margin-bottom: 24px;
+    }
+    .main-ing-title { font-size: 20px; font-weight: 800; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; color: var(--text-main); padding-bottom: 16px; border-bottom: 1px solid var(--border-line); }
+    
+    .ing-group { margin-bottom: 24px; }
+    .ing-group:last-child { margin-bottom: 0; }
+    .ing-group-head { font-size: 14px; font-weight: 800; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;}
+    
+    .ing-item { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; font-size: 14px; line-height: 1.4; color: var(--text-muted); }
+    .ing-item:last-child { margin-bottom: 0; }
+    .ing-item strong { color: var(--text-main); font-weight: 700; white-space: nowrap; }
+    .ing-item span { flex: 1; }
+    
+    .ing-bullet { width: 6px; height: 6px; background: var(--border-line); border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+
+    /* ================================= */
+    /* FASES / PASOS                     */
+    /* ================================= */
+    .phase-block {
+      background: var(--bg-surface); border-radius: var(--radius-lg);
+      padding: 24px 20px; box-shadow: var(--shadow-sm); border: 1px solid var(--border-line);
+      margin-bottom: 32px; 
+    }
+    @media (min-width: 800px) { .phase-block { padding: 32px 40px; } }
+
+    .phase-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      border-bottom: 1px solid var(--border-line); padding-bottom: 20px; margin-bottom: 8px;
+    }
+    
+    .ph-title-group { display: flex; align-items: center; gap: 12px; }
+    .ph-emoji { font-size: 24px; }
+    .ph-texts { display: flex; flex-direction: column; }
+    .ph-subtitle { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;}
+    .ph-title { font-size: 26px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;}
+
+    .ph-actions { display: flex; gap: 12px; align-items: center; }
+    .ph-tag { background: var(--bg-soft); color: var(--text-muted); font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 100px; display: none;}
+    @media (min-width: 600px) { .ph-tag { display: block; } }
+    
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border-line); color: var(--text-muted);
+      padding: 8px 16px; border-radius: 100px; font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; gap: 6px; cursor: pointer; transition: 0.2s;
+    }
+    .btn-outline:hover { background: var(--bg-soft); border-color: #D6D2CC; color: var(--text-main); }
+
+    /* Lista Lineal de Pasos */
+    .step-list { display: flex; flex-direction: column; }
+
+    .step-row { display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--bg-soft); position: relative; transition: 0.2s; }
+    .step-row:last-child { border-bottom: none; padding-bottom: 0; }
+    
+    .step-row.active::before { content: ''; position: absolute; left: -20px; top: 20px; bottom: 20px; width: 4px; background: var(--primary); border-radius: 0 4px 4px 0; }
+    @media (min-width: 800px) { .step-row.active::before { left: -40px; } }
+
+    .step-num {
+      width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--bg-soft); color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+      border: 1px solid var(--border-line); transition: 0.2s;
+    }
+    .step-row.active .step-num { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;}
+    .step-top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .step-text { font-size: 17px; font-weight: 500; line-height: 1.4; color: var(--text-main); margin-top: 4px; }
+    
+    .btn-timer {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; background: var(--bg-soft); border: 1px solid var(--border-line);
+      padding: 8px 14px; border-radius: 100px; font-size: 13px; font-weight: 800; color: var(--text-main); cursor: pointer; transition: 0.2s;
+      font-variant-numeric: tabular-nums;
+    }
+    .btn-timer:hover { background: #EFECE6; border-color: #DFDBD3; }
+    .btn-timer.running { background: var(--text-main); color: #fff; border-color: var(--text-main); animation: pulse 2s infinite;}
+    
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(31, 26, 23, 0.2); } 70% { box-shadow: 0 0 0 8px rgba(31, 26, 23, 0); } 100% { box-shadow: 0 0 0 0 rgba(31, 26, 23, 0); } }
+
+    .result-alert { margin-top: 12px; background: #FFF9ED; border-left: 3px solid #F5C518; padding: 12px 16px; border-radius: 0 8px 8px 0; display: inline-flex; align-items: center; gap: 8px; }
+    .result-tag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #D4A017; }
+    .result-text { font-size: 14px; font-weight: 600; color: #8A6D00; }
+
+  </style>
+</head>
+<body>
+
+  <div class="rt-overlay" id="recipe-runtime">
+    
+    <div class="rt-header-img">
+      <nav class="rt-nav">
+        <button class="rt-back">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+      </nav>
+      <div class="rt-hero-content">
+        <div class="rt-container" style="padding: 0;">
+          <div class="rt-badges" style="margin-bottom: 12px;">
+            <div class="rt-badge">🔪 En Olla</div>
+          </div>
+          <h1>Arroz con pollo</h1>
+          <div class="rt-badges">
+            <div class="rt-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 42 min </div>
+            <div class="rt-badge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> 3 personas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <div class="rt-container">
+      
+      <div class="desk-flex">
+        
+        <!-- SIDEBAR DE INGREDIENTES (Con Contenido de tu Ref) -->
+        <aside class="desk-ing" id="col-ingredients">
+          <div class="ing-card">
+            <h2 class="main-ing-title">🧺 Ingredientes</h2>
+            
+            <div class="ing-group">
+              <div class="ing-group-head">🍚 Arroz</div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>300 g</strong><span>arroz</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>750 ml</strong><span>caldo de pollo</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>2 dientes</strong><span>ajo (para el arroz)</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>30 ml</strong><span>aceite (para la olla principal)</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>al gusto</strong><span>sal</span></div>
+            </div>
+            
+            <div class="ing-group">
+              <div class="ing-group-head">🍗 Pollo</div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>600 g</strong><span>pollo (presas o trozos)</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>15 ml</strong><span>aceite (para sellar)</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>al gusto</strong><span>sal</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>al gusto</strong><span>pimienta</span></div>
+            </div>
+
+            <div class="ing-group">
+              <div class="ing-group-head">🥣 Base verde</div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>1 unidad</strong><span>cebolla, en brunoise</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>2 dientes</strong><span>ajo, picado (para la base)</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>1 taza</strong><span>culantro, licuado</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>100 g</strong><span>zanahoria, en cubos pequeños</span></div>
+              <div class="ing-item"><div class="ing-bullet"></div><strong>100 g</strong><span>arvejas</span></div>
+            </div>
+
+          </div>
+        </aside>
+
+        <!-- COLUMNA PRINCIPAL DE PREPARACIÓN -->
+        <main class="desk-prep" id="col-preparation">
+          
+          <div class="rt-tabs">
+            <div class="rt-tab" onclick="mSwitch('ing', this)">Ingredientes</div>
+            <div class="rt-tab active" onclick="mSwitch('prep', this)">Preparación</div>
+          </div>
+
+          <!-- FASE 1 -->
+          <div class="phase-block">
+            <div class="phase-header">
+              <div class="ph-title-group">
+                <span class="ph-emoji">🔪</span>
+                <div class="ph-texts">
+                  <span class="ph-subtitle">FASE 1</span>
+                  <h2 class="ph-title">Preparación</h2>
+                </div>
+              </div>
+              <div class="ph-actions">
+                <button class="btn-outline">Ocultar <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+              </div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-row">
+                <div class="step-num">01</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Lavar y escurrir 300 g de arroz.</p></div></div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">02</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Cortar 1 cebolla en brunoise (~0.5 cm).</p></div></div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">03</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Picar 4 dientes de ajo en brunoise fino.</p></div></div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">04</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Cortar 100 g de zanahoria en cubos pequeños (~0.5-1 cm).</p></div></div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">05</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Licuar 1 taza de culantro.</p></div></div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">06</div>
+                <div class="step-body"><div class="step-top-row"><p class="step-text">Salpimentar 600 g de pollo.</p></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FASE 2 -->
+          <div class="phase-block">
+            <div class="phase-header">
+              <div class="ph-title-group">
+                <span class="ph-emoji">🔥</span>
+                <div class="ph-texts">
+                  <span class="ph-subtitle">FASE 2</span>
+                  <h2 class="ph-title">Sellado del pollo</h2>
+                </div>
+              </div>
+              <div class="ph-actions">
+                <span class="ph-tag">4 timers</span>
+                <button class="btn-outline">Ocultar <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+              </div>
+            </div>
+
+            <div class="step-list">
+              <div class="step-row">
+                <div class="step-num">01</div>
+                <div class="step-body">
+                  <div class="step-top-row">
+                    <p class="step-text">Encender fuego medio-alto.</p>
+                    <button class="btn-timer" id="t1" onclick="runTimer('t1', 'x1', 120)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span id="x1">02:00</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">02</div>
+                <div class="step-body">
+                  <div class="step-top-row">
+                    <p class="step-text">Agregar 15 ml de aceite.</p>
+                    <button class="btn-timer" id="t2" onclick="runTimer('t2', 'x2', 30)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span id="x2">00:30</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">03</div>
+                <div class="step-body">
+                  <div class="step-top-row">
+                    <p class="step-text">Agregar 600 g de pollo.</p>
+                    <button class="btn-timer" id="t3" onclick="runTimer('t3', 'x3', 180)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span id="x3">03:00</span>
+                    </button>
+                  </div>
+                  <!-- RESULTADO -->
+                  <div class="result-alert"><span class="result-tag">✨ Resultado</span><span class="result-text">Base dorada del pollo.</span></div>
+                </div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">04</div>
+                <div class="step-body">
+                  <div class="step-top-row">
+                    <p class="step-text">Voltear el pollo.</p>
+                    <button class="btn-timer" id="t4" onclick="runTimer('t4', 'x4', 120)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <span id="x4">02:00</span>
+                    </button>
+                  </div>
+                  <!-- RESULTADO -->
+                  <div class="result-alert"><span class="result-tag">✨ Resultado</span><span class="result-text">Pollo dorado por fuera.</span></div>
+                </div>
+              </div>
+              <div class="step-row">
+                <div class="step-num">05</div>
+                <div class="step-body">
+                  <div class="step-top-row"><p class="step-text">Retirar el pollo.</p></div>
+                  <!-- RESULTADO -->
+                  <div class="result-alert"><span class="result-tag">✨ Resultado</span><span class="result-text">Pollo sellado, no cocido completamente.</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </main>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Logica Tabs Móvil
+    function mSwitch(tabName, el) {
+      document.querySelectorAll('.rt-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      if(window.innerWidth < 1024) {
+        if(tabName === 'ing') {
+          document.getElementById('col-ingredients').style.display = 'block';
+          document.getElementById('col-preparation').style.display = 'none';
+        } else {
+          document.getElementById('col-ingredients').style.display = 'none';
+          document.getElementById('col-preparation').style.display = 'block';
+        }
+      }
+    }
+
+    // Reset flex on resize over 1024
+    window.addEventListener('resize', () => {
+      if(window.innerWidth >= 1024) {
+        document.getElementById('col-ingredients').style.display = 'block';
+        document.getElementById('col-preparation').style.display = 'block';
+      } else {
+        document.querySelectorAll('.rt-tab')[1].click(); // default to prep
+      }
+    });
+    window.dispatchEvent(new Event('resize'));
+
+    const activeTimers = {};
+    function runTimer(btnId, txtId, total) {
+      let btn = document.getElementById(btnId);
+      let txt = document.getElementById(txtId);
+      document.querySelectorAll('.step-row').forEach(row => row.classList.remove('active'));
+      const parentRow = btn.closest('.step-row');
+      parentRow.classList.add('active');
+
+      if(activeTimers[btnId]) {
+        clearInterval(activeTimers[btnId].iv);
+        delete activeTimers[btnId];
+        btn.classList.remove('running');
+        let m = Math.floor(total/60).toString().padStart(2,'0');
+        let s = (total%60).toString().padStart(2,'0');
+        txt.innerText = `${m}:${s}`;
+        return;
+      }
+      
+      btn.classList.add('running');
+      let curr = total;
+
+      let iv = setInterval(() => {
+        curr--;
+        let m = Math.floor(curr/60).toString().padStart(2,'0');
+        let s = (curr%60).toString().padStart(2,'0');
+        txt.innerText = `${m}:${s}`;
+        if(curr <= 0) {
+          clearInterval(iv);
+          txt.innerText = "¡00:00!";
+          btn.style.background = "#16A34A";
+          btn.style.borderColor = "#16A34A";
+          delete activeTimers[btnId];
+        }
+      }, 1000);
+      
+      activeTimers[btnId] = {iv: iv, current: curr};
+    }
+  </script>
+</body>
+</html>

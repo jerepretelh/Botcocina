@@ -161,6 +161,10 @@ export default async function handler(req: any, res: any): Promise<void> {
     let openAIApiKey = ''
 
     if (settings.authMode === 'user_key') {
+      if (!ctx) {
+        sendJson(res, 401, { error: 'Debes iniciar sesión para usar tu API key personal.' })
+        return
+      }
       const storedSecret = await getStoredSecret(ctx.serviceClient, ctx.userId)
       if (!storedSecret || !settings.canUseUserKey) {
         sendJson(res, 400, {

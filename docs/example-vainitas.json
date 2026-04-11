@@ -1,0 +1,477 @@
+{
+    "id": "arroz-vainitas-pollo-3p",
+    "title": "Arroz con vainitas salteadas y pollo",
+    "recipeCategory": "stovetop",
+    "servings": 3,
+    "ingredients": [
+        {
+            "title": "Para el arroz",
+            "icon": "🍚",
+            "items": [
+                {
+                    "name": "arroz",
+                    "canonicalName": "arroz",
+                    "amount": 2,
+                    "unit": "tazas"
+                },
+                {
+                    "name": "agua",
+                    "canonicalName": "agua",
+                    "amount": 3,
+                    "unit": "tazas"
+                },
+                {
+                    "name": "ajo",
+                    "canonicalName": "ajo",
+                    "amount": 1,
+                    "unit": "diente"
+                },
+                {
+                    "name": "aceite",
+                    "canonicalName": "aceite",
+                    "amount": 10,
+                    "unit": "ml"
+                },
+                {
+                    "name": "sal",
+                    "canonicalName": "sal",
+                    "amount": "al gusto",
+                    "unit": "al gusto"
+                }
+            ]
+        },
+        {
+            "title": "Para el salteado",
+            "icon": "🍗🥬",
+            "items": [
+                {
+                    "name": "pollo",
+                    "canonicalName": "pollo",
+                    "amount": 400,
+                    "unit": "g"
+                },
+                {
+                    "name": "vainitas",
+                    "canonicalName": "vainitas",
+                    "amount": 400,
+                    "unit": "g"
+                },
+                {
+                    "name": "cebolla",
+                    "canonicalName": "cebolla",
+                    "amount": 1,
+                    "unit": "unidad"
+                },
+                {
+                    "name": "tomate",
+                    "canonicalName": "tomate",
+                    "amount": 2,
+                    "unit": "unidad"
+                },
+                {
+                    "name": "ajo",
+                    "canonicalName": "ajo",
+                    "amount": 2,
+                    "unit": "dientes"
+                },
+                {
+                    "name": "aceite",
+                    "canonicalName": "aceite",
+                    "amount": 30,
+                    "unit": "ml"
+                },
+                {
+                    "name": "salsa de soya",
+                    "canonicalName": "salsa de soya",
+                    "amount": 30,
+                    "unit": "ml"
+                },
+                {
+                    "name": "vinagre",
+                    "canonicalName": "vinagre",
+                    "amount": 15,
+                    "unit": "ml"
+                },
+                {
+                    "name": "sal",
+                    "canonicalName": "sal",
+                    "amount": "al gusto",
+                    "unit": "al gusto"
+                },
+                {
+                    "name": "pimienta",
+                    "canonicalName": "pimienta",
+                    "amount": "al gusto",
+                    "unit": "al gusto"
+                }
+            ]
+        }
+    ],
+    "phases": [
+        {
+            "id": "fase-1-preparacion",
+            "number": "FASE 1",
+            "title": "Preparación",
+            "emoji": "🔪",
+            "purpose": "Dejar todos los ingredientes listos antes de cocinar.",
+            "steps": [
+                {
+                    "id": "f1-s1",
+                    "kind": "group",
+                    "title": "Preparar el pollo",
+                    "substeps": [
+                        {
+                            "id": "f1-s1-1",
+                            "kind": "action",
+                            "text": "Cortar el pollo en trozos medianos."
+                        },
+                        {
+                            "id": "f1-s1-2",
+                            "kind": "action",
+                            "text": "Sazonar con sal y pimienta."
+                        }
+                    ]
+                },
+                {
+                    "id": "f1-s2",
+                    "kind": "group",
+                    "title": "Preparar las vainitas",
+                    "substeps": [
+                        {
+                            "id": "f1-s2-1",
+                            "kind": "action",
+                            "text": "Cortar las puntas de las vainitas."
+                        },
+                        {
+                            "id": "f1-s2-2",
+                            "kind": "action",
+                            "text": "Retirar las hebras si son gruesas."
+                        },
+                        {
+                            "id": "f1-s2-3",
+                            "kind": "action",
+                            "text": "Cortar en diagonal (3–5 cm)."
+                        }
+                    ]
+                },
+                {
+                    "id": "f1-s3",
+                    "kind": "group",
+                    "title": "Preparar el arroz",
+                    "substeps": [
+                        {
+                            "id": "f1-s3-1",
+                            "kind": "action",
+                            "text": "Lavar el arroz hasta que el agua salga clara."
+                        }
+                    ]
+                },
+                {
+                    "id": "f1-s4",
+                    "kind": "action",
+                    "text": "Cortar la cebolla en pluma."
+                },
+                {
+                    "id": "f1-s5",
+                    "kind": "action",
+                    "text": "Picar el ajo finamente."
+                },
+                {
+                    "id": "f1-s6",
+                    "kind": "action",
+                    "text": "Cortar los tomates en gajos."
+                }
+            ]
+        },
+        {
+            "id": "fase-2-arroz",
+            "number": "FASE 2",
+            "title": "Cocinar el arroz",
+            "emoji": "🍚",
+            "purpose": "Lograr un arroz graneado y suelto.",
+            "steps": [
+                {
+                    "id": "f2-s1",
+                    "kind": "action",
+                    "text": "Calentar una olla a fuego medio.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s2",
+                    "kind": "action",
+                    "text": "Agregar un chorrito de aceite.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s3",
+                    "kind": "action",
+                    "text": "Agregar el ajo picado.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s4",
+                    "kind": "timer",
+                    "text": "Dorar ligeramente el ajo.",
+                    "timerSec": 60,
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s5",
+                    "kind": "action",
+                    "text": "Agregar el arroz.",
+                    "container": "olla",
+                    "ingredients": [
+                        {
+                            "name": "arroz",
+                            "canonicalName": "arroz",
+                            "amount": 2,
+                            "unit": "tazas"
+                        }
+                    ]
+                },
+                {
+                    "id": "f2-s6",
+                    "kind": "timer",
+                    "text": "Nacarar el arroz.",
+                    "timerSec": 120,
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s7",
+                    "kind": "action",
+                    "text": "Agregar el agua y la sal.",
+                    "container": "olla",
+                    "ingredients": [
+                        {
+                            "name": "agua",
+                            "canonicalName": "agua",
+                            "amount": 3,
+                            "unit": "tazas"
+                        },
+                        {
+                            "name": "sal",
+                            "canonicalName": "sal",
+                            "amount": "al gusto",
+                            "unit": "al gusto"
+                        }
+                    ]
+                },
+                {
+                    "id": "f2-s8",
+                    "kind": "action",
+                    "text": "Mezclar una sola vez.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s9",
+                    "kind": "timer",
+                    "text": "Cocinar a fuego medio hasta que reduzca el agua.",
+                    "timerSec": 600,
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s10",
+                    "kind": "action",
+                    "text": "Bajar el fuego al mínimo y tapar.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s11",
+                    "kind": "timer",
+                    "text": "Terminar la cocción.",
+                    "timerSec": 300,
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s12",
+                    "kind": "action",
+                    "text": "Apagar el fuego.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s13",
+                    "kind": "timer",
+                    "text": "Dejar reposar.",
+                    "timerSec": 300,
+                    "container": "olla"
+                },
+                {
+                    "id": "f2-s14",
+                    "kind": "result",
+                    "text": "Arroz graneado y suelto.",
+                    "result": "arroz graneado"
+                }
+            ]
+        },
+        {
+            "id": "fase-3-blanqueado",
+            "number": "FASE 3",
+            "title": "Blanqueado de vainitas",
+            "emoji": "💧",
+            "purpose": "Mantener color y textura de las vainitas.",
+            "steps": [
+                {
+                    "id": "f3-s1",
+                    "kind": "action",
+                    "text": "Hervir agua con sal.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f3-s2",
+                    "kind": "action",
+                    "text": "Agregar las vainitas.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f3-s3",
+                    "kind": "timer",
+                    "text": "Cocinar las vainitas.",
+                    "timerSec": 180,
+                    "container": "olla"
+                },
+                {
+                    "id": "f3-s4",
+                    "kind": "action",
+                    "text": "Retirar y pasar a un bol con agua fría.",
+                    "container": "bol"
+                },
+                {
+                    "id": "f3-s5",
+                    "kind": "action",
+                    "text": "Escurrir y reservar.",
+                    "container": "bol"
+                },
+                {
+                    "id": "f3-s6",
+                    "kind": "result",
+                    "text": "Vainitas verdes y crocantes.",
+                    "result": "vainitas crocantes"
+                }
+            ]
+        },
+        {
+            "id": "fase-4-salteado",
+            "number": "FASE 4",
+            "title": "Salteado",
+            "emoji": "🔥",
+            "purpose": "Integrar pollo y vainitas a fuego alto.",
+            "steps": [
+                {
+                    "id": "f4-s1",
+                    "kind": "action",
+                    "text": "Calentar una sartén o wok a fuego alto.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s2",
+                    "kind": "action",
+                    "text": "Agregar el aceite.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s3",
+                    "kind": "action",
+                    "text": "Agregar el pollo.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s4",
+                    "kind": "timer",
+                    "text": "Dorar el pollo por todos lados.",
+                    "timerSec": 300,
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s5",
+                    "kind": "action",
+                    "text": "Agregar el ajo.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s6",
+                    "kind": "timer",
+                    "text": "Dorar ligeramente.",
+                    "timerSec": 60,
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s7",
+                    "kind": "action",
+                    "text": "Agregar la cebolla.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s8",
+                    "kind": "timer",
+                    "text": "Saltear la cebolla.",
+                    "timerSec": 120,
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s9",
+                    "kind": "action",
+                    "text": "Agregar las vainitas.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s10",
+                    "kind": "action",
+                    "text": "Añadir la salsa de soya y el vinagre.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s11",
+                    "kind": "action",
+                    "text": "Mezclar rápidamente.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s12",
+                    "kind": "action",
+                    "text": "Agregar el tomate.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s13",
+                    "kind": "timer",
+                    "text": "Saltear a fuego alto.",
+                    "timerSec": 60,
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s14",
+                    "kind": "action",
+                    "text": "Ajustar sal y pimienta.",
+                    "container": "sartén"
+                },
+                {
+                    "id": "f4-s15",
+                    "kind": "result",
+                    "text": "Salteado jugoso con pollo dorado y vainitas crocantes.",
+                    "result": "salteado listo"
+                }
+            ]
+        },
+        {
+            "id": "fase-5-servir",
+            "number": "FASE 5",
+            "title": "Servir",
+            "emoji": "🍽️",
+            "purpose": "Servir el plato caliente.",
+            "steps": [
+                {
+                    "id": "f5-s1",
+                    "kind": "action",
+                    "text": "Servir el arroz en el plato.",
+                    "container": "olla"
+                },
+                {
+                    "id": "f5-s2",
+                    "kind": "action",
+                    "text": "Agregar encima el salteado.",
+                    "container": "sartén"
+                }
+            ]
+        }
+    ]
+}

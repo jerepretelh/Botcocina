@@ -1,0 +1,710 @@
+[
+  {
+    "id": "arroz-con-pollo-3p",
+    "title": "Arroz con pollo",
+    "servings": 3,
+    "ingredients": [
+      {
+        "title": "Arroz",
+        "icon": "🍚",
+        "items": [
+          {
+            "name": "arroz",
+            "canonicalName": "arroz",
+            "shoppingKey": "arroz",
+            "amount": 300,
+            "unit": "g"
+          },
+          {
+            "name": "caldo de pollo",
+            "canonicalName": "caldo de pollo",
+            "shoppingKey": "caldo-de-pollo",
+            "amount": 750,
+            "unit": "ml"
+          },
+          {
+            "name": "ajo",
+            "canonicalName": "ajo",
+            "shoppingKey": "ajo",
+            "amount": 2,
+            "unit": "dientes",
+            "notes": "para el arroz"
+          },
+          {
+            "name": "aceite",
+            "canonicalName": "aceite",
+            "shoppingKey": "aceite",
+            "amount": 30,
+            "unit": "ml",
+            "notes": "para la olla principal"
+          },
+          {
+            "name": "sal",
+            "canonicalName": "sal",
+            "shoppingKey": "sal",
+            "amount": "al gusto",
+            "unit": "al gusto",
+            "isFlexible": true
+          }
+        ]
+      },
+      {
+        "title": "Pollo",
+        "icon": "🍗",
+        "items": [
+          {
+            "name": "pollo",
+            "canonicalName": "pollo",
+            "shoppingKey": "pollo",
+            "amount": 600,
+            "unit": "g",
+            "notes": "presas o trozos"
+          },
+          {
+            "name": "aceite",
+            "canonicalName": "aceite",
+            "shoppingKey": "aceite",
+            "amount": 15,
+            "unit": "ml",
+            "notes": "para sellar"
+          },
+          {
+            "name": "sal",
+            "canonicalName": "sal",
+            "shoppingKey": "sal",
+            "amount": "al gusto",
+            "unit": "al gusto",
+            "isFlexible": true
+          },
+          {
+            "name": "pimienta",
+            "canonicalName": "pimienta",
+            "shoppingKey": "pimienta",
+            "amount": "al gusto",
+            "unit": "al gusto",
+            "isFlexible": true
+          }
+        ]
+      },
+      {
+        "title": "Base verde",
+        "icon": "🥣",
+        "items": [
+          {
+            "name": "cebolla",
+            "canonicalName": "cebolla",
+            "shoppingKey": "cebolla",
+            "amount": 1,
+            "unit": "unidad",
+            "preparation": "en brunoise"
+          },
+          {
+            "name": "ajo",
+            "canonicalName": "ajo",
+            "shoppingKey": "ajo",
+            "amount": 2,
+            "unit": "dientes",
+            "notes": "para la base",
+            "preparation": "picado"
+          },
+          {
+            "name": "culantro",
+            "canonicalName": "culantro",
+            "shoppingKey": "culantro",
+            "amount": 1,
+            "unit": "taza",
+            "preparation": "licuado"
+          },
+          {
+            "name": "zanahoria",
+            "canonicalName": "zanahoria",
+            "shoppingKey": "zanahoria",
+            "amount": 100,
+            "unit": "g",
+            "preparation": "en cubos pequeños"
+          },
+          {
+            "name": "arvejas",
+            "canonicalName": "arvejas",
+            "shoppingKey": "arvejas",
+            "amount": 100,
+            "unit": "g"
+          }
+        ]
+      }
+    ],
+    "phases": [
+      {
+        "id": "fase-1-preparacion",
+        "number": "FASE 1",
+        "title": "Preparación",
+        "emoji": "🔪",
+        "purpose": "Dejar todos los ingredientes listos antes de encender fuego.",
+        "steps": [
+          {
+            "id": "f1-s1",
+            "kind": "action",
+            "text": "Lavar y escurrir 300 g de arroz.",
+            "ingredients": [
+              {
+                "name": "arroz",
+                "canonicalName": "arroz",
+                "shoppingKey": "arroz",
+                "amount": 300,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f1-s2",
+            "kind": "action",
+            "text": "Cortar 1 cebolla en brunoise (~0.5 cm).",
+            "ingredients": [
+              {
+                "name": "cebolla",
+                "canonicalName": "cebolla",
+                "shoppingKey": "cebolla",
+                "amount": 1,
+                "unit": "unidad",
+                "preparation": "en brunoise"
+              }
+            ]
+          },
+          {
+            "id": "f1-s3",
+            "kind": "action",
+            "text": "Picar 4 dientes de ajo en brunoise fino.",
+            "ingredients": [
+              {
+                "name": "ajo",
+                "canonicalName": "ajo",
+                "shoppingKey": "ajo",
+                "amount": 4,
+                "unit": "dientes",
+                "preparation": "picado fino"
+              }
+            ]
+          },
+          {
+            "id": "f1-s4",
+            "kind": "action",
+            "text": "Cortar 100 g de zanahoria en cubos pequeños (~0.5–1 cm).",
+            "ingredients": [
+              {
+                "name": "zanahoria",
+                "canonicalName": "zanahoria",
+                "shoppingKey": "zanahoria",
+                "amount": 100,
+                "unit": "g",
+                "preparation": "en cubos pequeños"
+              }
+            ]
+          },
+          {
+            "id": "f1-s5",
+            "kind": "action",
+            "text": "Licuar 1 taza de culantro.",
+            "ingredients": [
+              {
+                "name": "culantro",
+                "canonicalName": "culantro",
+                "shoppingKey": "culantro",
+                "amount": 1,
+                "unit": "taza",
+                "preparation": "licuado"
+              }
+            ]
+          },
+          {
+            "id": "f1-s6",
+            "kind": "action",
+            "text": "Salpimentar 600 g de pollo.",
+            "ingredients": [
+              {
+                "name": "pollo",
+                "canonicalName": "pollo",
+                "shoppingKey": "pollo",
+                "amount": 600,
+                "unit": "g"
+              },
+              {
+                "name": "sal",
+                "canonicalName": "sal",
+                "shoppingKey": "sal",
+                "amount": "al gusto",
+                "unit": "al gusto",
+                "isFlexible": true
+              },
+              {
+                "name": "pimienta",
+                "canonicalName": "pimienta",
+                "shoppingKey": "pimienta",
+                "amount": "al gusto",
+                "unit": "al gusto",
+                "isFlexible": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "fase-2-sellado-pollo",
+        "number": "FASE 2",
+        "title": "Sellado del pollo",
+        "emoji": "🔥",
+        "purpose": "Desarrollar sabor inicial y reservar el pollo sellado.",
+        "steps": [
+          {
+            "id": "f2-s1",
+            "kind": "action",
+            "text": "Encender fuego medio-alto."
+          },
+          {
+            "id": "f2-s2",
+            "kind": "timer",
+            "text": "Calentar sartén.",
+            "timerSec": 120
+          },
+          {
+            "id": "f2-s3",
+            "kind": "action",
+            "text": "Agregar 15 ml de aceite.",
+            "ingredients": [
+              {
+                "name": "aceite",
+                "canonicalName": "aceite",
+                "shoppingKey": "aceite",
+                "amount": 15,
+                "unit": "ml"
+              }
+            ]
+          },
+          {
+            "id": "f2-s4",
+            "kind": "timer",
+            "text": "Calentar aceite.",
+            "timerSec": 30
+          },
+          {
+            "id": "f2-s5",
+            "kind": "action",
+            "text": "Agregar 600 g de pollo.",
+            "ingredients": [
+              {
+                "name": "pollo",
+                "canonicalName": "pollo",
+                "shoppingKey": "pollo",
+                "amount": 600,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f2-s6",
+            "kind": "timer",
+            "text": "Sellar primer lado del pollo.",
+            "timerSec": 180
+          },
+          {
+            "id": "f2-s7",
+            "kind": "result",
+            "text": "Base dorada del pollo.",
+            "result": "base dorada"
+          },
+          {
+            "id": "f2-s8",
+            "kind": "action",
+            "text": "Voltear el pollo."
+          },
+          {
+            "id": "f2-s9",
+            "kind": "timer",
+            "text": "Sellar segundo lado del pollo.",
+            "timerSec": 120
+          },
+          {
+            "id": "f2-s10",
+            "kind": "result",
+            "text": "Pollo dorado por fuera.",
+            "result": "dorado parcial"
+          },
+          {
+            "id": "f2-s11",
+            "kind": "action",
+            "text": "Retirar el pollo."
+          },
+          {
+            "id": "f2-s12",
+            "kind": "result",
+            "text": "Pollo sellado, no cocido completamente.",
+            "result": "pollo sellado"
+          }
+        ]
+      },
+      {
+        "id": "fase-3-base-verde",
+        "number": "FASE 3",
+        "title": "Base del arroz con pollo",
+        "emoji": "🍲",
+        "purpose": "Construir la base aromática y verde del plato.",
+        "steps": [
+          {
+            "id": "f3-s1",
+            "kind": "action",
+            "text": "Encender fuego medio."
+          },
+          {
+            "id": "f3-s2",
+            "kind": "timer",
+            "text": "Calentar olla.",
+            "timerSec": 60
+          },
+          {
+            "id": "f3-s3",
+            "kind": "action",
+            "text": "Agregar 30 ml de aceite.",
+            "ingredients": [
+              {
+                "name": "aceite",
+                "canonicalName": "aceite",
+                "shoppingKey": "aceite",
+                "amount": 30,
+                "unit": "ml"
+              }
+            ]
+          },
+          {
+            "id": "f3-s4",
+            "kind": "timer",
+            "text": "Calentar aceite.",
+            "timerSec": 30
+          },
+          {
+            "id": "f3-s5",
+            "kind": "action",
+            "text": "Agregar 1 unidad de cebolla en brunoise.",
+            "ingredients": [
+              {
+                "name": "cebolla",
+                "canonicalName": "cebolla",
+                "shoppingKey": "cebolla",
+                "amount": 1,
+                "unit": "unidad",
+                "preparation": "en brunoise"
+              }
+            ]
+          },
+          {
+            "id": "f3-s6",
+            "kind": "timer",
+            "text": "Sofreír cebolla.",
+            "timerSec": 180
+          },
+          {
+            "id": "f3-s7",
+            "kind": "result",
+            "text": "Cebolla transparente.",
+            "result": "cebolla transparente"
+          },
+          {
+            "id": "f3-s8",
+            "kind": "action",
+            "text": "Agregar 2 dientes de ajo picado.",
+            "ingredients": [
+              {
+                "name": "ajo",
+                "canonicalName": "ajo",
+                "shoppingKey": "ajo",
+                "amount": 2,
+                "unit": "dientes",
+                "preparation": "picado"
+              }
+            ]
+          },
+          {
+            "id": "f3-s9",
+            "kind": "timer",
+            "text": "Sofreír ajo.",
+            "timerSec": 60
+          },
+          {
+            "id": "f3-s10",
+            "kind": "result",
+            "text": "Ajo aromático.",
+            "result": "ajo aromático"
+          },
+          {
+            "id": "f3-s11",
+            "kind": "action",
+            "text": "Agregar 1 taza de culantro licuado.",
+            "ingredients": [
+              {
+                "name": "culantro",
+                "canonicalName": "culantro",
+                "shoppingKey": "culantro",
+                "amount": 1,
+                "unit": "taza",
+                "preparation": "licuado"
+              }
+            ]
+          },
+          {
+            "id": "f3-s12",
+            "kind": "timer",
+            "text": "Reducir base verde.",
+            "timerSec": 300
+          },
+          {
+            "id": "f3-s13",
+            "kind": "result",
+            "text": "Base verde espesa y fragante.",
+            "result": "base verde espesa y fragante"
+          }
+        ]
+      },
+      {
+        "id": "fase-4-arroz",
+        "number": "FASE 4",
+        "title": "Arroz",
+        "emoji": "🍚",
+        "purpose": "Nacarar el arroz y llevarlo a hervor.",
+        "steps": [
+          {
+            "id": "f4-s1",
+            "kind": "action",
+            "text": "Agregar 300 g de arroz.",
+            "ingredients": [
+              {
+                "name": "arroz",
+                "canonicalName": "arroz",
+                "shoppingKey": "arroz",
+                "amount": 300,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f4-s2",
+            "kind": "timer",
+            "text": "Nacarar 300 g de arroz.",
+            "timerSec": 120
+          },
+          {
+            "id": "f4-s3",
+            "kind": "result",
+            "text": "Arroz translúcido.",
+            "result": "arroz translúcido"
+          },
+          {
+            "id": "f4-s4",
+            "kind": "action",
+            "text": "Agregar 750 ml de caldo de pollo.",
+            "ingredients": [
+              {
+                "name": "caldo de pollo",
+                "canonicalName": "caldo de pollo",
+                "shoppingKey": "caldo-de-pollo",
+                "amount": 750,
+                "unit": "ml"
+              }
+            ]
+          },
+          {
+            "id": "f4-s5",
+            "kind": "action",
+            "text": "Agregar sal.",
+            "ingredients": [
+              {
+                "name": "sal",
+                "canonicalName": "sal",
+                "shoppingKey": "sal",
+                "amount": "al gusto",
+                "unit": "al gusto",
+                "isFlexible": true
+              }
+            ]
+          },
+          {
+            "id": "f4-s6",
+            "kind": "timer",
+            "text": "Llevar arroz a hervor.",
+            "timerSec": 300
+          },
+          {
+            "id": "f4-s7",
+            "kind": "result",
+            "text": "Hervor activo.",
+            "result": "hervor activo"
+          }
+        ]
+      },
+      {
+        "id": "fase-5-integracion",
+        "number": "FASE 5",
+        "title": "Integración",
+        "emoji": "🔄",
+        "purpose": "Incorporar pollo y vegetales al arroz antes de la cocción final.",
+        "steps": [
+          {
+            "id": "f5-s1",
+            "kind": "action",
+            "text": "Regresar 600 g de pollo.",
+            "ingredients": [
+              {
+                "name": "pollo",
+                "canonicalName": "pollo",
+                "shoppingKey": "pollo",
+                "amount": 600,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f5-s2",
+            "kind": "action",
+            "text": "Agregar 100 g de zanahoria.",
+            "ingredients": [
+              {
+                "name": "zanahoria",
+                "canonicalName": "zanahoria",
+                "shoppingKey": "zanahoria",
+                "amount": 100,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f5-s3",
+            "kind": "action",
+            "text": "Agregar 100 g de arvejas.",
+            "ingredients": [
+              {
+                "name": "arvejas",
+                "canonicalName": "arvejas",
+                "shoppingKey": "arvejas",
+                "amount": 100,
+                "unit": "g"
+              }
+            ]
+          },
+          {
+            "id": "f5-s4",
+            "kind": "timer",
+            "text": "Estabilizar hervor con ingredientes integrados.",
+            "timerSec": 180
+          },
+          {
+            "id": "f5-s5",
+            "kind": "result",
+            "text": "Hervor estable con ingredientes integrados.",
+            "result": "hervor estable"
+          }
+        ]
+      },
+      {
+        "id": "fase-6-coccion-final",
+        "number": "FASE 6",
+        "title": "Cocción del arroz",
+        "emoji": "🔥",
+        "purpose": "Reducir el líquido y completar la cocción del arroz.",
+        "steps": [
+          {
+            "id": "f6-s1",
+            "kind": "action",
+            "text": "Mantener fuego medio."
+          },
+          {
+            "id": "f6-s2",
+            "kind": "timer",
+            "text": "Iniciar reducción.",
+            "timerSec": 300
+          },
+          {
+            "id": "f6-s3",
+            "kind": "timer",
+            "text": "Esperar secado del arroz.",
+            "timerSec": 180
+          },
+          {
+            "id": "f6-s4",
+            "kind": "result",
+            "text": "Huequitos visibles en la superficie.",
+            "result": "huequitos visibles"
+          },
+          {
+            "id": "f6-s5",
+            "kind": "action",
+            "text": "Tapar olla."
+          },
+          {
+            "id": "f6-s6",
+            "kind": "action",
+            "text": "Bajar a fuego mínimo."
+          },
+          {
+            "id": "f6-s7",
+            "kind": "timer",
+            "text": "Cocinar arroz tapado.",
+            "timerSec": 720
+          },
+          {
+            "id": "f6-s8",
+            "kind": "result",
+            "text": "Arroz cocido.",
+            "result": "arroz cocido"
+          }
+        ]
+      },
+      {
+        "id": "fase-7-reposo",
+        "number": "FASE 7",
+        "title": "Reposo",
+        "emoji": "🌿",
+        "purpose": "Asentar la cocción y mejorar la textura final.",
+        "steps": [
+          {
+            "id": "f7-s1",
+            "kind": "action",
+            "text": "Apagar fuego."
+          },
+          {
+            "id": "f7-s2",
+            "kind": "action",
+            "text": "Mantener olla tapada."
+          },
+          {
+            "id": "f7-s3",
+            "kind": "timer",
+            "text": "Reposar arroz tapado.",
+            "timerSec": 300
+          },
+          {
+            "id": "f7-s4",
+            "kind": "result",
+            "text": "Arroz graneado y húmedo.",
+            "result": "arroz graneado y húmedo"
+          }
+        ]
+      },
+      {
+        "id": "fase-8-servir",
+        "number": "FASE 8",
+        "title": "Servir",
+        "emoji": "🍽️",
+        "purpose": "Finalizar el plato y servir.",
+        "steps": [
+          {
+            "id": "f8-s1",
+            "kind": "action",
+            "text": "Mezclar suavemente el arroz con pollo."
+          },
+          {
+            "id": "f8-s2",
+            "kind": "action",
+            "text": "Servir caliente."
+          }
+        ]
+      }
+    ]
+  }
+]

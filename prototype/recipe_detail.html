@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arroz con Pollo - Asistente de Cocina</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Full Page Overlay Style / Recipe View */
+    .rt-header-img { position: relative; height: 320px; background-size: cover; background-position: center; background-image: url('https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=1600&q=80'); }
+    @media (min-width: 1024px) { .rt-header-img { height: 420px; } }
+    .rt-header-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(29,26,22,0.95) 100%); }
+
+    .rt-nav { position: absolute; top: 0; left: 0; right: 0; padding: 24px; z-index: 10; display: flex; justify-content: space-between; }
+    .rt-back { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); text-decoration: none; box-shadow: 0 8px 32px rgba(0,0,0,0.2);}
+    .rt-back:hover { background: rgba(255,255,255,0.4); transform: scale(1.1); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+
+    .rt-hero-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 48px 24px; z-index: 10; color: #fff; }
+    .rt-hero-content h1 { font-size: 42px; font-weight: 800; line-height: 1.1; margin-bottom: 20px; text-shadow: 0 4px 16px rgba(0,0,0,0.4); letter-spacing: -0.02em; }
+    .rt-badges { display: flex; gap: 12px; flex-wrap: wrap; }
+    .rt-badge { background: rgba(255,255,255,0.2); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 8px 20px; border-radius: 100px; font-size: 13px; font-weight: 700; border: 1px solid rgba(255,255,255,0.4); display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-shadow: 0 1px 2px rgba(0,0,0,0.2);}
+
+    .rt-container { max-width: 1240px; margin: 0 auto; padding: 40px 20px 100px; }
+    @media (min-width: 1024px) {
+      .desk-flex { display: flex; gap: 48px; align-items: flex-start; }
+      .desk-ing { width: 360px; position: sticky; top: 40px; }
+      .desk-prep { flex: 1; min-width: 0; }
+    }
+
+    /* Tabs Móvil Premium */
+    .rt-tabs { display: flex; background: var(--border-line); padding: 6px; border-radius: 100px; margin-bottom: 32px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+    .rt-tab { flex: 1; text-align: center; padding: 14px; border-radius: 100px; font-weight: 800; font-size: 14px; color: var(--text-muted); cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .rt-tab.active { background: var(--bg-surface); color: var(--text-main); box-shadow: 0 4px 12px rgba(29, 26, 22, 0.1); transform: scale(1.02); }
+    @media (min-width: 1024px) { .rt-tabs { display: none; } }
+
+    /* Ingredientes Sidebar */
+    .ing-card { background: var(--bg-surface); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-md); border: 1px solid var(--border-line); margin-bottom: 24px; }
+    .main-ing-title { font-size: 22px; font-weight: 800; margin-bottom: 24px; display: flex; align-items: center; gap: 10px; color: var(--text-main); padding-bottom: 20px; border-bottom: 1px solid var(--border-line); }
+    .ing-group { margin-bottom: 28px; }
+    .ing-group:last-child { margin-bottom: 0; }
+    .ing-group-head { font-size: 13px; font-weight: 800; color: var(--text-main); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8;}
+    .ing-item { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; font-size: 15px; line-height: 1.4; color: var(--text-muted); }
+    .ing-item strong { color: var(--text-main); font-weight: 700; white-space: nowrap; }
+    .ing-item span { flex: 1; }
+    .ing-bullet { width: 6px; height: 6px; background: var(--border-line); border-radius: 50%; margin-top: 7px; flex-shrink: 0; transition: background 0.2s;}
+    .ing-item:hover .ing-bullet { background: var(--primary); }
+
+    /* Bloque Fase Elevado */
+    .phase-block { background: var(--bg-surface); border-radius: var(--radius-lg); padding: 28px 24px; box-shadow: var(--shadow-md); border: 1px solid var(--border-line); margin-bottom: 40px; transition: transform 0.3s; }
+    @media (min-width: 800px) { .phase-block { padding: 40px 48px; } }
+    .phase-block:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    
+    .phase-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border-line); padding-bottom: 24px; margin-bottom: 16px; }
+    .ph-title-group { display: flex; align-items: center; gap: 16px; }
+    .ph-emoji { font-size: 28px; background: var(--bg-body); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); border: 1px solid var(--border-line); }
+    .ph-texts { display: flex; flex-direction: column; }
+    .ph-subtitle { font-size: 11px; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;}
+    .ph-title { font-size: 28px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em;}
+
+    /* Step List & Timers Magnified */
+    .step-list { display: flex; flex-direction: column; }
+    .step-row { display: flex; gap: 20px; padding: 24px 0; border-bottom: 1px solid var(--bg-soft); position: relative; transition: all 0.3s ease; }
+    .step-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .step-row.active { background: rgba(224, 88, 62, 0.02); padding-left: 20px; padding-right: 20px; border-radius: var(--radius-md); border-bottom-color: transparent; margin: 8px -20px; }
+    
+    .step-row.active::before { content: ''; position: absolute; left: 0px; top: 24px; bottom: 24px; width: 4px; background: var(--primary); border-radius: 0 4px 4px 0; }
+
+    .step-num { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; background: var(--bg-soft); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; border: 1px solid var(--border-line); transition: all 0.3s; }
+    .step-row.active .step-num { background: var(--primary); color: #fff; border-color: var(--primary); transform: scale(1.1); box-shadow: 0 4px 12px rgba(224, 88, 62, 0.3); }
+    
+    .step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center;}
+    .step-top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+    .step-text { font-size: 18px; font-weight: 500; line-height: 1.5; color: var(--text-main); margin-top: 4px; transition: color 0.3s; }
+    .step-row.active .step-text { font-weight: 600; }
+
+    /* The Premium Progress Timer */
+    .btn-timer { 
+      flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+      background: var(--bg-surface); border: 2px solid var(--border-line); 
+      border-radius: 100px; font-size: 14px; font-weight: 800; color: var(--text-main); 
+      cursor: pointer; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); 
+      font-variant-numeric: tabular-nums; position: relative; overflow: hidden;
+      min-width: 110px; height: 44px; box-shadow: var(--shadow-sm); z-index: 1;
+    }
+    .btn-timer span, .btn-timer svg { z-index: 2; position: relative; }
+    .btn-timer svg { margin-right: 6px; }
+    
+    .btn-timer:hover { border-color: #D6D2CC; transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    
+    .timer-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: var(--text-main); z-index: 0; transition: width 1s linear; }
+
+    .btn-timer.running { border-color: var(--text-main); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(29, 26, 22, 0.25); animation: pulsePremium 2s infinite; }
+    .btn-timer.running svg { color: var(--primary); }
+
+    .btn-timer.done { background: var(--success); border-color: var(--success); color: white; animation: none;}
+    .btn-timer.done svg { color: white; }
+    
+    @keyframes pulsePremium { 0% { box-shadow: 0 0 0 0 rgba(29, 26, 22, 0.2); } 70% { box-shadow: 0 0 0 12px rgba(29, 26, 22, 0); } 100% { box-shadow: 0 0 0 0 rgba(29, 26, 22, 0); } }
+
+    /* Resultado Cinematico */
+    .result-alert { margin-top: 16px; background: #FFFBF0; border: 1px solid #FDE68A; border-left: 4px solid #F59E0B; padding: 16px 20px; border-radius: 0 12px 12px 0; display: inline-flex; align-items: flex-start; flex-direction: column; gap: 6px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.05); }
+    .result-tag { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #D97706; display: flex; align-items: center; gap: 4px; }
+    .result-text { font-size: 15px; font-weight: 600; color: #92400E; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="rt-header-img">
+    <nav class="rt-nav">
+      <a href="library.html" class="rt-back">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+    </nav>
+    <div class="rt-hero-content">
+      <div class="rt-container" style="padding: 0;">
+        <div class="rt-badges" style="margin-bottom: 16px;"><div class="rt-badge">🔪 En Olla</div></div>
+        <h1>Arroz con pollo</h1>
+        <div class="rt-badges">
+          <div class="rt-badge"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 42 min </div>
+          <div class="rt-badge"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg> 3 personas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rt-container">
+    <div class="desk-flex">
+      <!-- SIDEBAR INGREDIENTES -->
+      <aside class="desk-ing" id="col-ingredients">
+        <div class="ing-card">
+          <h2 class="main-ing-title">🧺 Ingredientes</h2>
+          <div class="ing-group">
+            <div class="ing-group-head">🍚 Arroz</div>
+            <div class="ing-item"><div class="ing-bullet"></div><strong>300 g</strong><span>arroz</span></div>
+            <div class="ing-item"><div class="ing-bullet"></div><strong>750 ml</strong><span>caldo de pollo</span></div>
+          </div>
+          <div class="ing-group">
+            <div class="ing-group-head">🍗 Pollo</div>
+            <div class="ing-item"><div class="ing-bullet"></div><strong>600 g</strong><span>pollo en trozos</span></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- PREPARACIÓN -->
+      <main class="desk-prep" id="col-preparation">
+        <div class="rt-tabs">
+          <div class="rt-tab" onclick="mSwitch('ing', this)">Ingredientes</div>
+          <div class="rt-tab active" onclick="mSwitch('prep', this)">Preparación</div>
+        </div>
+        
+        <div class="phase-block">
+          <div class="phase-header">
+            <div class="ph-title-group">
+              <div class="ph-emoji">🔥</div>
+              <div class="ph-texts"><span class="ph-subtitle">Fase 2</span><h2 class="ph-title">Sellado del pollo</h2></div>
+            </div>
+          </div>
+          <div class="step-list">
+            
+            <div class="step-row">
+              <div class="step-num">01</div>
+              <div class="step-body">
+                <div class="step-top-row">
+                  <p class="step-text">Agregar 15 ml de aceite e incorporar 600 g de pollo.</p>
+                  <button class="btn-timer" id="t1" onclick="runTimer('t1', 'x1', 'f1', 30)">
+                    <div class="timer-fill" id="f1"></div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="x1">00:30</span>
+                  </button>
+                </div>
+                <div class="result-alert"><span class="result-tag">✨ Validar Resultado</span><span class="result-text">La base del pollo debe estar uniformemente dorada para soltar el sabor.</span></div>
+              </div>
+            </div>
+
+            <div class="step-row">
+              <div class="step-num">02</div>
+              <div class="step-body">
+                <div class="step-top-row">
+                  <p class="step-text">Voltear todas las presas y repetir.</p>
+                  <button class="btn-timer" id="t2" onclick="runTimer('t2', 'x2', 'f2', 120)">
+                    <div class="timer-fill" id="f2"></div>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span id="x2">02:00</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    function mSwitch(tabName, el) {
+      document.querySelectorAll('.rt-tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      if(window.innerWidth < 1024) {
+        if(tabName === 'ing') { document.getElementById('col-ingredients').style.display = 'block'; document.getElementById('col-preparation').style.display = 'none'; } 
+        else { document.getElementById('col-ingredients').style.display = 'none'; document.getElementById('col-preparation').style.display = 'block'; }
+      }
+    }
+    window.addEventListener('resize', () => {
+      if(window.innerWidth >= 1024) { document.getElementById('col-ingredients').style.display = 'block'; document.getElementById('col-preparation').style.display = 'block'; } 
+      else { document.querySelectorAll('.rt-tab')[1].click(); }
+    });
+    window.dispatchEvent(new Event('resize'));
+
+    const activeTimers = {};
+    function runTimer(btnId, txtId, fillId, total) {
+      let btn = document.getElementById(btnId);
+      let txt = document.getElementById(txtId);
+      let fill = document.getElementById(fillId);
+      
+      document.querySelectorAll('.step-row').forEach(row => row.classList.remove('active'));
+      btn.closest('.step-row').classList.add('active');
+
+      if(activeTimers[btnId]) {
+        clearInterval(activeTimers[btnId].iv); delete activeTimers[btnId]; 
+        btn.classList.remove('running'); btn.classList.remove('done');
+        fill.style.width = '0%';
+        let m = Math.floor(total/60).toString().padStart(2,'0'); let s = (total%60).toString().padStart(2,'0');
+        txt.innerText = `${m}:${s}`; return;
+      }
+      
+      btn.classList.add('running'); let curr = total; fill.style.width = '0%';
+      let iv = setInterval(() => {
+        curr--; 
+        let pct = ((total - curr) / total) * 100;
+        fill.style.width = pct + '%';
+
+        let m = Math.floor(curr/60).toString().padStart(2,'0'); let s = (curr%60).toString().padStart(2,'0');
+        txt.innerText = `${m}:${s}`;
+        
+        if(curr <= 0) { 
+            clearInterval(iv); txt.innerText = "¡Listo!"; 
+            btn.classList.remove('running'); btn.classList.add('done');
+            fill.style.width = '100%';
+            delete activeTimers[btnId]; 
+        }
+      }, 1000);
+      activeTimers[btnId] = {iv: iv, current: curr};
+    }
+  </script>
+</body>
+</html>

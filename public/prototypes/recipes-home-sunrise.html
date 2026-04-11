@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recetas • Propuesta A</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#fff8f2;
+      --ink:#22180f;
+      --muted:#7c6a5c;
+      --card:#ffffff;
+      --line:#f0dfd1;
+      --brand:#ff6f3d;
+      --brand-2:#ffb347;
+      --ok:#26a269;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;
+      background:
+        radial-gradient(circle at 15% -5%, #ffd8c2 0 22%, transparent 35%),
+        radial-gradient(circle at 90% 10%, #ffe7ae 0 16%, transparent 32%),
+        var(--bg);
+      color:var(--ink);
+    }
+    .app{
+      max-width:430px;
+      min-height:100vh;
+      margin:0 auto;
+      padding:18px 16px 106px;
+      position:relative;
+    }
+    .top{
+      position:sticky;
+      top:0;
+      z-index:20;
+      padding:8px 0 12px;
+      backdrop-filter:blur(10px);
+      background:linear-gradient(180deg, rgba(255,248,242,.93) 65%, rgba(255,248,242,0));
+    }
+    .title{
+      margin:2px 0 12px;
+      font-size:36px;
+      line-height:0.95;
+      letter-spacing:-0.04em;
+      font-weight:800;
+    }
+    .sub{
+      color:var(--muted);
+      margin:0 0 10px;
+      font-weight:600;
+      font-size:14px;
+    }
+    .search{
+      width:100%;
+      border:none;
+      outline:none;
+      border-radius:18px;
+      padding:14px 14px 14px 42px;
+      background:#fff;
+      box-shadow:0 10px 28px rgba(108,68,34,.10);
+      font-size:15px;
+    }
+    .search-wrap{position:relative}
+    .search-icon{
+      position:absolute;left:14px;top:50%;translate:0 -50%;
+      color:#9b8a7c;font-size:14px;font-weight:700;
+    }
+    .chip-row{
+      display:flex;gap:8px;overflow:auto;padding:12px 0 2px;scrollbar-width:none;
+    }
+    .chip-row::-webkit-scrollbar{display:none}
+    .chip{
+      border:none;border-radius:999px;padding:8px 12px;
+      background:#f8ebde;color:#765f4d;font-weight:700;font-size:12px;
+      white-space:nowrap;cursor:pointer;transition:.18s;
+    }
+    .chip.active{background:var(--ink);color:#fff}
+    .toolbar{
+      display:flex;align-items:center;justify-content:space-between;margin-top:14px;
+    }
+    .count{font-size:12px;color:var(--muted);font-weight:700}
+    .new-btn{
+      border:none;border-radius:14px;padding:10px 14px;cursor:pointer;
+      color:#fff;background:linear-gradient(135deg,var(--brand),var(--brand-2));
+      font-weight:800;font-size:13px;box-shadow:0 8px 22px rgba(255,111,61,.35);
+    }
+    .list{display:grid;gap:12px;margin-top:12px}
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:12px;
+      box-shadow:0 12px 24px rgba(74,45,19,.08);
+      transition:transform .2s, box-shadow .2s;
+    }
+    .card:hover{transform:translateY(-2px);box-shadow:0 16px 28px rgba(74,45,19,.12)}
+    .head{display:flex;gap:10px;align-items:flex-start}
+    .thumb{
+      width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font-size:26px;
+      background:linear-gradient(135deg,#fff5ee,#ffe4d2);
+      flex:0 0 auto;
+    }
+    .meta{min-width:0;flex:1}
+    .name{margin:2px 0 4px;font-size:19px;line-height:1.05;letter-spacing:-0.02em;font-weight:800}
+    .tagline{margin:0;color:var(--muted);font-size:12px;font-weight:600}
+    .fav{
+      border:none;background:#fff4ea;color:#d36e2b;width:34px;height:34px;border-radius:11px;
+      font-size:16px;font-weight:800;cursor:pointer;flex:0 0 auto;
+    }
+    .facts{
+      display:flex;gap:8px;flex-wrap:wrap;margin-top:10px
+    }
+    .fact{font-size:11px;font-weight:700;padding:5px 8px;border-radius:10px;background:#f7efe8;color:#6f5f51}
+    .actions{display:flex;gap:8px;margin-top:12px}
+    .btn{
+      border:none;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;cursor:pointer;flex:1;
+    }
+    .btn.plan{background:#fff;border:1px solid #e6d3c4;color:#6f5f51}
+    .btn.open{background:var(--ink);color:#fff}
+    .bottom-nav{
+      position:fixed;left:50%;translate:-50% 0;bottom:14px;z-index:30;
+      width:min(430px,calc(100vw - 20px));padding:8px;background:rgba(255,255,255,.92);
+      border:1px solid #f0dfd1;border-radius:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+      box-shadow:0 14px 34px rgba(50,30,15,.16);backdrop-filter:blur(10px);
+    }
+    .tab{
+      border:none;background:transparent;padding:9px 6px;border-radius:14px;font-size:12px;font-weight:800;color:#7f6f62;
+    }
+    .tab.active{background:#fff1e6;color:#d86220}
+    .toast{
+      position:fixed;left:50%;translate:-50% 12px;bottom:92px;z-index:40;
+      background:#1e160f;color:#fff;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:700;
+      opacity:0;pointer-events:none;transition:.2s;
+    }
+    .toast.show{opacity:1;translate:-50% 0}
+    @media (min-width:760px){
+      .app{max-width:860px;padding-inline:24px}
+      .list{grid-template-columns:1fr 1fr}
+      .bottom-nav{width:min(860px,calc(100vw - 40px))}
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="top">
+      <p class="sub">Tu cocina de hoy</p>
+      <h1 class="title">Recetas</h1>
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="search" class="search" placeholder="Buscar por receta, ingrediente o mood" />
+      </div>
+      <div id="chips" class="chip-row"></div>
+      <div class="toolbar">
+        <span class="count" id="countLabel"></span>
+        <button class="new-btn">+ Nueva receta</button>
+      </div>
+    </section>
+
+    <section class="list" id="list"></section>
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="tab active">Recetas</button>
+    <button class="tab">Plan</button>
+    <button class="tab">Compras</button>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const recipes = [
+      { id:1, emoji:"🍲", name:"Arroz con lentejas", category:"Casero", mins:35, portions:3, tags:["comfort","rápido"] },
+      { id:2, emoji:"🥘", name:"Arroz con pollo", category:"Peruano", mins:53, portions:3, tags:["arroz","fondo"] },
+      { id:3, emoji:"🍳", name:"Huevo sancochado", category:"Express", mins:10, portions:1, tags:["desayuno","proteína"] },
+      { id:4, emoji:"🍌", name:"Keke de plátano", category:"Horno", mins:50, portions:6, tags:["dulce","postre"] },
+      { id:5, emoji:"🥗", name:"Ensalada verde", category:"Ligero", mins:12, portions:2, tags:["saludable","fresco"] }
+    ];
+    const categories = ["Todas", ...new Set(recipes.map(r => r.category))];
+    let active = "Todas";
+    let query = "";
+
+    const chips = document.getElementById("chips");
+    const list = document.getElementById("list");
+    const search = document.getElementById("search");
+    const toast = document.getElementById("toast");
+    const countLabel = document.getElementById("countLabel");
+
+    function showToast(text){
+      toast.textContent = text;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function renderChips(){
+      chips.innerHTML = categories.map(c =>
+        `<button class="chip ${c===active?'active':''}" data-cat="${c}">${c}</button>`
+      ).join("");
+      chips.querySelectorAll(".chip").forEach(btn => {
+        btn.onclick = () => { active = btn.dataset.cat; render(); };
+      });
+    }
+
+    function render(){
+      const q = query.trim().toLowerCase();
+      const filtered = recipes.filter(r => {
+        const byCat = active === "Todas" || r.category === active;
+        const byQ = !q || `${r.name} ${r.category} ${r.tags.join(" ")}`.toLowerCase().includes(q);
+        return byCat && byQ;
+      });
+      countLabel.textContent = `${filtered.length} de ${recipes.length} recetas`;
+      list.innerHTML = filtered.map(r => `
+        <article class="card">
+          <div class="head">
+            <div class="thumb">${r.emoji}</div>
+            <div class="meta">
+              <h3 class="name">${r.name}</h3>
+              <p class="tagline">${r.category}</p>
+            </div>
+            <button class="fav" data-fav="${r.id}">♡</button>
+          </div>
+          <div class="facts">
+            <span class="fact">${r.mins} min</span>
+            <span class="fact">${r.portions} porciones</span>
+          </div>
+          <div class="actions">
+            <button class="btn plan" data-plan="${r.name}">Planificar</button>
+            <button class="btn open" data-open="${r.name}">Abrir</button>
+          </div>
+        </article>
+      `).join("");
+      list.querySelectorAll("[data-plan]").forEach(b => b.onclick = () => showToast(`Añadido al plan: ${b.dataset.plan}`));
+      list.querySelectorAll("[data-open]").forEach(b => b.onclick = () => showToast(`Abriendo ${b.dataset.open}`));
+      list.querySelectorAll("[data-fav]").forEach(b => {
+        b.onclick = () => { b.textContent = b.textContent === "♡" ? "♥" : "♡"; };
+      });
+    }
+
+    search.addEventListener("input", (e) => { query = e.target.value; render(); });
+    renderChips();
+    render();
+  </script>
+</body>
+</html>

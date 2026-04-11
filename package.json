@@ -18,6 +18,7 @@
     "typecheck:vercel-api": "tsc -p tsconfig.api.json --noEmit",
     "catalog:validate": "tsx scripts/validate_catalog.ts",
     "seed:catalog:generate": "tsx scripts/generate_catalog_seed_sql.ts",
+    "seed:fixed-runtime": "tsx scripts/seed_fixed_runtime_recipes.ts",
     "catalog:release:prepare": "npm run catalog:validate && npm run seed:catalog:generate",
     "catalog:push": "tsx scripts/push_catalog_to_supabase.ts",
     "import:recipes:sheets": "tsx scripts/import_recipes_from_sheets.ts"
@@ -55,6 +56,7 @@
     "@radix-ui/react-toggle-group": "1.1.2",
     "@radix-ui/react-tooltip": "1.1.8",
     "@supabase/supabase-js": "^2.98.0",
+    "ajv": "^8.18.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",

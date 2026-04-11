@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recetas • Propuesta B</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f7fbff;
+      --ink:#10202f;
+      --muted:#5d7487;
+      --surface:#ffffff;
+      --line:#dce9f5;
+      --a:#24b3ff;
+      --b:#1ed27a;
+      --c:#a855f7;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 100% 0%, rgba(36,179,255,.20), transparent 28%),
+        radial-gradient(circle at 0% 25%, rgba(168,85,247,.12), transparent 26%),
+        radial-gradient(circle at 80% 80%, rgba(30,210,122,.18), transparent 32%),
+        var(--bg);
+    }
+    .shell{
+      max-width:430px;
+      margin:0 auto;
+      min-height:100vh;
+      padding:16px 16px 108px;
+    }
+    .hero{
+      background:linear-gradient(135deg,#0e2a3f,#0f415f);
+      color:#ecf8ff;
+      border-radius:28px;
+      padding:18px;
+      box-shadow:0 22px 40px rgba(6,23,37,.28);
+      position:relative;
+      overflow:hidden;
+    }
+    .hero::after{
+      content:"";
+      position:absolute;inset:auto -20px -30px auto;
+      width:140px;height:140px;border-radius:50%;
+      background:radial-gradient(circle,#32d583 0%,rgba(50,213,131,0) 70%);
+      opacity:.35;
+    }
+    .hello{font-size:12px;opacity:.8;font-weight:600}
+    .title{margin:6px 0 8px;font-size:30px;line-height:.95;letter-spacing:-.03em;font-weight:800}
+    .search{
+      margin-top:10px;
+      width:100%;
+      border:none;
+      border-radius:14px;
+      padding:12px 12px;
+      font-size:14px;
+      color:#10324a;
+      outline:none;
+      background:linear-gradient(135deg,#e8f5ff,#f4fffb);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);
+    }
+    .quick{
+      display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;
+    }
+    .q{
+      background:#ffffff12;
+      border:1px solid #ffffff33;
+      color:#fff;
+      border-radius:14px;padding:10px 12px;font-size:12px;font-weight:700;
+      backdrop-filter:blur(4px);
+    }
+    .section-head{
+      display:flex;justify-content:space-between;align-items:center;
+      margin:18px 2px 10px;
+    }
+    .section-title{font-size:18px;font-weight:800;letter-spacing:-.02em}
+    .link{font-size:12px;font-weight:700;color:#206ee8}
+    .filters{
+      display:flex;gap:8px;overflow:auto;padding-bottom:4px;scrollbar-width:none;
+    }
+    .filters::-webkit-scrollbar{display:none}
+    .pill{
+      border:none;border-radius:999px;padding:8px 12px;
+      background:#eaf2fa;color:#4f6476;font-weight:700;font-size:12px;white-space:nowrap;
+      transition:.2s;cursor:pointer;
+    }
+    .pill.active{background:linear-gradient(135deg,var(--a),#3f8cff);color:#fff}
+    .grid{
+      margin-top:12px;
+      display:grid;gap:12px;
+    }
+    .item{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:12px;
+      box-shadow:0 12px 24px rgba(18,41,67,.10);
+      transition:transform .2s, box-shadow .2s;
+    }
+    .item:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(18,41,67,.16)}
+    .row{display:flex;gap:10px}
+    .icon{
+      width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:24px;
+      background:linear-gradient(135deg,#f1f8ff,#edfdf4);
+      flex:0 0 auto;
+    }
+    .main{min-width:0;flex:1}
+    .name{margin:1px 0 4px;font-size:18px;line-height:1.04;font-weight:800;letter-spacing:-.02em}
+    .meta{font-size:12px;color:var(--muted);font-weight:600}
+    .badge{
+      font-size:10px;font-weight:800;color:#206ee8;background:#e9f3ff;border-radius:10px;padding:5px 8px;height:max-content;
+    }
+    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+    .stats{display:flex;gap:6px;flex-wrap:wrap}
+    .stat{font-size:11px;font-weight:700;color:#506678;background:#eef4fb;padding:5px 8px;border-radius:9px}
+    .cta{display:flex;gap:8px}
+    .btn{
+      border:none;border-radius:11px;padding:8px 10px;font-size:12px;font-weight:800;cursor:pointer;
+      transition:.15s;
+    }
+    .btn.plan{background:#eef4fb;color:#526b7f}
+    .btn.open{background:linear-gradient(135deg,#0f384f,#19557a);color:#fff}
+    .fab{
+      position:fixed;right:max(16px,calc((100vw - 430px)/2 + 16px));bottom:96px;
+      width:54px;height:54px;border:none;border-radius:16px;cursor:pointer;
+      color:#fff;font-size:26px;font-weight:700;
+      background:linear-gradient(135deg,var(--c),#6f68ff);
+      box-shadow:0 18px 30px rgba(92,64,208,.42);
+    }
+    .nav{
+      position:fixed;left:50%;translate:-50% 0;bottom:14px;
+      width:min(430px,calc(100vw - 20px));
+      border-radius:20px;background:#ffffffd4;backdrop-filter:blur(14px);
+      border:1px solid #dce9f5;padding:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+      box-shadow:0 16px 34px rgba(16,36,58,.18);
+    }
+    .tab{
+      border:none;background:transparent;border-radius:12px;padding:9px 6px;
+      font-size:12px;font-weight:800;color:#64798d;
+    }
+    .tab.active{background:#eaf4ff;color:#206ee8}
+    .toast{
+      position:fixed;left:50%;translate:-50% 8px;bottom:88px;
+      background:#10202f;color:#fff;border-radius:999px;padding:10px 14px;
+      font-size:12px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;
+    }
+    .toast.show{opacity:1;translate:-50% 0}
+    @media (min-width:760px){
+      .shell{max-width:900px}
+      .grid{grid-template-columns:1fr 1fr}
+      .nav{width:min(900px,calc(100vw - 40px))}
+      .fab{right:max(20px,calc((100vw - 900px)/2 + 20px))}
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="hello">Buen día, chef</div>
+      <h1 class="title">¿Qué cocinamos hoy?</h1>
+      <input id="search" class="search" placeholder="Busca por plato, ingrediente o categoría" />
+      <div class="quick">
+        <div class="q">🔥 3 recetas rápidas</div>
+        <div class="q">🛒 Compra lista para hoy</div>
+      </div>
+    </section>
+
+    <div class="section-head">
+      <h2 class="section-title">Tu biblioteca</h2>
+      <span class="link" id="count"></span>
+    </div>
+    <div class="filters" id="filters"></div>
+    <section class="grid" id="grid"></section>
+  </main>
+
+  <button class="fab" id="fab">+</button>
+  <nav class="nav">
+    <button class="tab active">Recetas</button>
+    <button class="tab">Plan</button>
+    <button class="tab">Compras</button>
+  </nav>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const data = [
+      { id:1, icon:"🍝", name:"Pasta cremosa", cat:"Cena", mins:20, diff:"Fácil", tags:["pasta","rápido"] },
+      { id:2, icon:"🥑", name:"Toast de palta", cat:"Desayuno", mins:8, diff:"Express", tags:["palta","huevo"] },
+      { id:3, icon:"🍛", name:"Curry de garbanzos", cat:"Veggie", mins:28, diff:"Medio", tags:["garbanzo","curry"] },
+      { id:4, icon:"🐟", name:"Salmón al horno", cat:"Proteína", mins:24, diff:"Fácil", tags:["salmón","horno"] },
+      { id:5, icon:"🍰", name:"Keke de plátano", cat:"Postre", mins:50, diff:"Horno", tags:["plátano","dulce"] }
+    ];
+
+    const categories = ["Todas", ...new Set(data.map(r => r.cat))];
+    let currentCat = "Todas";
+    let q = "";
+
+    const $grid = document.getElementById("grid");
+    const $filters = document.getElementById("filters");
+    const $count = document.getElementById("count");
+    const $search = document.getElementById("search");
+    const $toast = document.getElementById("toast");
+
+    function toast(msg){
+      $toast.textContent = msg;
+      $toast.classList.add("show");
+      setTimeout(() => $toast.classList.remove("show"), 1700);
+    }
+
+    function drawFilters(){
+      $filters.innerHTML = categories.map(cat => `<button class="pill ${cat===currentCat?'active':''}" data-cat="${cat}">${cat}</button>`).join("");
+      [...$filters.querySelectorAll(".pill")].forEach(btn => {
+        btn.onclick = () => { currentCat = btn.dataset.cat; render(); drawFilters(); };
+      });
+    }
+
+    function render(){
+      const query = q.trim().toLowerCase();
+      const list = data.filter(item => {
+        const catOk = currentCat === "Todas" || item.cat === currentCat;
+        const qOk = !query || `${item.name} ${item.cat} ${item.tags.join(" ")}`.toLowerCase().includes(query);
+        return catOk && qOk;
+      });
+
+      $count.textContent = `${list.length}/${data.length} recetas`;
+      $grid.innerHTML = list.map(item => `
+        <article class="item">
+          <div class="row">
+            <div class="icon">${item.icon}</div>
+            <div class="main">
+              <h3 class="name">${item.name}</h3>
+              <div class="meta">${item.cat}</div>
+            </div>
+            <span class="badge">${item.diff}</span>
+          </div>
+          <div class="foot">
+            <div class="stats">
+              <span class="stat">${item.mins} min</span>
+              <span class="stat">${item.tags[0]}</span>
+            </div>
+            <div class="cta">
+              <button class="btn plan" data-plan="${item.name}">Planificar</button>
+              <button class="btn open" data-open="${item.name}">Abrir</button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      [...$grid.querySelectorAll("[data-plan]")].forEach(b => b.onclick = () => toast(`Planificado: ${b.dataset.plan}`));
+      [...$grid.querySelectorAll("[data-open]")].forEach(b => b.onclick = () => toast(`Abriendo ${b.dataset.open}`));
+    }
+
+    $search.addEventListener("input", e => { q = e.target.value; render(); });
+    document.getElementById("fab").onclick = () => toast("Nueva receta");
+    drawFilters();
+    render();
+  </script>
+</body>
+</html>

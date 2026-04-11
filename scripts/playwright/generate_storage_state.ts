@@ -21,11 +21,13 @@ async function main() {
   try {
     await page.goto(`${baseUrl}/#/auth`, { waitUntil: 'domcontentloaded' });
 
-    const authHeading = page.getByRole('heading', { name: 'Inicia sesión', exact: true });
-    await expect(authHeading).toBeVisible();
+    const emailInput = page.locator('#signin-email');
+    const passwordInput = page.locator('#signin-password');
+    await expect(emailInput).toBeVisible({ timeout: 10_000 });
+    await expect(passwordInput).toBeVisible({ timeout: 10_000 });
 
-    await page.locator('#signin-email').fill(email);
-    await page.locator('#signin-password').fill(password);
+    await emailInput.fill(email);
+    await passwordInput.fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
     await expect
@@ -34,8 +36,6 @@ async function main() {
         { timeout: 15_000 },
       )
       .not.toBe('/auth');
-
-    await expect(authHeading).toBeHidden();
 
     await context.storageState({ path: storageStatePath });
   } finally {

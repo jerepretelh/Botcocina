@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Meal Planner Mobile Prototype</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%23eb7a2b'/%3E%3Cpath d='M9 10h14M9 16h14M9 22h8' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="prototype-shell">
+      <main class="phone-frame" aria-label="Meal planner prototype">
+        <div class="phone-glow" aria-hidden="true"></div>
+
+        <header class="app-header">
+          <button class="icon-button header-back" id="header-back" type="button" aria-label="Volver" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14.5 6.5L9 12l5.5 5.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+            </svg>
+          </button>
+          <div class="header-copy">
+            <p class="eyebrow" id="header-eyebrow">Meal planner</p>
+            <h1 id="header-title">Organiza tu semana</h1>
+            <p class="header-subtitle" id="header-subtitle">
+              Elige recetas, acomódalas rápido y convierte tu plan en una compra simple.
+            </p>
+          </div>
+          <button class="icon-button header-action" type="button" aria-label="Abrir filtros">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+            </svg>
+          </button>
+        </header>
+
+        <section class="content-stack">
+          <section class="screen is-active" id="screen-recipes" data-screen="recipes" aria-labelledby="recipes-title">
+            <div class="hero-card">
+              <div>
+                <p class="section-kicker">Inicio</p>
+                <h2 id="recipes-title">Tus recetas listas para entrar al plan</h2>
+              </div>
+              <span class="hero-badge">4 ideas</span>
+            </div>
+
+            <div class="recipe-list" id="recipe-list"></div>
+          </section>
+
+          <section class="screen" id="screen-recipe" data-screen="recipe" aria-labelledby="recipe-detail-title">
+            <div class="recipe-detail-hero" id="recipe-detail-hero">
+              <div class="recipe-detail-cover">
+                <div class="recipe-detail-emoji" id="detail-emoji" aria-hidden="true">🍲</div>
+                <div class="recipe-detail-copy">
+                  <p class="section-kicker" id="detail-kicker">Receta interna</p>
+                  <h2 id="recipe-detail-title">Arroz con lentejas</h2>
+                  <p class="recipe-detail-description" id="detail-description">
+                    Una receta pensada para verse lista por dentro aunque todavía no tenga lógica real.
+                  </p>
+                </div>
+              </div>
+              <div class="recipe-detail-stats" id="detail-stats"></div>
+            </div>
+
+            <div class="recipe-detail-grid">
+              <section class="detail-card">
+                <div class="detail-card-header">
+                  <div>
+                    <p class="section-kicker">Ingredientes</p>
+                    <h3>Lo esencial para arrancar</h3>
+                  </div>
+                  <span class="detail-chip">Base</span>
+                </div>
+                <div class="ingredient-group" id="ingredient-groups"></div>
+              </section>
+
+              <section class="detail-card">
+                <div class="detail-card-header">
+                  <div>
+                    <p class="section-kicker">Preparación</p>
+                    <h3>Una guía breve, sin entrar al runtime</h3>
+                  </div>
+                  <span class="detail-chip detail-chip-soft">Preview</span>
+                </div>
+                <div class="step-list" id="step-list"></div>
+              </section>
+            </div>
+
+            <div class="recipe-inline-note">
+              <span class="inline-note-dot"></span>
+              Esta vista es visual e intencional: deja claro qué receta abriste y te permite volver al flujo de plan sin bloquearte.
+            </div>
+
+            <div class="recipe-detail-actions">
+              <button class="button button-secondary" id="detail-secondary" type="button">Guardar idea</button>
+              <button class="button button-primary" id="detail-primary" type="button">Planificar receta</button>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-plan" data-screen="plan" aria-labelledby="plan-title">
+            <div class="hero-card">
+              <div>
+                <p class="section-kicker">Plan semanal</p>
+                <h2 id="plan-title">Una vista liviana, lista para decidir</h2>
+              </div>
+              <span class="hero-badge badge-soft" id="plan-count">2 días</span>
+            </div>
+
+            <div class="plan-list" id="plan-list"></div>
+
+            <button class="button button-primary button-block" id="generate-shopping" type="button">
+              Generar compras
+            </button>
+          </section>
+
+          <section class="screen" id="screen-shopping" data-screen="shopping" aria-labelledby="shopping-title">
+            <div class="shopping-summary">
+              <div>
+                <p class="summary-label">Total</p>
+                <p class="summary-amount" id="shopping-total">S/ 0.00</p>
+                <p class="summary-budget" id="shopping-budget">Restante S/ 40.00</p>
+              </div>
+              <div class="summary-pill">
+                <span class="status-dot"></span>
+                Compra en curso
+              </div>
+            </div>
+
+            <div class="shopping-toolbar">
+              <div>
+                <p class="section-kicker">Compras</p>
+                <h2 id="shopping-title">Hecha para usar dentro del súper</h2>
+              </div>
+
+              <button class="toggle-card" id="super-mode-toggle" type="button" aria-pressed="false">
+                <span class="toggle-copy">
+                  <span class="toggle-title">Modo súper</span>
+                  <span class="toggle-caption">Compactar lista</span>
+                </span>
+                <span class="toggle-switch" aria-hidden="true">
+                  <span class="toggle-thumb"></span>
+                </span>
+              </button>
+            </div>
+
+            <div class="shopping-list" id="shopping-list"></div>
+
+            <div class="shopping-sticky" id="shopping-sticky">
+              <div>
+                <p class="sticky-label">Total actual</p>
+                <p class="sticky-amount" id="sticky-total">S/ 0.00</p>
+              </div>
+              <button class="button button-primary" id="finish-shopping" type="button">
+                Finalizar
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <nav class="bottom-nav" aria-label="Navegación principal">
+          <button class="nav-item is-active" type="button" data-target="recipes">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 6.5h14M5 12h14M5 17.5h9" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+              </svg>
+            </span>
+            <span>Recetas</span>
+          </button>
+          <button class="nav-item" type="button" data-target="plan">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 4.5v15M17 4.5v15M4.5 8h15M4.5 19.5h15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+              </svg>
+            </span>
+            <span>Plan</span>
+          </button>
+          <button class="nav-item" type="button" data-target="shopping">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M7 8h12l-1.3 8.2a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.6L5.8 5.6A1.4 1.4 0 0 0 4.4 4.5H3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+                <circle cx="10" cy="20" r="1.2" fill="currentColor"></circle>
+                <circle cx="17" cy="20" r="1.2" fill="currentColor"></circle>
+              </svg>
+            </span>
+            <span>Compras</span>
+          </button>
+        </nav>
+
+        <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+        <aside
+          class="bottom-sheet"
+          id="plan-sheet"
+          hidden
+          aria-hidden="true"
+          aria-labelledby="sheet-title"
+          aria-modal="true"
+          role="dialog"
+        >
+          <div class="sheet-handle" aria-hidden="true"></div>
+          <div class="sheet-header">
+            <div>
+              <p class="section-kicker">Planificar</p>
+              <h2 id="sheet-title">Planificar receta</h2>
+              <p class="sheet-subtitle" id="sheet-recipe-name">Arroz con lentejas</p>
+            </div>
+            <button class="icon-button" id="sheet-close" type="button" aria-label="Cerrar modal">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="selector-group">
+            <p class="selector-label">Día</p>
+            <div class="chip-row" id="day-chips"></div>
+          </div>
+
+          <div class="selector-group">
+            <p class="selector-label">Momento</p>
+            <div class="chip-row" id="moment-chips"></div>
+          </div>
+
+          <div class="sheet-actions">
+            <button class="button button-secondary" id="sheet-cancel" type="button">Cancelar</button>
+            <button class="button button-primary" id="sheet-confirm" type="button">Agregar al plan</button>
+          </div>
+        </aside>
+
+        <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+        <section class="completion-overlay" id="completion-overlay" hidden aria-live="polite">
+          <div class="completion-card">
+            <div class="completion-badge">Compra finalizada</div>
+            <h2>Todo listo para volver a cocinar</h2>
+            <p id="completion-total">S/ 0.00</p>
+            <button class="button button-primary button-block" id="completion-reset" type="button">
+              Seguir explorando
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

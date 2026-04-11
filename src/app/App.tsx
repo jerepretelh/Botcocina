@@ -1,14 +1,13 @@
 import { useEffect } from 'react';
 import { HashRouter, useLocation, useNavigate } from 'react-router';
-import { ThermomixCooker } from './components/ThermomixCooker';
+import { AUTH_REDIRECT_PATH_KEY, resolveAppAuthRouteDecision } from './appAuthRouting';
 import { AuthScreen } from './components/screens/AuthScreen';
+import { FixedRuntimeApp } from './features/fixed-runtime/FixedRuntimeApp';
 import { useAuthSession } from './hooks/useAuthSession';
 
 type AuthRedirectState = {
   redirectTo?: string;
 };
-
-const AUTH_REDIRECT_PATH_KEY = 'auth:redirect:path';
 
 function AppShell() {
   const auth = useAuthSession();
@@ -16,35 +15,40 @@ function AppShell() {
   const navigate = useNavigate();
   const isAuthRoute = location.pathname === '/auth';
   const redirectState = (location.state as AuthRedirectState | null) ?? null;
+  const isRuntimeRoute = location.pathname === '/runtime-fijo' || location.pathname.startsWith('/runtime-fijo/');
+  const shouldRenderAuthScreen = !auth.isAuthenticated || auth.authFlow === 'password_recovery';
 
   useEffect(() => {
-    if (!auth.isReady) return;
     const pendingRedirectPath = window.sessionStorage.getItem(AUTH_REDIRECT_PATH_KEY);
+    const decision = resolveAppAuthRouteDecision({
+      isReady: auth.isReady,
+      isAuthenticated: auth.isAuthenticated,
+      isAuthRoute,
+      isRuntimeRoute,
+      isPasswordRecoveryFlow: auth.authFlow === 'password_recovery',
+      locationPathname: location.pathname,
+      pendingRedirectPath,
+      redirectStatePath: redirectState?.redirectTo ?? null,
+    });
 
-    if (!auth.isAuthenticated && !isAuthRoute) {
-      window.sessionStorage.setItem(AUTH_REDIRECT_PATH_KEY, location.pathname);
+    if (decision.kind === 'store_redirect') {
+      window.sessionStorage.setItem(AUTH_REDIRECT_PATH_KEY, decision.path);
       navigate('/auth', {
         replace: true,
-        state: { redirectTo: location.pathname },
+        state: { redirectTo: decision.path },
       });
       return;
     }
 
-    if (auth.isAuthenticated && isAuthRoute) {
-      const nextPath = pendingRedirectPath || redirectState?.redirectTo || '/';
-      navigate(nextPath, { replace: true });
+    if (decision.kind === 'redirect') {
+      navigate(decision.to, { replace: true });
       return;
     }
 
-    if (auth.isAuthenticated && pendingRedirectPath && location.pathname === '/') {
-      navigate(pendingRedirectPath, { replace: true });
-      return;
-    }
-
-    if (auth.isAuthenticated && pendingRedirectPath === location.pathname) {
+    if (decision.kind === 'clear_redirect') {
       window.sessionStorage.removeItem(AUTH_REDIRECT_PATH_KEY);
     }
-  }, [auth.isAuthenticated, auth.isReady, isAuthRoute, location.pathname, navigate, redirectState?.redirectTo]);
+  }, [auth.authFlow, auth.isAuthenticated, auth.isReady, isAuthRoute, isRuntimeRoute, location.pathname, navigate, redirectState?.redirectTo]);
 
   if (!auth.isReady) {
     return (
@@ -54,11 +58,12 @@ function AppShell() {
     );
   }
 
-  if (!auth.isAuthenticated) {
+  if (shouldRenderAuthScreen) {
     return (
       <AuthScreen
         error={auth.error}
         isConfigured={auth.isSupabaseEnabled}
+        isPasswordRecovery={auth.authFlow === 'password_recovery'}
         onSignIn={async (email, password) => {
           await auth.signIn(email, password);
         }}
@@ -68,11 +73,30 @@ function AppShell() {
             requiresEmailConfirmation: !result.session,
           };
         }}
+        onRequestPasswordReset={async (email) => {
+          await auth.requestPasswordReset(email);
+        }}
+        onUpdatePassword={async (password) => {
+          await auth.updatePassword(password);
+        }}
+        onRetry={() => {
+          void auth.retry();
+        }}
       />
     );
   }
 
-  return <ThermomixCooker auth={auth} />;
+  if (isRuntimeRoute) {
+    return <FixedRuntimeApp pathname={location.pathname} navigate={navigate} userId={auth.userId} />;
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#f5efe8] text-[#6f5d4b]">
+      <div className="rounded-2xl border border-[#e8dbcc] bg-white px-5 py-3 text-sm shadow-sm">
+        Redirigiendo a runtime-fijo...
+      </div>
+    </div>
+  );
 }
 
 export default function App() {

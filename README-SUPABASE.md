@@ -26,6 +26,7 @@ Importación desde Google Sheets:
 La migración quedó en:
 
 - `supabase/migrations/20260305_supabase_bootstrap_cooking_assistant_v1.sql`
+- `supabase/migrations/20260402_v20_fixed_runtime_recipes.sql`
 
 Puedes aplicarla desde:
 
@@ -87,6 +88,20 @@ npm run catalog:push
 
 4. Aplicar seed primero en staging, luego producción.
 5. Registrar release en `docs/ops/catalog-release-log.md`.
+
+## 8) Seed oficial de Runtime Fijo (JSONB)
+
+Para sembrar el catálogo oficial de `runtime-fijo` en `public.fixed_recipes`:
+
+```bash
+SUPABASE_URL="https://<project-ref>.supabase.co" \
+SUPABASE_SERVICE_ROLE_KEY="<service-role-key>" \
+npm run seed:fixed-runtime
+```
+
+El script toma como fuente:
+
+- `public/fixed-runtime/recipes.json`
 
 ## 6) Reglas de fallback en producción
 

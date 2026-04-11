@@ -1,0 +1,76 @@
+{
+  "id": "limonada-jarra-4p",
+  "title": "Limonada fresca",
+  "recipeCategory": "beverage",
+  "equipment": ["licuadora", "jarra"],
+  "servings": 4,
+  "ingredients": [
+    {
+      "title": "Base",
+      "icon": "🥤",
+      "items": [
+        {
+          "name": "limon",
+          "canonicalName": "limon",
+          "shoppingKey": "limon",
+          "amount": 6,
+          "unit": "unidad"
+        },
+        {
+          "name": "agua fria",
+          "canonicalName": "agua",
+          "shoppingKey": "agua",
+          "amount": 1200,
+          "unit": "ml",
+          "displayAmount": "5",
+          "displayUnit": "tazas"
+        },
+        {
+          "name": "azucar",
+          "canonicalName": "azucar",
+          "shoppingKey": "azucar",
+          "amount": 80,
+          "unit": "g",
+          "displayAmount": "1/3",
+          "displayUnit": "taza"
+        },
+        {
+          "name": "hielo",
+          "canonicalName": "hielo",
+          "shoppingKey": "hielo",
+          "amount": 300,
+          "unit": "g",
+          "displayAmount": "2",
+          "displayUnit": "tazas",
+          "isOptional": true
+        }
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "id": "fase-1-preparacion",
+      "number": "FASE 1",
+      "title": "Preparación",
+      "emoji": "🔪",
+      "purpose": "Dejar ingredientes listos para licuar.",
+      "steps": [
+        { "id": "f1-s1", "kind": "action", "text": "Exprimir limones.", "container": "bowl-1" },
+        { "id": "f1-s2", "kind": "action", "text": "Medir agua y azucar.", "container": "jarra-1" }
+      ]
+    },
+    {
+      "id": "fase-2-mezcla",
+      "number": "FASE 2",
+      "title": "Mezcla",
+      "emoji": "🥤",
+      "purpose": "Integrar y enfriar bebida.",
+      "steps": [
+        { "id": "f2-s1", "kind": "action", "text": "Licuar jugo, agua y azucar.", "container": "licuadora-1" },
+        { "id": "f2-s2", "kind": "timer", "text": "Licuar limonada.", "timerSec": 45, "container": "licuadora-1" },
+        { "id": "f2-s3", "kind": "result", "text": "Limonada homogénea.", "result": "bebida integrada", "container": "jarra-1" },
+        { "id": "f2-s4", "kind": "action", "text": "Servir con hielo opcional.", "container": "jarra-1" }
+      ]
+    }
+  ]
+}
