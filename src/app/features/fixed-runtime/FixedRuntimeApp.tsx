@@ -1,5 +1,5 @@
 import './fixed-runtime.css';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   ArrowDown,
   CalendarDays,
@@ -539,6 +539,48 @@ function formatTime(totalSeconds: number) {
   return `${mins}:${secs}`;
 }
 
+/** Plays a short beep using Web Audio API. frequency in Hz, duration in ms. */
+function playBeep(frequency = 880, duration = 150, volume = 0.3): void {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    gain.gain.value = volume;
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + duration / 1000);
+    oscillator.onended = () => ctx.close();
+  } catch {
+    // Silent fallback if audio is not available
+  }
+}
+
+function playTimerPreAlarm(): void {
+  playBeep(660, 120, 0.2);
+}
+
+function playTimerEndAlarm(): void {
+  // Play a triple beep pattern for completion
+  playBeep(880, 200, 0.4);
+  setTimeout(() => playBeep(880, 200, 0.4), 300);
+  setTimeout(() => playBeep(1100, 300, 0.5), 600);
+  // Vibrate if available
+  try {
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+  } catch {
+    // Silent fallback
+  }
+}
+
+const PRE_ALARM_SECONDS = 10;
+
 function formatCurrency(value: number): string {
   const safeValue = Number.isFinite(value) ? value : 0;
   return new Intl.NumberFormat('es-PE', {
@@ -677,6 +719,8 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({});
+  const preAlarmFiredRef = useRef<Set<string>>(new Set());
+  const endAlarmFiredRef = useRef<Set<string>>(new Set());
   const [recipeImages, setRecipeImages] = useState<Record<string, string>>(() => {
     try {
       const raw = window.localStorage.getItem('RUNTIME_RECIPE_IMAGES');
@@ -728,6 +772,64 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
 
     return () => clearInterval(interval);
   }, []);
+
+  // Issue 4: Wake Lock — prevent screen from locking during recipe
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+    let released = false;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+            wakeLock = null;
+          });
+        }
+      } catch {
+        // Browser may deny wake lock (e.g. low battery mode)
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (!released && document.visibilityState === 'visible') {
+        void requestWakeLock();
+      }
+    };
+
+    void requestWakeLock();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) {
+        void wakeLock.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Issue 3: Timer alarms — pre-alarm at 10s + end alarm
+  useEffect(() => {
+    Object.entries(timers).forEach(([id, timer]) => {
+      if (!timer.running) return;
+      // Pre-alarm: fire once when reaching PRE_ALARM_SECONDS
+      if (
+        timer.remaining <= PRE_ALARM_SECONDS &&
+        timer.remaining > 0 &&
+        timer.duration > PRE_ALARM_SECONDS &&
+        !preAlarmFiredRef.current.has(id)
+      ) {
+        preAlarmFiredRef.current.add(id);
+        playTimerPreAlarm();
+      }
+      // End alarm: fire once when timer hits 0
+      if (timer.remaining === 0 && timer.done && !endAlarmFiredRef.current.has(id)) {
+        endAlarmFiredRef.current.add(id);
+        playTimerEndAlarm();
+      }
+    });
+  }, [timers]);
 
   const stepMetaMap = useMemo(() => {
     const map: Record<string, StepMeta> = {};
@@ -1529,9 +1631,9 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
             <div className="mb-6 flex items-center justify-between">
               <h2 className="font-editorial text-[32px] font-medium tracking-tight text-[#23180f] sm:text-[42px]">🧺 Ingredientes</h2>
             </div>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {recipe.ingredients.map((group) => (
-                <section key={group.title} className="rounded-2xl bg-[var(--bg-soft-rt)] p-5">
+                <section key={group.title} className="w-full rounded-2xl bg-[var(--bg-soft-rt)] p-4 sm:p-5">
                   <div className="mb-3 flex items-center gap-3">
                     <div className="text-xl">{group.icon}</div>
                     <h3 className="font-editorial text-[22px] font-medium tracking-tight text-[#23180f]">
@@ -1770,16 +1872,18 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
         </div>
       ) : null}
 
-      {activeTimerId && activeTimer ? (
+      {activeTimerId && activeTimer ? (() => {
+        const isPreAlarm = activeTimer.running && activeTimer.remaining <= PRE_ALARM_SECONDS && activeTimer.remaining > 0 && activeTimer.duration > PRE_ALARM_SECONDS;
+        return (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 sm:items-center sm:p-4">
-          <div className="w-full rounded-t-[28px] bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-[28px] sm:p-8">
+          <div className={`w-full rounded-t-[28px] bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-[28px] sm:p-8 ${isPreAlarm ? 'rt-timer-pre-alarm' : ''}`}>
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-stone-200 sm:hidden" />
             <div className="mb-5 flex items-start justify-between gap-4 border-b border-stone-200 pb-5">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stone-500">
                   {stepMetaMap[activeTimerId]?.phaseTitle}
                 </p>
-                <h3 className="mt-2 text-[40px] font-semibold tracking-tight text-stone-950 tabular-nums sm:text-4xl">
+                <h3 className={`mt-2 text-[40px] font-semibold tracking-tight tabular-nums sm:text-4xl ${isPreAlarm ? 'text-amber-600' : activeTimer.done ? 'text-emerald-700' : 'text-stone-950'}`}>
                   {formatTime(activeTimer.remaining)}
                 </h3>
               </div>
@@ -1792,13 +1896,20 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
               </button>
             </div>
 
+            {isPreAlarm ? (
+              <div className="mb-4 flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-800">
+                <span className="text-lg">⚠️</span>
+                <span>¡Faltan {activeTimer.remaining} segundos!</span>
+              </div>
+            ) : null}
+
             <p className="mb-6 text-[24px] font-medium leading-[1.15] text-stone-900 sm:text-2xl">
               {stepMetaMap[activeTimerId]?.text}
             </p>
 
             <div className="mb-7 h-[4px] w-full overflow-hidden rounded-full bg-stone-200">
               <div
-                className="h-[4px] rounded-full bg-amber-700 transition-all"
+                className={`h-[4px] rounded-full transition-all ${isPreAlarm ? 'bg-amber-500' : activeTimer.done ? 'bg-emerald-500' : 'bg-amber-700'}`}
                 style={{
                   width: `${((activeTimer.duration - activeTimer.remaining) / activeTimer.duration) * 100}%`,
                 }}
@@ -1823,7 +1934,8 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
             </div>
           </div>
         </div>
-      ) : null}
+        );
+      })() : null}
 
       {suggestion ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/25 sm:items-center sm:p-4">
@@ -1922,6 +2034,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
   const [storageMode, setStorageMode] = useState<FixedRuntimeStorageMode>('local-fallback');
   const [shoppingUiState, setShoppingUiState] = useState<Record<string, ShoppingUiState>>({});
   const [shoppingScope, setShoppingScope] = useState<ShoppingScope>('weekly');
+  const [shoppingStep, setShoppingStep] = useState<'list' | 'configure'>('list');
   const [weeklySelectedRecipeIds, setWeeklySelectedRecipeIds] = useState<string[]>([]);
   const knownWeeklyRecipeIdsRef = useRef<Set<string>>(new Set());
   const [extraSelectedRecipeIds, setExtraSelectedRecipeIds] = useState<string[]>([]);
@@ -2937,6 +3050,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
       setImportError(syncError instanceof Error ? syncError.message : 'No se pudo actualizar compras.');
       showShellToast('Mostrando compras sin sincronizar');
     } finally {
+      setShoppingStep('list');
       setActiveShellTab('shopping');
     }
   };
@@ -3360,252 +3474,285 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
 
               {runtimeScreen === 'library' && activeShellTab === 'shopping' ? (
                 <div className="space-y-4 pb-24">
-                  <section className={`${SHELL_UI.surface} px-4 py-5`}>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div>
-                        <h2 className="text-[22px] font-extrabold leading-[1.04] tracking-[-0.03em] text-[#23180f]">Generar lista de compras</h2>
-                        <p className="mt-1 text-[13px] text-[#5f5245] max-w-sm">
-                          Tus platos semanales ya están preseleccionados. Suma recetas sueltas o productos libres a tu voluntad.
-                        </p>
+                  {shoppingStep === 'configure' ? (
+                    /* Step 2: Configure recipes */
+                    <section className={`${SHELL_UI.surface} px-4 py-5`}>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                          <h2 className="text-[22px] font-extrabold leading-[1.04] tracking-[-0.03em] text-[#23180f]">Personalizar recetas</h2>
+                          <p className="mt-1 text-[13px] text-[#5f5245] max-w-sm">
+                            Busca recetas adicionales o selecciona platos de tu plan semanal.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setShoppingStep('list'); void openShoppingTab(shoppingScope); }}
+                          className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-stone-900 px-5 text-sm font-bold text-white transition hover:bg-stone-800"
+                        >
+                          ← Volver a la lista
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsManualSheetOpen(true)}
-                        className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-stone-900 px-5 text-sm font-bold text-white transition hover:bg-stone-800"
-                      >
-                        + Agregar producto suelto
-                      </button>
-                    </div>
                     
-                    <div className="mt-6 border-t border-[#f4f1ea] pt-5">
-                      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <div className="relative">
-                          <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0a6]">
-                            <path d="M11 4a7 7 0 1 1 0 14a7 7 0 0 1 0-14m0 0l0 0m8.5 15.5L17 17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-                          </svg>
-                          <input
-                            value={shoppingRecipeQuery}
-                            onChange={(event) => setShoppingRecipeQuery(event.target.value)}
-                            placeholder="Buscar y añadir receta extra (ej: Postre)"
-                            className="h-11 w-full rounded-xl border border-black/10 bg-[#f8f9fa] pl-11 pr-4 text-sm text-[#1f2328] outline-none transition focus:border-[var(--primary-rt)] focus:ring-2 focus:ring-[#fce2ba]"
-                          />
+                      <div className="mt-6 border-t border-[#f4f1ea] pt-5">
+                        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <div className="relative">
+                            <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa0a6]">
+                              <path d="M11 4a7 7 0 1 1 0 14a7 7 0 0 1 0-14m0 0l0 0m8.5 15.5L17 17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+                            </svg>
+                            <input
+                              value={shoppingRecipeQuery}
+                              onChange={(event) => setShoppingRecipeQuery(event.target.value)}
+                              placeholder="Buscar y añadir receta extra (ej: Postre)"
+                              className="h-11 w-full rounded-xl border border-black/10 bg-[#f8f9fa] pl-11 pr-4 text-sm text-[#1f2328] outline-none transition focus:border-[var(--primary-rt)] focus:ring-2 focus:ring-[#fce2ba]"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
                     
-                    {shoppingRecipeQuery.trim().length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {shoppingRecipeSuggestions.length === 0 ? (
-                          <span className="rounded-full bg-[#f8f2eb] px-3 py-1.5 text-xs font-semibold text-[#8a7768]">Sin coincidencias</span>
-                        ) : (
-                          shoppingRecipeSuggestions.map((recipe) => (
+                      {shoppingRecipeQuery.trim().length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {shoppingRecipeSuggestions.length === 0 ? (
+                            <span className="rounded-full bg-[#f8f2eb] px-3 py-1.5 text-xs font-semibold text-[#8a7768]">Sin coincidencias</span>
+                          ) : (
+                            shoppingRecipeSuggestions.map((recipe) => (
+                              <button
+                                key={recipe.id}
+                                type="button"
+                                onClick={() => {
+                                  addRecipeToShoppingSelection(recipe.id);
+                                  setShoppingRecipeQuery('');
+                                }}
+                                className="inline-flex min-h-9 items-center rounded-full border border-[#e3d9ce] bg-white px-3 text-xs font-bold text-[#d86315] transition hover:bg-[#fff7ef]"
+                              >
+                                + {recipe.title}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-6">
+                        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a6759]">
+                          Recetas incluidas ({weeklySelectedRecipeIds.length + selectedExtraRecipes.length})
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {weeklyRecipeIds.length === 0 && selectedExtraRecipes.length === 0 ? (
+                            <span className="rounded-xl border border-dashed border-[#d5c9ba] px-4 py-3 text-[13px] font-medium text-[#8a7768] w-full text-center">
+                              Ninguna receta seleccionada. ¿Planeamos la semana?
+                            </span>
+                          ) : (
+                            <>
+                              {weeklyRecipeIds.map((recipeId) => {
+                                const recipe = recipesById.get(recipeId);
+                                if (!recipe) return null;
+                                const active = weeklySelectedRecipeIds.includes(recipeId);
+                                return (
+                                  <button
+                                    key={recipeId}
+                                    type="button"
+                                    onClick={() => toggleWeeklyRecipeSelection(recipeId)}
+                                    className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-[13px] font-semibold transition ${
+                                      active
+                                        ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
+                                        : 'border-[#dacfc3] bg-[#fdfaf7] text-[#8a7768] hover:bg-white'
+                                    }`}
+                                  >
+                                    {active ? '✓ ' : ''}{recipe.title}
+                                  </button>
+                                );
+                              })}
+                              {selectedExtraRecipes.map((recipe) => (
+                                <span key={recipe.id} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--primary-rt)] bg-[var(--primary-rt)] px-3 py-1 text-[13px] font-semibold text-white">
+                                  ✓ {recipe.title}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeExtraRecipeFromShoppingSelection(recipe.id)}
+                                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </span>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  ) : (
+                    /* Step 1: Shopping list */
+                    <>
+                      <section className={`${SHELL_UI.surface} px-4 py-5`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div>
+                            <h2 className="text-[22px] font-extrabold leading-[1.04] tracking-[-0.03em] text-[#23180f]">Lista de compras</h2>
+                            <p className="mt-1 text-[13px] text-[#5f5245] max-w-sm">
+                              Lista semanal generada desde tu plan. Marca, precio y finaliza.
+                            </p>
+                          </div>
+                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                             <button
-                              key={recipe.id}
                               type="button"
-                              onClick={() => {
-                                addRecipeToShoppingSelection(recipe.id);
-                                setShoppingRecipeQuery('');
-                              }}
-                              className="inline-flex min-h-9 items-center rounded-full border border-[#e3d9ce] bg-white px-3 text-xs font-bold text-[#d86315] transition hover:bg-[#fff7ef]"
+                              onClick={() => setIsManualSheetOpen(true)}
+                              className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl border border-stone-300 bg-white px-4 text-sm font-bold text-stone-700 transition hover:bg-stone-50"
                             >
-                              + {recipe.title}
+                              + Producto suelto
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setShoppingStep('configure')}
+                              className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-xl bg-stone-900 px-5 text-sm font-bold text-white transition hover:bg-stone-800"
+                            >
+                              Personalizar recetas
+                            </button>
+                          </div>
+                        </div>
+                      </section>
+
+                      <div className="grid gap-3 sm:grid-cols-[300px_1fr]">
+                        <section className={`${SHELL_UI.surfaceSoft} px-4 py-4`}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--primary-rt)]">Progreso</p>
+                            <p className="text-xs font-bold text-[var(--text-muted-rt)]">{shellShoppingItems.filter(i => i.checked).length} / {shellShoppingItems.length}</p>
+                          </div>
+                          <div className="mt-2 h-2 w-full rounded-full bg-[#f4f1ea] overflow-hidden">
+                            <div 
+                              className="h-full bg-[var(--success-rt)] transition-all duration-500" 
+                              style={{ width: `${shellShoppingItems.length === 0 ? 0 : Math.round((shellShoppingItems.filter(i => i.checked).length / shellShoppingItems.length) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-4 text-[48px] font-extrabold leading-none tracking-[-0.05em] text-[#23180f]">{formatCurrency(shoppingTotal)}</p>
+                          <p className="mt-2 text-sm text-[var(--text-muted-rt)]">
+                            {shoppingTotal <= 40 ? `Restante ${formatCurrency(40 - shoppingTotal)}` : `Excedido ${formatCurrency(shoppingTotal - 40)}`}
+                          </p>
+                        </section>
+                        <section className={`${SHELL_UI.surfaceSoft} flex items-center justify-between gap-3 px-4 py-4`}>
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d86315]">Compras</p>
+                            <h2 className="mt-1 text-[26px] font-extrabold leading-[1.02] tracking-[-0.03em] text-[#23180f]">Lista operativa</h2>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSuperMode((current) => !current)}
+                            className={`inline-flex min-h-12 items-center gap-3 rounded-[18px] border px-3 py-2 text-left ${
+                              superMode ? 'border-[#efc9aa] bg-[#fff2e7]' : 'border-[#e7dccf] bg-[#fffaf5]'
+                            }`}
+                          >
+                            <span>
+                              <span className="block text-sm font-bold text-[#23180f]">Modo súper</span>
+                              <span className="block text-xs text-[#8a7768]">Compactar lista</span>
+                            </span>
+                            <span className={`relative inline-flex h-8 w-14 rounded-full transition ${superMode ? 'bg-[#eb7a2b]' : 'bg-[#ddd4c8]'}`}>
+                              <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${superMode ? 'left-7' : 'left-1'}`} />
+                            </span>
+                          </button>
+                        </section>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {shellShoppingItems.length === 0 ? (
+                          <section className="col-span-full rounded-[20px] border border-[#e7dccf] bg-[#fffaf5] px-4 py-4 text-sm text-[#8a7768] shadow-[0_10px_24px_rgba(50,35,20,0.06)]">
+                            {shoppingScope === 'selected' && extraSelectedRecipeIds.length === 0 ? (
+                              <>
+                                <p className="font-semibold text-[#5f5245]">Aún no elegiste recetas para comprar.</p>
+                                <p className="mt-1">Busca recetas arriba y agrégalas para generar cantidades automáticamente.</p>
+                              </>
+                            ) : !hasPlannedRecipes && shoppingScope === 'weekly' ? (
+                              <>
+                                <p className="font-semibold text-[#5f5245]">No hay plan semanal activo para generar compras.</p>
+                                <p className="mt-1">Puedes volver a plan o continuar comprando por platos elegidos.</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-semibold text-[#5f5245]">No encontramos ingredientes para la selección actual.</p>
+                                <p className="mt-1">Prueba con otras recetas o usa el plan semanal.</p>
+                              </>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setActiveShellTab('plan')}
+                                className="inline-flex min-h-10 items-center rounded-full border border-[#dacfc3] bg-white px-4 text-xs font-bold text-[#5f5245] transition hover:bg-[#f8f2eb]"
+                              >
+                                Ir al plan
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShoppingStep('configure')}
+                                className="inline-flex min-h-10 items-center rounded-full border border-[#dacfc3] bg-white px-4 text-xs font-bold text-[#5f5245] transition hover:bg-[#f8f2eb]"
+                              >
+                                Personalizar recetas
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void openShoppingTab(shoppingScope)}
+                                className="inline-flex min-h-10 items-center rounded-full bg-[#eb7a2b] px-4 text-xs font-bold text-white transition hover:bg-[#d86315]"
+                              >
+                                Actualizar compras
+                              </button>
+                            </div>
+                          </section>
+                        ) : (
+                          shellShoppingItems.map((item) => (
+                            <div
+                              key={item.key}
+                              onClick={() => toggleShoppingChecked(item.key)}
+                              className={`rt-shop-item ${item.checked ? 'checked' : ''} ${superMode ? 'py-3 gap-2' : ''}`}
+                            >
+                              <div
+                                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition ${
+                                  item.checked
+                                    ? 'border-[var(--success-rt)] bg-[var(--success-rt)] text-white'
+                                    : 'border-[var(--border-line-rt)] bg-white text-transparent'
+                                }`}
+                              >
+                                ✓
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className={`truncate text-[20px] font-extrabold leading-none tracking-[-0.02em] transition-all duration-300 ${item.checked ? 'text-[var(--text-muted-rt)] line-through opacity-75' : 'text-[#23180f]'}`}>
+                                  {item.name}
+                                </p>
+                                <p className={`mt-1 text-sm font-bold ${item.checked ? 'text-[var(--text-muted-rt)]' : 'text-[var(--primary-rt)]'}`}>
+                                  {item.quantityLabel}
+                                </p>
+                                {!superMode ? (
+                                  <p className="mt-1 text-xs text-[#8a7768] overflow-hidden text-ellipsis whitespace-nowrap max-w-full">
+                                    {item.isManual ? 'Producto libre' : `Para: ${item.recipeTitles.length <= 1 ? item.recipeTitles.join('') : `${item.recipeTitles[0]} y ${item.recipeTitles.length - 1} más`}`}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.10"
+                                value={item.price}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(event) => updateShoppingPrice(item.key, event.target.value)}
+                                disabled={!item.checked}
+                                placeholder="S/"
+                                className="min-h-12 w-[85px] sm:w-[100px] shrink-0 rounded-[14px] border border-[#ddd4c8] bg-white px-2 text-right text-sm font-bold text-[#5f5245] outline-none transition focus:border-[var(--primary-rt)] disabled:opacity-50"
+                              />
+                            </div>
                           ))
                         )}
                       </div>
-                    ) : null}
 
-                    <div className="mt-6">
-                      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#7a6759]">
-                        Recetas incluidas ({weeklySelectedRecipeIds.length + selectedExtraRecipes.length})
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {weeklyRecipeIds.length === 0 && selectedExtraRecipes.length === 0 ? (
-                          <span className="rounded-xl border border-dashed border-[#d5c9ba] px-4 py-3 text-[13px] font-medium text-[#8a7768] w-full text-center">
-                            Ninguna receta seleccionada. ¿Planeamos la semana?
-                          </span>
-                        ) : (
-                          <>
-                            {weeklyRecipeIds.map((recipeId) => {
-                              const recipe = recipesById.get(recipeId);
-                              if (!recipe) return null;
-                              const active = weeklySelectedRecipeIds.includes(recipeId);
-                              return (
-                                <button
-                                  key={recipeId}
-                                  type="button"
-                                  onClick={() => toggleWeeklyRecipeSelection(recipeId)}
-                                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1 text-[13px] font-semibold transition ${
-                                    active
-                                      ? 'border-[#eb7a2b] bg-[#fff1e3] text-[#d86315]'
-                                      : 'border-[#dacfc3] bg-[#fdfaf7] text-[#8a7768] hover:bg-white'
-                                  }`}
-                                >
-                                  {active ? '✓ ' : ''}{recipe.title}
-                                </button>
-                              );
-                            })}
-                            {selectedExtraRecipes.map((recipe) => (
-                              <span key={recipe.id} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--primary-rt)] bg-[var(--primary-rt)] px-3 py-1 text-[13px] font-semibold text-white">
-                                ✓ {recipe.title}
-                                <button
-                                  type="button"
-                                  onClick={() => removeExtraRecipeFromShoppingSelection(recipe.id)}
-                                  className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </span>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-
-                  <div className="grid gap-3 sm:grid-cols-[300px_1fr]">
-                    <section className={`${SHELL_UI.surfaceSoft} px-4 py-4`}>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--primary-rt)]">Progreso</p>
-                        <p className="text-xs font-bold text-[var(--text-muted-rt)]">{shellShoppingItems.filter(i => i.checked).length} / {shellShoppingItems.length}</p>
-                      </div>
-                      <div className="mt-2 h-2 w-full rounded-full bg-[#f4f1ea] overflow-hidden">
-                        <div 
-                          className="h-full bg-[var(--success-rt)] transition-all duration-500" 
-                          style={{ width: `${shellShoppingItems.length === 0 ? 0 : Math.round((shellShoppingItems.filter(i => i.checked).length / shellShoppingItems.length) * 100)}%` }}
-                        />
-                      </div>
-                      <p className="mt-4 text-[48px] font-extrabold leading-none tracking-[-0.05em] text-[#23180f]">{formatCurrency(shoppingTotal)}</p>
-                      <p className="mt-2 text-sm text-[var(--text-muted-rt)]">
-                        {shoppingTotal <= 40 ? `Restante ${formatCurrency(40 - shoppingTotal)}` : `Excedido ${formatCurrency(shoppingTotal - 40)}`}
-                      </p>
-                    </section>
-                    <section className={`${SHELL_UI.surfaceSoft} flex items-center justify-between gap-3 px-4 py-4`}>
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d86315]">Compras</p>
-                        <h2 className="mt-1 text-[26px] font-extrabold leading-[1.02] tracking-[-0.03em] text-[#23180f]">Lista operativa</h2>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSuperMode((current) => !current)}
-                        className={`inline-flex min-h-12 items-center gap-3 rounded-[18px] border px-3 py-2 text-left ${
-                          superMode ? 'border-[#efc9aa] bg-[#fff2e7]' : 'border-[#e7dccf] bg-[#fffaf5]'
-                        }`}
-                      >
-                        <span>
-                          <span className="block text-sm font-bold text-[#23180f]">Modo súper</span>
-                          <span className="block text-xs text-[#8a7768]">Compactar lista</span>
-                        </span>
-                        <span className={`relative inline-flex h-8 w-14 rounded-full transition ${superMode ? 'bg-[#eb7a2b]' : 'bg-[#ddd4c8]'}`}>
-                          <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${superMode ? 'left-7' : 'left-1'}`} />
-                        </span>
-                      </button>
-                    </section>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {shellShoppingItems.length === 0 ? (
-                      <section className="col-span-full rounded-[20px] border border-[#e7dccf] bg-[#fffaf5] px-4 py-4 text-sm text-[#8a7768] shadow-[0_10px_24px_rgba(50,35,20,0.06)]">
-                        {shoppingScope === 'selected' && extraSelectedRecipeIds.length === 0 ? (
-                          <>
-                            <p className="font-semibold text-[#5f5245]">Aún no elegiste recetas para comprar.</p>
-                            <p className="mt-1">Busca recetas arriba y agrégalas para generar cantidades automáticamente.</p>
-                          </>
-                        ) : !hasPlannedRecipes && shoppingScope === 'weekly' ? (
-                          <>
-                            <p className="font-semibold text-[#5f5245]">No hay plan semanal activo para generar compras.</p>
-                            <p className="mt-1">Puedes volver a plan o continuar comprando por platos elegidos.</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-semibold text-[#5f5245]">No encontramos ingredientes para la selección actual.</p>
-                            <p className="mt-1">Prueba con otras recetas o usa el plan semanal.</p>
-                          </>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="sticky bottom-0 z-20 rounded-3xl border border-[#e8dbcc] bg-white/95 px-4 py-3 shadow-[0_18px_34px_rgba(93,63,33,0.2)] backdrop-blur">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d86315]">Total actual</p>
+                            <p className="text-[38px] font-extrabold leading-none tracking-[-0.04em] text-[#23180f]">{formatCurrency(shoppingTotal)}</p>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => setActiveShellTab('plan')}
-                            className="inline-flex min-h-10 items-center rounded-full border border-[#dacfc3] bg-white px-4 text-xs font-bold text-[#5f5245] transition hover:bg-[#f8f2eb]"
+                            onClick={finishShopping}
+                            className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#eb7a2b] px-6 text-base font-bold text-white transition hover:bg-[#d86315] active:scale-[0.99]"
                           >
-                            Ir al plan
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveShellTab('recipes')}
-                            className="inline-flex min-h-10 items-center rounded-full border border-[#dacfc3] bg-white px-4 text-xs font-bold text-[#5f5245] transition hover:bg-[#f8f2eb]"
-                          >
-                            Ver recetas
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void openShoppingTab(shoppingScope)}
-                            className="inline-flex min-h-10 items-center rounded-full bg-[#eb7a2b] px-4 text-xs font-bold text-white transition hover:bg-[#d86315]"
-                          >
-                            Actualizar compras
+                            Finalizar
                           </button>
                         </div>
-                      </section>
-                    ) : (
-                      shellShoppingItems.map((item) => (
-                        <div
-                          key={item.key}
-                          onClick={() => toggleShoppingChecked(item.key)}
-                          className={`rt-shop-item ${item.checked ? 'checked' : ''} ${superMode ? 'py-3 gap-2' : ''}`}
-                        >
-                          <div
-                            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition ${
-                              item.checked
-                                ? 'border-[var(--success-rt)] bg-[var(--success-rt)] text-white'
-                                : 'border-[var(--border-line-rt)] bg-white text-transparent'
-                            }`}
-                          >
-                            ✓
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className={`truncate text-[20px] font-extrabold leading-none tracking-[-0.02em] transition-all duration-300 ${item.checked ? 'text-[var(--text-muted-rt)] line-through opacity-75' : 'text-[#23180f]'}`}>
-                              {item.name}
-                            </p>
-                            <p className={`mt-1 text-sm font-bold ${item.checked ? 'text-[var(--text-muted-rt)]' : 'text-[var(--primary-rt)]'}`}>
-                              {item.quantityLabel}
-                            </p>
-                            {!superMode ? (
-                              <p className="mt-1 truncate text-xs text-[#8a7768]">
-                                {item.isManual ? 'Producto libre' : `Para: ${item.recipeTitles.join(' · ')}`}
-                              </p>
-                            ) : null}
-                          </div>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.10"
-                            value={item.price}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(event) => updateShoppingPrice(item.key, event.target.value)}
-                            disabled={!item.checked}
-                            placeholder="S/"
-                            className="min-h-12 w-[85px] sm:w-[100px] shrink-0 rounded-[14px] border border-[#ddd4c8] bg-white px-2 text-right text-sm font-bold text-[#5f5245] outline-none transition focus:border-[var(--primary-rt)] disabled:opacity-50"
-                          />
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="sticky bottom-0 z-20 rounded-3xl border border-[#e8dbcc] bg-white/95 px-4 py-3 shadow-[0_18px_34px_rgba(93,63,33,0.2)] backdrop-blur">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#d86315]">Total actual</p>
-                        <p className="text-[38px] font-extrabold leading-none tracking-[-0.04em] text-[#23180f]">{formatCurrency(shoppingTotal)}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={finishShopping}
-                        className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#eb7a2b] px-6 text-base font-bold text-white transition hover:bg-[#d86315] active:scale-[0.99]"
-                      >
-                        Finalizar
-                      </button>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               ) : null}
             </section>
@@ -3613,7 +3760,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
             {/* Legacy nav block removed, moved to the outer layout */}
 
             {isPlanningSheetOpen ? (
-              <div className="absolute inset-0 z-40 flex items-end bg-black/30 p-3 sm:items-center sm:justify-center" onClick={closePlanningSheet}>
+              <div className="fixed inset-0 z-40 flex items-end bg-black/30 p-3 sm:items-center sm:justify-center" onClick={closePlanningSheet}>
                 <div
                   className="w-full rounded-[28px] bg-white px-5 py-5 shadow-[0_24px_60px_rgba(20,10,0,0.18)] sm:max-w-md"
                   onClick={(event) => event.stopPropagation()}
@@ -3648,21 +3795,29 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
                       />
                     </div>
                     <div className="mt-2 max-h-28 space-y-1 overflow-auto pr-1">
-                      {(planningRecipeQuery.trim().length > 0 ? planningRecipeResults : recipes.slice(0, 6)).map((recipe) => (
-                        <button
-                          key={recipe.id}
-                          type="button"
-                          onClick={() => selectPlanningRecipe(recipe.id)}
-                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
-                            planningRecipeId === recipe.id
-                              ? 'bg-[#fff1e3] text-[#d86315]'
-                              : 'bg-[#f8f2eb] text-[#5f5245] hover:bg-[#efe3d6]'
-                          }`}
-                        >
-                          <span className="truncate">{recipe.title}</span>
-                          {planningRecipeId === recipe.id ? <span className="text-xs">Seleccionada</span> : null}
-                        </button>
-                      ))}
+                      {planningRecipeQuery.trim().length > 0 ? (
+                        planningRecipeResults.map((recipe) => (
+                          <button
+                            key={recipe.id}
+                            type="button"
+                            onClick={() => selectPlanningRecipe(recipe.id)}
+                            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-semibold transition ${
+                              planningRecipeId === recipe.id
+                                ? 'bg-[#fff1e3] text-[#d86315]'
+                                : 'bg-[#f8f2eb] text-[#5f5245] hover:bg-[#efe3d6]'
+                            }`}
+                          >
+                            <span className="truncate">{recipe.title}</span>
+                            {planningRecipeId === recipe.id ? <span className="text-xs">Seleccionada</span> : null}
+                          </button>
+                        ))
+                      ) : planningRecipeId ? (
+                        <div className="rounded-xl bg-[#fff1e3] px-3 py-2 text-sm font-semibold text-[#d86315]">
+                          ✓ {recipesById.get(planningRecipeId)?.title ?? 'Receta seleccionada'}
+                        </div>
+                      ) : (
+                        <p className="px-3 py-3 text-center text-sm text-[#8a7768]">Escribe para buscar recetas</p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4">
@@ -3720,7 +3875,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
             ) : null}
 
             {isManualSheetOpen ? (
-              <div className="absolute inset-0 z-40 flex items-end bg-black/30 p-3 sm:items-center sm:justify-center" onClick={() => setIsManualSheetOpen(false)}>
+              <div className="fixed inset-0 z-40 flex items-end bg-black/30 p-3 sm:items-center sm:justify-center" onClick={() => setIsManualSheetOpen(false)}>
                 <div
                   className="w-full rounded-[28px] bg-white px-5 py-5 shadow-[0_24px_60px_rgba(20,10,0,0.18)] sm:max-w-md"
                   onClick={(event) => event.stopPropagation()}
@@ -3785,7 +3940,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
             ) : null}
 
             {shellToast ? (
-              <div className="absolute inset-x-0 bottom-28 z-40 flex justify-center px-4">
+              <div className="fixed inset-x-0 bottom-28 z-40 flex justify-center px-4">
                 <div className="rounded-full bg-[#23180f] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(0,0,0,0.25)]">
                   {shellToast}
                 </div>
@@ -3793,7 +3948,7 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
             ) : null}
 
             {shoppingCompleted ? (
-              <section className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+              <section className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
                 <div className="w-full max-w-sm rounded-[24px] bg-white px-5 py-6 text-center shadow-[0_20px_40px_rgba(48,31,15,0.25)]">
                   <div className="inline-flex rounded-full bg-[#fff1e3] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[#d86315]">
                     Compra finalizada
