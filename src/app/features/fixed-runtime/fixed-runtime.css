@@ -136,7 +136,7 @@
 .rt-cinematic-header { position: relative; height: 240px; background-size: cover; background-position: center; }
 @media (min-width: 768px) { .rt-cinematic-header { height: 360px; } }
 @media (min-width: 1024px) { .rt-cinematic-header { height: 480px; } }
-.rt-cinematic-header::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(29,26,22,0.6) 40%, rgba(29,26,22,0.92) 100%); }
+/* Cinematic header clean for images to shine */
 
 /* Sticky ingredient sidebar on desktop split view */
 @media (min-width: 1024px) {

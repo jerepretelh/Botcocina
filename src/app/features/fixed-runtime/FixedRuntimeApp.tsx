@@ -19,6 +19,7 @@ import { findFixedRecipeById, parseFixedRecipesJson } from './loader';
 import { buildImportPreview, type ImportPreviewResult } from './importPreview';
 import { validateRecipesGuidelines, type FixedRecipeGuidelineIssue } from './guidelines';
 import { parseFixedRuntimeRoute } from './router';
+import { uploadRecipeCover } from '../../lib/imageUpload';
 import {
   buildLibraryCategoryOptions,
   filterLibraryRecipes,
@@ -29,6 +30,7 @@ import type {
   FixedRecipeJson,
   FixedRecipePhase,
   FixedRecipeStep,
+  FixedRecipeStepIngredientRef,
   FixedRuntimeScreen,
   FixedTimerState,
 } from './types';
@@ -200,6 +202,75 @@ function defaultYieldFromRecipe(recipe: FixedRecipeJson): RecipeYieldV2 {
     unit: 'porciones',
   };
 }
+
+const StepIngredientsList = ({ 
+  ingredients, 
+  stepText, 
+  allIngredients 
+}: { 
+  ingredients?: FixedRecipeStepIngredientRef[];
+  stepText?: string;
+  allIngredients?: any[];
+}) => {
+  let resolvedIngredients = (ingredients || []).slice();
+
+  if (resolvedIngredients.length === 0 && stepText && allIngredients) {
+    const textLower = stepText.toLowerCase();
+    const removeAccents = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalizedText = removeAccents(textLower);
+
+    for (const group of allIngredients) {
+      if (!group.items) continue;
+      for (const item of group.items) {
+        const itemName = removeAccents(item.name.toLowerCase());
+        const canonicalName = removeAccents((item.canonicalName || '').toLowerCase());
+        
+        // Improved match logic: check full name, or significant individual words 
+        // to handle "clavo" matching "clavos de olor"
+        const isMatch = (name: string) => {
+          if (!name || name.length < 3) return false;
+          // Direct inclusion
+          if (normalizedText.includes(name)) return true;
+          // Plural/singular simple check (clavo vs clavos)
+          if (name.endsWith('s') && normalizedText.includes(name.slice(0, -1))) return true;
+          if (!name.endsWith('s') && normalizedText.includes(name + 's')) return true;
+          // Check words
+          const words = name.split(/\s+/).filter(w => w.length > 3);
+          return words.some(w => normalizedText.includes(w) || (w.endsWith('s') && normalizedText.includes(w.slice(0, -1))));
+        };
+
+        const matched = isMatch(itemName) || isMatch(canonicalName);
+
+        if (matched) {
+          // Identify which name actually matched for the regex check
+          const activeName = (itemName && normalizedText.includes(itemName.split(/\s+/)[0])) ? itemName.split(/\s+/)[0] : canonicalName.split(/\s+/)[0];
+          
+          const explicitQuantityRegex = new RegExp(`(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*(?:taza|cda|cucharada|cdta|cucharadita|g|gr|gramo|kg|kilo|ml|litro|l|pizca|chorrito|tallo|diente|rama|paquete|lata)\\w*\\s*(?:de\\s+)?${activeName}`, 'i');
+          const explicitNumberRegex = new RegExp(`(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*${activeName}`, 'i');
+
+          if (!explicitQuantityRegex.test(normalizedText) && !explicitNumberRegex.test(normalizedText)) {
+            if (!resolvedIngredients.some(ri => ri.name === item.name || ri.canonicalName === item.canonicalName)) {
+              resolvedIngredients.push(item);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (resolvedIngredients.length === 0) return null;
+  return (
+    <div className="mt-3.5 mb-1 flex flex-wrap gap-2.5">
+      {resolvedIngredients.map((ing, i) => (
+        <span key={`${ing.canonicalName || ing.name}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#f8f6f3] px-3 py-1.5 text-[14px] font-medium border border-[#e6e0d8] text-[#5f5245]">
+          <span className="font-bold text-[#23180f]">{ing.displayAmount ?? ing.amount}</span>
+          {ing.displayUnit || ing.unit ? <span className="font-semibold text-[#8c7a6b]">{ing.displayUnit ?? ing.unit}</span> : null}
+          <span className="text-[#5f5245]">{ing.name}</span>
+        </span>
+      ))}
+    </div>
+  );
+};
 
 function createPlannedEntryId(): string {
   return `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -713,7 +784,7 @@ function initialTimerState(phases: FixedRecipePhase[]) {
   return state;
 }
 
-function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRecipe; recipeJson: FixedRecipeJson; onExit: () => void }) {
+function FixedRecipeRuntime({ recipe, recipeJson, onExit, recipeImages, updateRecipeImage }: { recipe: RuntimeRecipe; recipeJson: FixedRecipeJson; onExit: () => void; recipeImages: Record<string, string>; updateRecipeImage: (id: string, url: string) => void }) {
   const [phasesView, setPhasesView] = useState<'runtime' | 'guide'>('runtime');
   const [timers, setTimers] = useState<Record<string, FixedTimerState>>(() => initialTimerState(recipe.phases));
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
@@ -721,20 +792,24 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
   const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({});
   const preAlarmFiredRef = useRef<Set<string>>(new Set());
   const endAlarmFiredRef = useRef<Set<string>>(new Set());
-  const [recipeImages, setRecipeImages] = useState<Record<string, string>>(() => {
-    try {
-      const raw = window.localStorage.getItem('RUNTIME_RECIPE_IMAGES');
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
-  });
   const previousTimersRef = useRef(timers);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const updateRecipeImage = (id: string, url: string) => {
-    setRecipeImages(prev => {
-      const next = { ...prev, [id]: url };
-      window.localStorage.setItem('RUNTIME_RECIPE_IMAGES', JSON.stringify(next));
-      return next;
-    });
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingImage(true);
+      const url = await uploadRecipeCover(file, recipe.id);
+      updateRecipeImage(recipe.id, url);
+    } catch (error) {
+      alert('Error al subir imagen. Revisa la consola o asegúrate de que haya conexión.');
+      console.error(error);
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   useEffect(() => {
@@ -1203,6 +1278,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                   <p className="text-[15px] leading-relaxed text-[var(--text-main-rt)] sm:text-[18px]">
                                     {timerStep.groupStepText ?? resolveTimerPrimaryText(timerStep)}
                                   </p>
+                                  <StepIngredientsList ingredients={timerStep.ingredients} stepText={timerStep.groupStepText ?? resolveTimerPrimaryText(timerStep)} allIngredients={recipe.ingredients} />
                                   {resultStep && shouldShowResultFeedback(resultStep) ? (
                                     <p className="mt-2 text-sm text-[var(--text-muted-rt)] sm:text-base">
                                       → {normalizeResultFeedbackText(resultStep.text)}
@@ -1250,6 +1326,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                 <p className="text-[15px] leading-relaxed text-[var(--text-main-rt)] sm:text-[18px]">
                                   {actionStep.groupStepText ?? actionStep.text}
                                 </p>
+                                <StepIngredientsList ingredients={actionStep.ingredients} stepText={actionStep.groupStepText ?? actionStep.text} allIngredients={recipe.ingredients} />
                                 {resultStep && shouldShowResultFeedback(resultStep) ? (
                                   <p className="mt-2 text-sm text-[var(--text-muted-rt)] sm:text-base">
                                     → {normalizeResultFeedbackText(resultStep.text)}
@@ -1325,6 +1402,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                             <p className="max-w-4xl text-[19px] font-medium leading-[1.28] tracking-[-0.02em] text-stone-900 sm:text-[31px]">
                               {step.text}
                             </p>
+                            <StepIngredientsList ingredients={step.ingredients} stepText={step.text} allIngredients={recipe.ingredients} />
                             {step.timer ? (
                               <button
                                 onClick={() => openTimer(step.id)}
@@ -1404,6 +1482,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                         <p className="max-w-4xl text-[19px] font-medium leading-[1.28] tracking-[-0.02em] text-stone-900 sm:text-[31px]">
                           {cleanupStepText(primaryText)}
                         </p>
+                        <StepIngredientsList ingredients={timerStep.ingredients} stepText={cleanupStepText(primaryText)} allIngredients={recipe.ingredients} />
 
                         <button
                           onClick={() => openTimer(timerStep.id)}
@@ -1506,6 +1585,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                       <p className="max-w-4xl text-[19px] font-medium leading-[1.28] tracking-[-0.02em] text-stone-900 sm:text-[31px]">
                         {cleanupStepText(action.text)}
                       </p>
+                      <StepIngredientsList ingredients={action.ingredients} stepText={cleanupStepText(action.text)} allIngredients={recipe.ingredients} />
 
                       {inlineTimerStep ? (
                         <button
@@ -1576,50 +1656,57 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
         className="rt-cinematic-header group relative overflow-hidden" 
         style={{ backgroundImage: `url('${recipeImages[recipe.id] || 'https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=1200&q=80'}')` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 z-0" />
+        {/* Soft gradient just for UI legibility at the very top and bottom */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/30 z-0 pointer-events-none" />
+        
         <div className="absolute left-4 right-4 top-4 flex justify-between z-10 sm:left-6 sm:right-6 sm:top-6">
-          <button onClick={onExit} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/20 font-bold text-white backdrop-blur-md transition hover:bg-black/40">
+          <button onClick={onExit} className="flex h-11 w-11 items-center justify-center rounded-full bg-black/30 font-bold text-white backdrop-blur-md transition hover:bg-black/50 hover:scale-105 active:scale-95 shadow-sm">
             <X size={20} />
           </button>
+          
           <div className="flex items-center gap-2">
+            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
             <button
-              onClick={() => {
-                const url = window.prompt('Pega el enlace URL de la imagen de tu receta (ej. https://images.unsplash.com/...)');
-                if (url) updateRecipeImage(recipe.id, url);
-              }}
-              className="hidden lg:flex items-center gap-2 rounded-full bg-black/20 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/50 lg:opacity-0 lg:group-hover:opacity-100"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              className="hidden lg:flex items-center gap-2 rounded-full bg-black/30 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/50 disabled:opacity-50 shadow-sm"
             >
               <Camera size={16} />
-              <span>Cambiar portada</span>
+              <span>{isUploadingImage ? 'Subiendo...' : 'Editar portada'}</span>
             </button>
             <button
               onClick={() => downloadRecipeAsJson(recipeJson)}
-              className="flex items-center gap-2 rounded-full bg-black/20 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/40"
+              className="flex items-center gap-2 rounded-full bg-black/30 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/50 shadow-sm"
             >
               <ArrowDown size={16} />
-              <span className="hidden sm:inline">Descargar JSON</span>
+              <span className="hidden sm:inline">JSON</span>
             </button>
           </div>
         </div>
-        <div className="absolute bottom-10 left-[5%] right-[5%] z-10 text-white sm:bottom-14">
+
+        {/* Mobile floating button at bottom right (less intrusive) */}
+        <div className="absolute bottom-4 right-4 z-10 sm:bottom-6 sm:right-6 lg:hidden">
           <button
-            onClick={() => {
-              const url = window.prompt('Pega el enlace URL de la imagen de tu receta (ej. https://images.unsplash.com/...)');
-              if (url) updateRecipeImage(recipe.id, url);
-            }}
-            className="mb-4 inline-flex lg:hidden items-center gap-2 rounded-full bg-black/30 px-3 py-1.5 text-[11px] font-bold text-white/90 backdrop-blur"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingImage}
+            className="flex items-center gap-2 rounded-full bg-black/40 px-4 py-2.5 text-[13px] font-bold text-white backdrop-blur-md shadow-lg disabled:opacity-50 transition active:scale-95"
           >
-            <Camera size={14} />
-            <span>Editar portada</span>
+            <Camera size={16} />
+            <span>{isUploadingImage ? 'Subiendo...' : 'Portada'}</span>
           </button>
-          <h1 className="rt-page-title drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)] !text-white !mb-4">{recipe.title}</h1>
-          <p className="rt-page-subtitle !text-white/90 drop-shadow-md">
-            {recipe.recipeCategory} {recipe.recipeCategory && '·'} {recipe.yield ? `Rinde: ${recipe.yield} · ` : ''}{recipe.servings} serving(s)
-          </p>
         </div>
       </div>
 
       <div className="rt-view-container relative z-20 pb-40">
+        <div className="mb-10 mt-8 sm:mt-12 text-center sm:text-left">
+          <h1 className="font-editorial text-[42px] font-medium leading-[1.05] tracking-[-0.02em] text-[#23180f] sm:text-[56px] lg:text-[72px]">
+            {recipe.title}
+          </h1>
+          <p className="mt-4 text-[16px] font-semibold tracking-wide uppercase text-[#8c7a6b] sm:text-[18px]">
+            {recipe.recipeCategory} {recipe.recipeCategory && '·'} {recipe.yield ? `Rinde: ${recipe.yield} · ` : ''}{recipe.servings} porciones
+          </p>
+        </div>
+
         <div className="flex flex-col gap-6 sm:gap-10">
           
 
@@ -1711,6 +1798,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                           <p className="text-[16px] leading-relaxed text-stone-800 sm:text-[20px]">
                                             {entry.timer.groupStepText ?? resolveTimerPrimaryText(entry.timer)}
                                           </p>
+                                          <StepIngredientsList ingredients={entry.timer.ingredients} stepText={entry.timer.groupStepText ?? resolveTimerPrimaryText(entry.timer)} allIngredients={recipe.ingredients} />
                                           {timerText ? (
                                             <p className="mt-1 text-[15px] font-semibold text-stone-900 sm:text-[18px]">
                                               ⏱ {timerText}
@@ -1734,6 +1822,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                         <p className="text-[16px] leading-relaxed text-stone-800 sm:text-[20px]">
                                           {action.groupStepText ?? action.text}
                                         </p>
+                                        <StepIngredientsList ingredients={action.ingredients} stepText={action.groupStepText ?? action.text} allIngredients={recipe.ingredients} />
                                         {timerText ? (
                                           <p className="mt-1 text-[15px] font-semibold text-stone-900 sm:text-[18px]">
                                             ⏱ {timerText}
@@ -1770,15 +1859,19 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                 <div key={`${fallback.id}-guide-fallback-timer`} className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
                                   {showContainerChip ? <ContainerChip container={unitContainer} /> : null}
                                   <p className="text-[18px] leading-relaxed text-stone-800 sm:text-[22px]">{fallback.text}</p>
+                                  <StepIngredientsList ingredients={fallback.ingredients} stepText={fallback.text} allIngredients={recipe.ingredients} />
                                   <p className="mt-1 text-[15px] font-semibold text-stone-700 sm:text-[18px]">⏱ {fallbackTimer}</p>
                                 </div>
                               );
                             }
                             return (
-                              <p key={`${fallback.id}-guide-fallback-action`} className="text-[18px] leading-relaxed text-stone-800 sm:text-[22px]">
-                                {showContainerChip ? <><ContainerChip container={unitContainer} /> </> : null}
-                                {fallback.text}
-                              </p>
+                              <div key={`${fallback.id}-guide-fallback-action`}>
+                                <p className="text-[18px] leading-relaxed text-stone-800 sm:text-[22px]">
+                                  {showContainerChip ? <><ContainerChip container={unitContainer} /> </> : null}
+                                  {fallback.text}
+                                </p>
+                                <StepIngredientsList ingredients={fallback.ingredients} stepText={fallback.text} allIngredients={recipe.ingredients} />
+                              </div>
                             );
                           }
                           if (unit.kind === 'timer_unit') {
@@ -1791,6 +1884,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                                 <p className="text-[18px] leading-relaxed text-stone-800 sm:text-[22px]">
                                   {actionNumber}. {primaryText}
                                 </p>
+                                <StepIngredientsList ingredients={unit.timer.ingredients} stepText={primaryText} allIngredients={recipe.ingredients} />
                                 {timerText ? (
                                   <p className="mt-1 text-[15px] font-semibold text-stone-900 sm:text-[18px]">
                                     ⏱ {timerText}
@@ -1814,6 +1908,7 @@ function FixedRecipeRuntime({ recipe, recipeJson, onExit }: { recipe: RuntimeRec
                               <p className="text-[18px] leading-relaxed text-stone-800 sm:text-[22px]">
                                 {actionNumber}. {action.text}
                               </p>
+                              <StepIngredientsList ingredients={action.ingredients} stepText={action.text} allIngredients={recipe.ingredients} />
                               {timerText ? (
                                 <p className="mt-1 text-[15px] font-semibold text-stone-900 sm:text-[18px]">
                                   ⏱ {timerText}
@@ -1986,6 +2081,20 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
   const runtimePersistenceEnabled = Boolean(isSupabaseEnabled && userId && FIXED_RUNTIME_STORAGE_MODE === 'supabase');
   const [baseRecipes, setBaseRecipes] = useState<FixedRecipeJson[]>([]);
   const [importedRecipes, setImportedRecipes] = useState<FixedRecipeJson[]>([]);
+  const [recipeImages, setRecipeImages] = useState<Record<string, string>>(() => {
+    try {
+      const raw = window.localStorage.getItem('RUNTIME_RECIPE_IMAGES');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
+  const updateRecipeImage = (id: string, url: string) => {
+    setRecipeImages(prev => {
+      const next = { ...prev, [id]: url };
+      window.localStorage.setItem('RUNTIME_RECIPE_IMAGES', JSON.stringify(next));
+      return next;
+    });
+  };
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [importText, setImportText] = useState('');
@@ -3195,9 +3304,11 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
                       const originLabel = resolveRecipeOriginLabel(recipe, importedRecipeIds, sessionPreviewRecipe?.id ?? null);
                       const isExtra = originLabel === 'Preview' || originLabel === 'Importada';
                       // Unsplash placeholder or conditional logic can go here. For now we use standard default.
-                      const bgImage = recipe.recipeCategory === 'stovetop' ? 'https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=800&q=80' : 
+                      const bgImage = recipeImages[recipe.id] || (
+                                      recipe.recipeCategory === 'stovetop' ? 'https://images.unsplash.com/photo-1544025162-811114cd354c?auto=format&fit=crop&w=800&q=80' : 
                                       recipe.recipeCategory === 'baking' ? 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80' : 
-                                      'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80';
+                                      'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80'
+                                    );
                       
                       return (
                         <button
@@ -4000,6 +4111,8 @@ export function FixedRuntimeApp({ pathname, navigate, userId }: FixedRuntimeAppP
         window.sessionStorage.setItem(RUNTIME_RETURN_TOAST_KEY, 'Volviste a la biblioteca');
         navigate('/runtime-fijo');
       }}
+      recipeImages={recipeImages}
+      updateRecipeImage={updateRecipeImage}
     />
   );
 }
