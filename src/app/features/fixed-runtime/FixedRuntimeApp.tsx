@@ -226,12 +226,12 @@ function formatDecimalToFraction(value: number | string): string {
   // Common fractions we want to snap to (nearest wins)
   const FRACS: Array<{ dec: number; str: string }> = [
     { dec: 0,      str: '' },
-    { dec: 0.125,  str: '1/8' },
-    { dec: 0.25,   str: '1/4' },
-    { dec: 0.333,  str: '1/3' },
-    { dec: 0.5,    str: '1/2' },
-    { dec: 0.667,  str: '2/3' },
-    { dec: 0.75,   str: '3/4' },
+    { dec: 0.125,  str: '⅛' },
+    { dec: 0.25,   str: '¼' },
+    { dec: 0.333,  str: '⅓' },
+    { dec: 0.5,    str: '½' },
+    { dec: 0.667,  str: '⅔' },
+    { dec: 0.75,   str: '¾' },
     { dec: 1,      str: '' },   // whole – handled by carry
   ];
   const TOLERANCE = 0.07; // snap if within ~4 ml / 1 tsp error
