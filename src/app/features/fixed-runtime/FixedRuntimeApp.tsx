@@ -253,8 +253,10 @@ function formatIngredientLine(item: FixedRecipeIngredientItem): string {
   return `${amountText} ${unitText} ${item.name}${prepText}${notesText}`.replace(/\s+/g, ' ').trim();
 }
 
-// Verbs that signal the step is NOT adding an ingredient — skip auto-match
-const NON_ADD_VERBS = /\b(retirar|reservar|sacar|escurrir|voltear|apartar|botar|desechar|verter en otro|pasar a)\b/i;
+// Verbs that signal the step IS adding an ingredient (whitelist)
+// Auto-match only fires when one of these verbs is present — avoids false positives on
+// steps like "Cortar el pollo", "Lavar el arroz", "Licuar hasta...", etc.
+const ADD_VERB_RGX = /\b(agregar|anadir|añadir|incorporar|colocar|poner|verter|mezclar con|echar|espolvorear|sazonar con|condimentar|aderezar|bañar con|cubrir con|rociar|dejar caer)\b/i;
 
 function friendlyIngredientUnit(amount: number | string, unit: string) {
   const unitLower = (unit || '').toLowerCase().trim();
@@ -278,8 +280,10 @@ const StepIngredientsList = ({
 }) => {
   let resolved = (ingredients || []).slice();
 
-  // Auto-match only on addition-type steps
-  if (resolved.length === 0 && stepText && allIngredients && !NON_ADD_VERBS.test(stepText)) {
+  // Auto-match only when the step contains an explicit addition verb (whitelist)
+  const isAdditionStep = stepText ? ADD_VERB_RGX.test(stepText) : false;
+
+  if (resolved.length === 0 && isAdditionStep && stepText && allIngredients) {
     const removeAccents = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const normText = removeAccents(stepText.toLowerCase());
 
@@ -292,8 +296,10 @@ const StepIngredientsList = ({
         const hits = (name: string) => {
           if (!name || name.length < 3) return false;
           if (normText.includes(name)) return true;
+          // Plural/singular
           if (name.endsWith('s') && normText.includes(name.slice(0, -1))) return true;
           if (!name.endsWith('s') && normText.includes(name + 's')) return true;
+          // Word-by-word (only words > 3 chars to avoid false hits on short words)
           return name.split(/\s+/).filter(w => w.length > 3).some(
             w => normText.includes(w) || (w.endsWith('s') && normText.includes(w.slice(0, -1)))
           );
@@ -304,6 +310,7 @@ const StepIngredientsList = ({
             ? iName.split(/\s+/)[0]
             : cName.split(/\s+/)[0];
 
+          // Skip if step already states an explicit quantity for this ingredient
           const qtyRgx = new RegExp(
             `(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*(?:taza|cda|cucharada|cdta|cucharadita|g|gr|gramo|kg|kilo|ml|litro|l|pizca|chorrito|tallo|diente|rama|paquete|lata)\\w*\\s*(?:de\\s+)?${key}`, 'i'
           );
@@ -324,6 +331,21 @@ const StepIngredientsList = ({
   return (
     <div className="mt-3.5 mb-1 flex flex-wrap gap-2.5">
       {resolved.map((ing, i) => {
+        const rawAmt = String(ing.displayAmount ?? ing.amount ?? '').trim().toLowerCase();
+        const rawUnit = String(ing.displayUnit ?? ing.unit ?? '').trim().toLowerCase();
+        // "al gusto" case: avoid showing "al gusto al gusto" — collapse to a single label
+        const isAlGusto = rawAmt === 'al gusto' || rawAmt === 'cantidad necesaria' || rawAmt === 'c/n';
+        if (isAlGusto) {
+          return (
+            <span
+              key={`${ing.canonicalName || ing.name}-${i}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#f8f6f3] px-3 py-1.5 text-[14px] font-medium border border-[#e6e0d8] text-[#5f5245]"
+            >
+              <span className="font-semibold text-[#8c7a6b]">al gusto</span>
+              <span className="text-[#5f5245]">{ing.name}</span>
+            </span>
+          );
+        }
         const { amt, unit } = friendlyIngredientUnit(ing.displayAmount ?? ing.amount, ing.displayUnit ?? ing.unit ?? '');
         const prep = ing.preparation ? `, ${ing.preparation}` : '';
         return (
