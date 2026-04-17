@@ -216,22 +216,50 @@ function shellMomentSortValue(moment: ShellMoment): number {
 function formatDecimalToFraction(value: number | string): string {
   if (typeof value === 'string') {
     const num = parseFloat(value);
+    // If it's not a pure number string, return as-is (e.g. "al gusto", "1/2")
     if (isNaN(num) || String(num) !== value.trim()) return value.trim();
     value = num;
   }
-  
-  // Basic fractional mappings
-  if (value === 0.25) return '1/4';
-  if (value === 0.33 || value === 0.333 || value === 0.3333) return '1/3';
-  if (value === 0.5) return '1/2';
-  if (value === 0.66 || value === 0.666 || value === 0.6666) return '2/3';
-  if (value === 0.75) return '3/4';
-  if (value === 1.5) return '1 1/2';
-  if (value === 1.25) return '1 1/4';
-  if (value === 2.5) return '2 1/2';
-  
-  // Return original string representation if no match
-  return String(value);
+
+  if (!isFinite(value)) return String(value);
+
+  // Common fractions we want to snap to (nearest wins)
+  const FRACS: Array<{ dec: number; str: string }> = [
+    { dec: 0,      str: '' },
+    { dec: 0.125,  str: '1/8' },
+    { dec: 0.25,   str: '1/4' },
+    { dec: 0.333,  str: '1/3' },
+    { dec: 0.5,    str: '1/2' },
+    { dec: 0.667,  str: '2/3' },
+    { dec: 0.75,   str: '3/4' },
+    { dec: 1,      str: '' },   // whole – handled by carry
+  ];
+  const TOLERANCE = 0.07; // snap if within ~4 ml / 1 tsp error
+
+  const whole = Math.floor(value);
+  let decimal = value - whole;
+
+  // Find closest fraction
+  let best = FRACS[0];
+  let bestDist = Math.abs(decimal - FRACS[0].dec);
+  for (const f of FRACS) {
+    const d = Math.abs(decimal - f.dec);
+    if (d < bestDist) { best = f; bestDist = d; }
+  }
+
+  // If decimal snapped to 0 or is very close → no fraction part
+  if (bestDist > TOLERANCE) {
+    // No close fraction — fall back to 1 decimal place
+    return value % 1 === 0 ? String(value) : value.toFixed(1).replace(/\.0$/, '');
+  }
+
+  // If snapped to 1 (e.g. 0.95 → 1/1) carry over
+  const carryWhole = best.dec === 1 ? whole + 1 : whole;
+  const fracPart = best.dec === 1 ? '' : best.str;
+
+  if (carryWhole === 0) return fracPart || '0';
+  if (!fracPart)        return String(carryWhole);
+  return `${carryWhole} ${fracPart}`;
 }
 
 function formatIngredientLine(item: FixedRecipeIngredientItem): string {
