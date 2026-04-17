@@ -203,75 +203,6 @@ function defaultYieldFromRecipe(recipe: FixedRecipeJson): RecipeYieldV2 {
   };
 }
 
-const StepIngredientsList = ({ 
-  ingredients, 
-  stepText, 
-  allIngredients 
-}: { 
-  ingredients?: FixedRecipeStepIngredientRef[];
-  stepText?: string;
-  allIngredients?: any[];
-}) => {
-  let resolvedIngredients = (ingredients || []).slice();
-
-  if (resolvedIngredients.length === 0 && stepText && allIngredients) {
-    const textLower = stepText.toLowerCase();
-    const removeAccents = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const normalizedText = removeAccents(textLower);
-
-    for (const group of allIngredients) {
-      if (!group.items) continue;
-      for (const item of group.items) {
-        const itemName = removeAccents(item.name.toLowerCase());
-        const canonicalName = removeAccents((item.canonicalName || '').toLowerCase());
-        
-        // Improved match logic: check full name, or significant individual words 
-        // to handle "clavo" matching "clavos de olor"
-        const isMatch = (name: string) => {
-          if (!name || name.length < 3) return false;
-          // Direct inclusion
-          if (normalizedText.includes(name)) return true;
-          // Plural/singular simple check (clavo vs clavos)
-          if (name.endsWith('s') && normalizedText.includes(name.slice(0, -1))) return true;
-          if (!name.endsWith('s') && normalizedText.includes(name + 's')) return true;
-          // Check words
-          const words = name.split(/\s+/).filter(w => w.length > 3);
-          return words.some(w => normalizedText.includes(w) || (w.endsWith('s') && normalizedText.includes(w.slice(0, -1))));
-        };
-
-        const matched = isMatch(itemName) || isMatch(canonicalName);
-
-        if (matched) {
-          // Identify which name actually matched for the regex check
-          const activeName = (itemName && normalizedText.includes(itemName.split(/\s+/)[0])) ? itemName.split(/\s+/)[0] : canonicalName.split(/\s+/)[0];
-          
-          const explicitQuantityRegex = new RegExp(`(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*(?:taza|cda|cucharada|cdta|cucharadita|g|gr|gramo|kg|kilo|ml|litro|l|pizca|chorrito|tallo|diente|rama|paquete|lata)\\w*\\s*(?:de\\s+)?${activeName}`, 'i');
-          const explicitNumberRegex = new RegExp(`(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*${activeName}`, 'i');
-
-          if (!explicitQuantityRegex.test(normalizedText) && !explicitNumberRegex.test(normalizedText)) {
-            if (!resolvedIngredients.some(ri => ri.name === item.name || ri.canonicalName === item.canonicalName)) {
-              resolvedIngredients.push(item);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (resolvedIngredients.length === 0) return null;
-  return (
-    <div className="mt-3.5 mb-1 flex flex-wrap gap-2.5">
-      {resolvedIngredients.map((ing, i) => (
-        <span key={`${ing.canonicalName || ing.name}-${i}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#f8f6f3] px-3 py-1.5 text-[14px] font-medium border border-[#e6e0d8] text-[#5f5245]">
-          <span className="font-bold text-[#23180f]">{ing.displayAmount ?? ing.amount}</span>
-          {ing.displayUnit || ing.unit ? <span className="font-semibold text-[#8c7a6b]">{ing.displayUnit ?? ing.unit}</span> : null}
-          <span className="text-[#5f5245]">{ing.name}</span>
-        </span>
-      ))}
-    </div>
-  );
-};
-
 function createPlannedEntryId(): string {
   return `plan-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -321,6 +252,94 @@ function formatIngredientLine(item: FixedRecipeIngredientItem): string {
   const notesText = item.notes ? ` (${item.notes})` : '';
   return `${amountText} ${unitText} ${item.name}${prepText}${notesText}`.replace(/\s+/g, ' ').trim();
 }
+
+// Verbs that signal the step is NOT adding an ingredient — skip auto-match
+const NON_ADD_VERBS = /\b(retirar|reservar|sacar|escurrir|voltear|apartar|botar|desechar|verter en otro|pasar a)\b/i;
+
+function friendlyIngredientUnit(amount: number | string, unit: string) {
+  const unitLower = (unit || '').toLowerCase().trim();
+  const raw = typeof amount === 'number' ? amount : parseFloat(String(amount));
+  if ((unitLower === 'ml' || unitLower === 'mililitro' || unitLower === 'mililitros') && !isNaN(raw)) {
+    if (raw <= 5)   return { amt: formatDecimalToFraction(raw / 5),   unit: 'cdta' };
+    if (raw <= 60)  return { amt: formatDecimalToFraction(raw / 15),  unit: 'cda' };
+    if (raw <= 500) return { amt: formatDecimalToFraction(raw / 240), unit: 'taza' };
+  }
+  return { amt: formatDecimalToFraction(amount), unit };
+}
+
+const StepIngredientsList = ({
+  ingredients,
+  stepText,
+  allIngredients,
+}: {
+  ingredients?: FixedRecipeStepIngredientRef[];
+  stepText?: string;
+  allIngredients?: any[];
+}) => {
+  let resolved = (ingredients || []).slice();
+
+  // Auto-match only on addition-type steps
+  if (resolved.length === 0 && stepText && allIngredients && !NON_ADD_VERBS.test(stepText)) {
+    const removeAccents = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normText = removeAccents(stepText.toLowerCase());
+
+    for (const group of allIngredients) {
+      if (!group.items) continue;
+      for (const item of group.items) {
+        const iName = removeAccents(item.name.toLowerCase());
+        const cName = removeAccents((item.canonicalName || '').toLowerCase());
+
+        const hits = (name: string) => {
+          if (!name || name.length < 3) return false;
+          if (normText.includes(name)) return true;
+          if (name.endsWith('s') && normText.includes(name.slice(0, -1))) return true;
+          if (!name.endsWith('s') && normText.includes(name + 's')) return true;
+          return name.split(/\s+/).filter(w => w.length > 3).some(
+            w => normText.includes(w) || (w.endsWith('s') && normText.includes(w.slice(0, -1)))
+          );
+        };
+
+        if (hits(iName) || hits(cName)) {
+          const key = (iName && normText.includes(iName.split(/\s+/)[0]))
+            ? iName.split(/\s+/)[0]
+            : cName.split(/\s+/)[0];
+
+          const qtyRgx = new RegExp(
+            `(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*(?:taza|cda|cucharada|cdta|cucharadita|g|gr|gramo|kg|kilo|ml|litro|l|pizca|chorrito|tallo|diente|rama|paquete|lata)\\w*\\s*(?:de\\s+)?${key}`, 'i'
+          );
+          const numRgx = new RegExp(`(?:\\d+(?:\\.\\d+)?(?:\\s*\\/\\s*\\d+)?)\\s*${key}`, 'i');
+
+          if (!qtyRgx.test(normText) && !numRgx.test(normText)) {
+            if (!resolved.some(r => r.name === item.name || r.canonicalName === item.canonicalName)) {
+              resolved.push(item);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (resolved.length === 0) return null;
+
+  return (
+    <div className="mt-3.5 mb-1 flex flex-wrap gap-2.5">
+      {resolved.map((ing, i) => {
+        const { amt, unit } = friendlyIngredientUnit(ing.displayAmount ?? ing.amount, ing.displayUnit ?? ing.unit ?? '');
+        const prep = ing.preparation ? `, ${ing.preparation}` : '';
+        return (
+          <span
+            key={`${ing.canonicalName || ing.name}-${i}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#f8f6f3] px-3 py-1.5 text-[14px] font-medium border border-[#e6e0d8] text-[#5f5245]"
+          >
+            <span className="font-bold text-[#23180f]">{amt}</span>
+            {unit ? <span className="font-semibold text-[#8c7a6b]">{unit}</span> : null}
+            <span className="text-[#5f5245]">{ing.name}{prep}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+};
 
 function ContainerChip({ container }: { container?: string }) {
   if (!container) return null;
